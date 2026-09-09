@@ -6,15 +6,14 @@ import { HeroRoutineSystem } from "./HeroRoutineSystem";
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
   private readonly routineSystem = new HeroRoutineSystem();
+  private readonly usedNames = new Set<string>();
 
   constructor(private readonly generator = new HeroGenerator()) {}
 
   generateInitialRoster(count: number): readonly Hero[] {
     while (this.heroes.size < count) {
-      const hero = this.generator.generate(createInitialMovement(this.heroes.size));
-      if ([...this.heroes.values()].some((existingHero) => existingHero.name === hero.name)) {
-        continue;
-      }
+      const hero = this.generator.generate(createInitialMovement(this.heroes.size), this.usedNames);
+      this.usedNames.add(hero.name);
       this.heroes.set(hero.id, hero);
     }
     return this.getAll();

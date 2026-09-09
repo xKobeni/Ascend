@@ -118,10 +118,10 @@ export class HeroRoutineSystem {
       return { x: 0, z: 0 };
     }
     if (activity === "Training") {
-      return { x: 5.4, z: -4.5 };
+      return { x: 16.2, z: -13.5 };
     }
     if (activity === "Resting") {
-      return { x: -5.7, z: -4.4 };
+      return { x: -17.1, z: -13.2 };
     }
     return { x: 0, z: 0 };
   }

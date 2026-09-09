@@ -24,7 +24,7 @@ export class HeroGenerator {
     this.names = new NameGenerator(random);
   }
 
-  generate(initialMovement: HeroMovement): Hero {
+  generate(initialMovement: HeroMovement, usedNames?: ReadonlySet<string>): Hero {
     const occupation = this.random.pick(OCCUPATIONS);
     const attributes = this.generateAttributes(occupation);
     const skills = this.generateSkills(occupation);
@@ -40,7 +40,7 @@ export class HeroGenerator {
       level: 1,
       morale: 100,
       movement: initialMovement,
-      name: this.names.generate(),
+      name: this.names.generate(usedNames),
       personality,
       previousOccupation: occupation.name,
       rank: 1,

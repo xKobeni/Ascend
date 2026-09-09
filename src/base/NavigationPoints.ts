@@ -28,24 +28,24 @@ const createRing = (
   });
 
 export const INITIAL_HERO_SPAWN_POINTS: readonly NavigationPoint[] = [
-  { id: "arrival-1", label: "Arrival Area", x: -2.8, z: -2.1 },
-  { id: "arrival-2", label: "Arrival Area", x: 0, z: -3.15 },
-  { id: "arrival-3", label: "Arrival Area", x: 2.8, z: -2.05 },
-  { id: "arrival-4", label: "Arrival Area", x: -2.7, z: 2.25 },
-  { id: "arrival-5", label: "Arrival Area", x: 2.65, z: 2.35 },
+  { id: "arrival-1", label: "Arrival Area", x: -8.4, z: -6.3 },
+  { id: "arrival-2", label: "Arrival Area", x: 0, z: -9.45 },
+  { id: "arrival-3", label: "Arrival Area", x: 8.4, z: -6.15 },
+  { id: "arrival-4", label: "Arrival Area", x: -8.1, z: 6.75 },
+  { id: "arrival-5", label: "Arrival Area", x: 7.95, z: 7.05 },
 ] as const;
 
 export const NAVIGATION_POINTS: Readonly<Record<ScheduledActivity, readonly NavigationPoint[]>> = {
-  Eating: createRing("campfire-seat", "Campfire", 0, 0, 1.7),
-  Resting: createRing("dorm-bed", "Dormitory", -5.7, -4.4, 1.55),
-  Socializing: createRing("social-spot", "Campfire Commons", 0, 0, 2.65),
-  Training: createRing("training-spot", "Training Area", 5.4, -4.5, 1.7),
+  Eating: createRing("campfire-seat", "Campfire", 0, 0, 5.1),
+  Resting: createRing("dorm-bed", "Dormitory", -17.1, -13.2, 4.65),
+  Socializing: createRing("social-spot", "Campfire Commons", 0, 0, 7.95),
+  Training: createRing("training-spot", "Training Area", 16.2, -13.5, 5.1),
 };
 
 export const IDLE_NAVIGATION_POINTS: readonly NavigationPoint[] = [
-  ...createRing("storage-work", "Storage", -5.4, 4.5, 1.65, 3),
-  { id: "idle-lookout-1", label: "Idle Area", x: -2.4, z: 5.8 },
-  { id: "idle-lookout-2", label: "Idle Area", x: 2.2, z: 5.7 },
+  ...createRing("storage-work", "Storage", -16.2, 13.5, 4.95, 3),
+  { id: "idle-lookout-1", label: "Idle Area", x: -7.2, z: 17.4 },
+  { id: "idle-lookout-2", label: "Idle Area", x: 6.6, z: 17.1 },
 ] as const;
 
 export function createInitialMovement(index: number): HeroMovement {

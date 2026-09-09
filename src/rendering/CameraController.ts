@@ -9,7 +9,7 @@ export interface CameraDiagnostics {
 
 export class CameraController {
   private readonly activeKeys = new Set<string>();
-  private distance = 19;
+  private distance = 57;
   private readonly elevation = THREE.MathUtils.degToRad(43);
   private readonly target = new THREE.Vector3(0, 0.35, 0);
   private yaw = THREE.MathUtils.degToRad(42);
@@ -46,8 +46,8 @@ export class CameraController {
       const movement = forward.multiplyScalar(forwardAmount).add(right.multiplyScalar(rightAmount));
       movement.normalize().multiplyScalar(deltaSeconds * 7.5);
       this.target.add(movement);
-      this.target.x = THREE.MathUtils.clamp(this.target.x, -8, 8);
-      this.target.z = THREE.MathUtils.clamp(this.target.z, -8, 8);
+      this.target.x = THREE.MathUtils.clamp(this.target.x, -24, 24);
+      this.target.z = THREE.MathUtils.clamp(this.target.z, -24, 24);
     }
 
     this.applyCameraTransform();
@@ -86,7 +86,7 @@ export class CameraController {
 
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.distance = THREE.MathUtils.clamp(this.distance + event.deltaY * 0.012, 10, 28);
+    this.distance = THREE.MathUtils.clamp(this.distance + event.deltaY * 0.036, 30, 84);
     this.applyCameraTransform();
   };
 

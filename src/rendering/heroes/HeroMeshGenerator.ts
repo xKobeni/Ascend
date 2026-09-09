@@ -3,8 +3,15 @@ import * as THREE from "three";
 import type { HairStyle, Hero } from "../../heroes/Hero";
 
 export interface HeroRig {
+  bootLeft: THREE.Mesh;
+  bootRight: THREE.Mesh;
+  handLeft: THREE.Mesh;
+  handRight: THREE.Mesh;
+  head: THREE.Mesh;
+  hair: THREE.Object3D[];
   leftArm: THREE.Mesh;
   leftLeg: THREE.Mesh;
+  nose: THREE.Mesh;
   rightArm: THREE.Mesh;
   rightLeg: THREE.Mesh;
   root: THREE.Group;
@@ -19,7 +26,7 @@ export class HeroMeshGenerator {
     const skin = new THREE.MeshStandardMaterial({ color: hero.appearance.skinTone, roughness: 0.82 });
     const clothing = new THREE.MeshStandardMaterial({ color: hero.appearance.clothingColor, roughness: 0.88 });
     const trousers = new THREE.MeshStandardMaterial({ color: "#2d3438", roughness: 0.95 });
-    const hair = new THREE.MeshStandardMaterial({ color: hero.appearance.hairColor, roughness: 0.92 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: hero.appearance.hairColor, roughness: 0.92 });
     const boots = new THREE.MeshStandardMaterial({ color: "#272422", roughness: 1 });
 
     const torso = new THREE.Mesh(
@@ -38,29 +45,34 @@ export class HeroMeshGenerator {
     nose.rotation.x = Math.PI / 2;
     group.add(nose);
 
-    this.addHair(group, hero.appearance.hairStyle, hair);
+    const hairPieces = this.addHair(group, hero.appearance.hairStyle, hairMat);
+
+    const bootLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.38), boots);
+    const bootRight = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.38), boots);
 
     const legs: THREE.Mesh[] = [];
-    for (const x of [-0.23, 0.23]) {
+    for (const [i, x] of [-0.23, 0.23].entries()) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.13, 0.82, 7), trousers);
       leg.position.set(x * hero.appearance.bodyWidth, 0.58, 0);
       group.add(leg);
       legs.push(leg);
 
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.38), boots);
+      const boot = i === 0 ? bootLeft : bootRight;
       boot.position.set(x * hero.appearance.bodyWidth, 0.13, 0.07);
       group.add(boot);
     }
 
+    const handLeft = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 6), skin);
+    const handRight = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 6), skin);
     const arms: THREE.Mesh[] = [];
-    for (const x of [-1, 1]) {
+    for (const [i, x] of [-1, 1].entries()) {
       const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.105, 0.88, 7), clothing);
       arm.position.set(x * (0.5 * hero.appearance.bodyWidth), 1.38, 0);
       arm.rotation.z = x * -0.09;
       group.add(arm);
       arms.push(arm);
 
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 6), skin);
+      const hand = i === 0 ? handLeft : handRight;
       hand.position.set(x * (0.54 * hero.appearance.bodyWidth), 0.93, 0);
       group.add(hand);
     }
@@ -77,12 +89,27 @@ export class HeroMeshGenerator {
     if (!leftLeg || !rightLeg || !leftArm || !rightArm) {
       throw new Error(`Hero rig for ${hero.name} is incomplete.`);
     }
-    return { leftArm, leftLeg, rightArm, rightLeg, root: group, torso };
+    return {
+      bootLeft,
+      bootRight,
+      handLeft,
+      handRight,
+      head,
+      hair: hairPieces,
+      leftArm,
+      leftLeg,
+      nose,
+      rightArm,
+      rightLeg,
+      root: group,
+      torso,
+    };
   }
 
-  private addHair(group: THREE.Group, style: HairStyle, material: THREE.Material): void {
+  private addHair(group: THREE.Group, style: HairStyle, material: THREE.Material): THREE.Object3D[] {
+    const pieces: THREE.Object3D[] = [];
     if (style === "bald") {
-      return;
+      return pieces;
     }
 
     const cap = new THREE.Mesh(
@@ -91,21 +118,26 @@ export class HeroMeshGenerator {
     );
     cap.position.y = 2.23;
     group.add(cap);
+    pieces.push(cap);
 
     if (style === "bun") {
       const bun = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), material);
       bun.position.set(0, 2.38, -0.25);
       group.add(bun);
+      pieces.push(bun);
     } else if (style === "mohawk") {
       const crest = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.25, 0.5), material);
       crest.position.set(0, 2.52, -0.02);
       crest.rotation.x = -0.12;
       group.add(crest);
+      pieces.push(crest);
     } else if (style === "swept") {
       const sweep = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.12, 0.3), material);
       sweep.position.set(0.13, 2.46, 0.01);
       sweep.rotation.z = -0.28;
       group.add(sweep);
+      pieces.push(sweep);
     }
+    return pieces;
   }
 }
