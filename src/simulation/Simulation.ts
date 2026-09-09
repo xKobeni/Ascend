@@ -39,6 +39,7 @@ export class Simulation {
     this.heroManager.step(
       deltaSeconds,
       deltaSeconds * GAME_MINUTES_PER_REAL_SECOND,
+      this.state.day,
       this.state.minuteOfDay,
     );
   }
@@ -53,5 +54,9 @@ export class Simulation {
 
   getHero(id: string): Readonly<Hero> | undefined {
     return this.heroManager.getById(id);
+  }
+
+  getSocialEvents() {
+    return this.heroManager.getSocialEvents();
   }
 }

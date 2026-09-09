@@ -2,11 +2,13 @@ import { createInitialMovement } from "../base/NavigationPoints";
 import type { Hero } from "./Hero";
 import { HeroGenerator } from "./HeroGenerator";
 import { NeedsSystem } from "./NeedsSystem";
+import { RelationshipSystem } from "./RelationshipSystem";
 import { HeroRoutineSystem } from "./HeroRoutineSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
   private readonly needsSystem = new NeedsSystem();
+  private readonly relationshipSystem = new RelationshipSystem();
   private readonly routineSystem = new HeroRoutineSystem();
   private readonly usedNames = new Set<string>();
 
@@ -22,7 +24,9 @@ export class HeroManager {
       this.usedNames.add(hero.name);
       this.heroes.set(hero.id, hero);
     }
-    return this.getAll();
+    const heroes = this.getAll();
+    this.relationshipSystem.initialize(heroes);
+    return heroes;
   }
 
   getAll(): readonly Hero[] {
@@ -33,10 +37,20 @@ export class HeroManager {
     return this.heroes.get(id);
   }
 
-  step(deltaSeconds: number, gameMinutes: number, minuteOfDay: number): void {
+  step(
+    deltaSeconds: number,
+    gameMinutes: number,
+    day: number,
+    minuteOfDay: number,
+  ): void {
     const heroes = [...this.heroes.values()];
     this.needsSystem.step(heroes, gameMinutes);
     this.routineSystem.step(heroes, deltaSeconds, minuteOfDay, this.needsSystem);
+    this.relationshipSystem.step(heroes, gameMinutes, day, minuteOfDay);
+  }
+
+  getSocialEvents() {
+    return this.relationshipSystem.getEvents();
   }
 
   getDayPeriod(minuteOfDay: number) {

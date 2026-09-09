@@ -134,6 +134,89 @@ kbd {
   font: 11px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
+.hero-panel__relationships {
+  display: grid;
+  gap: 5px;
+}
+
+.hero-panel__relationships > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #aebbc0;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-panel__relationships > div > span:last-child {
+  color: #aab7ba;
+  white-space: nowrap;
+}
+
+.hero-panel__relationships [data-relationship="friend"] > span:last-child,
+.hero-panel__relationships [data-relationship="close-friend"] > span:last-child {
+  color: #82c7b2;
+}
+
+.hero-panel__relationships [data-relationship="dislike"] > span:last-child,
+.hero-panel__relationships [data-relationship="enemy"] > span:last-child {
+  color: #d98a78;
+}
+
+.social-log {
+  position: fixed;
+  inset: auto auto 64px 16px;
+  width: min(360px, calc(100% - 32px));
+  padding: 10px 12px;
+  border: 1px solid rgb(130 163 179 / 20%);
+  border-radius: 7px;
+  background: rgb(7 12 17 / 74%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  color: #aebbc0;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.social-log__title {
+  margin-bottom: 6px;
+  color: #dbe9eb;
+  font: 700 10px/1.3 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.social-log__empty {
+  color: #75868b;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.social-log ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.social-log li {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 7px;
+  font: 9px/1.35 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.social-log time {
+  color: #6faeba;
+  font-variant-numeric: tabular-nums;
+}
+
+.social-log li[data-event-type="argument"] span {
+  color: #d98a78;
+}
+
+.social-log li[data-event-type="help"] span {
+  color: #82c7b2;
+}
+
 .hero-panel__status {
   display: inline-block;
   margin-top: 7px;
@@ -276,6 +359,13 @@ kbd {
 
   .controls-hint span:nth-child(2) {
     display: none;
+  }
+
+  .social-log {
+    bottom: 62px;
+    width: calc(100% - 24px);
+    max-height: 104px;
+    overflow: hidden;
   }
 }
 

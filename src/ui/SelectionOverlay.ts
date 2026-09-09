@@ -6,6 +6,7 @@ import type {
   Personality,
 } from "../heroes/Hero";
 import type { SelectionDetails } from "../rendering/SelectionRaycaster";
+import { getRelationshipLabel } from "../heroes/RelationshipSystem";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
   ["strength", "Strength"],
@@ -86,6 +87,10 @@ export class SelectionOverlay {
           <span class="hero-panel__heading">Personality</span>
           <div class="hero-panel__meters" data-hero="personality"></div>
         </section>
+        <section>
+          <span class="hero-panel__heading">Relationships</span>
+          <div class="hero-panel__relationships" data-hero="relationships"></div>
+        </section>
         <div class="hero-panel__potential">Potential · Undiscovered</div>
       </div>
     `;
@@ -96,7 +101,11 @@ export class SelectionOverlay {
     container.appendChild(this.element);
   }
 
-  setSelection(selection: SelectionDetails | null, hero?: Readonly<Hero>): void {
+  setSelection(
+    selection: SelectionDetails | null,
+    hero?: Readonly<Hero>,
+    heroes: readonly Readonly<Hero>[] = [],
+  ): void {
     this.element.hidden = selection === null;
     if (!selection) {
       return;
@@ -107,7 +116,7 @@ export class SelectionOverlay {
     this.detail.hidden = !selection.detail;
     this.heroContent.hidden = !hero;
     if (hero) {
-      this.renderHero(hero);
+      this.renderHero(hero, heroes);
     }
   }
 
@@ -115,7 +124,7 @@ export class SelectionOverlay {
     this.element.remove();
   }
 
-  updateHeroRuntime(hero: Readonly<Hero>): void {
+  updateHeroRuntime(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
     const status = this.requireHeroElement("status");
     status.textContent =
       hero.movement.activity === "Walking" && hero.movement.destinationLabel
@@ -129,12 +138,13 @@ export class SelectionOverlay {
     decision.hidden = false;
     decision.dataset.source = hero.movement.decisionSource.toLowerCase();
     this.renderNeeds(hero);
+    this.renderRelationships(hero, heroes);
   }
 
-  private renderHero(hero: Readonly<Hero>): void {
+  private renderHero(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
     const identity = this.requireHeroElement("identity");
     identity.textContent = `${hero.previousOccupation} · Age ${hero.age}`;
-    this.updateHeroRuntime(hero);
+    this.updateHeroRuntime(hero, heroes);
 
     const traits = this.requireHeroElement("traits");
     traits.replaceChildren(
@@ -161,6 +171,29 @@ export class SelectionOverlay {
         }
         return row;
       }),
+    );
+  }
+
+  private renderRelationships(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
+    const relationships = this.requireHeroElement("relationships");
+    relationships.replaceChildren(
+      ...heroes
+        .filter((other) => other.id !== hero.id)
+        .sort(
+          (left, right) =>
+            (hero.relationships[right.id] ?? 0) - (hero.relationships[left.id] ?? 0),
+        )
+        .map((other) => {
+          const value = Math.round(hero.relationships[other.id] ?? 0);
+          const row = document.createElement("div");
+          const name = document.createElement("span");
+          const relationship = document.createElement("span");
+          name.textContent = other.name;
+          relationship.textContent = `${getRelationshipLabel(value)} · ${value > 0 ? "+" : ""}${value}`;
+          row.dataset.relationship = getRelationshipLabel(value).toLowerCase().replace(" ", "-");
+          row.append(name, relationship);
+          return row;
+        }),
     );
   }
 

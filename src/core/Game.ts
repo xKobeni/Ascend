@@ -2,6 +2,7 @@ import { Simulation } from "../simulation/Simulation";
 import { DebugOverlay } from "../ui/DebugOverlay";
 import { ControlsHint } from "../ui/ControlsHint";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
+import { SocialLogOverlay } from "../ui/SocialLogOverlay";
 import { EventBus } from "./EventBus";
 import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
@@ -18,6 +19,7 @@ export class Game {
   private selectedHeroId: string | null = null;
   private readonly selectionOverlay: SelectionOverlay;
   private readonly simulation = new Simulation();
+  private readonly socialLogOverlay: SocialLogOverlay;
   private readonly unsubscribeEvents: Array<() => void> = [];
 
   constructor(private readonly container: HTMLElement) {
@@ -25,6 +27,7 @@ export class Game {
     this.debugOverlay = new DebugOverlay(container);
     this.controlsHint = new ControlsHint(container);
     this.selectionOverlay = new SelectionOverlay(container);
+    this.socialLogOverlay = new SocialLogOverlay(container);
 
     this.unsubscribeEvents.push(
       this.events.on("contextLost", () => this.debugOverlay.setRendererStatus("lost")),
@@ -32,7 +35,7 @@ export class Game {
       this.events.on("selectionChanged", (selection) => {
         this.selectedHeroId = selection?.category === "hero" ? selection.id : null;
         const hero = selection?.category === "hero" ? this.simulation.getHero(selection.id) : undefined;
-        this.selectionOverlay.setSelection(selection, hero);
+        this.selectionOverlay.setSelection(selection, hero, this.simulation.getHeroes());
       }),
     );
   }
@@ -58,6 +61,7 @@ export class Game {
     this.controlsHint.dispose();
     this.debugOverlay.dispose();
     this.selectionOverlay.dispose();
+    this.socialLogOverlay.dispose();
     this.renderer.dispose();
     this.container.replaceChildren();
   }
@@ -70,10 +74,11 @@ export class Game {
       this.simulation.getSnapshot(),
       this.renderer.getCameraDiagnostics(),
     );
+    this.socialLogOverlay.update(this.simulation.getSocialEvents());
     if (this.selectedHeroId) {
       const selectedHero = this.simulation.getHero(this.selectedHeroId);
       if (selectedHero) {
-        this.selectionOverlay.updateHeroRuntime(selectedHero);
+        this.selectionOverlay.updateHeroRuntime(selectedHero, this.simulation.getHeroes());
       }
     }
     this.animationFrameId = requestAnimationFrame(this.frame);
