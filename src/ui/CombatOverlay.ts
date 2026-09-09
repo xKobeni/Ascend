@@ -93,7 +93,7 @@ export class CombatOverlay {
 
   private renderSetup(ready: boolean): string {
     return `
-      <p>${ready ? "Squad ready for an isolated 3v3 test." : "Form a complete three-hero squad before entering the arena."}</p>
+      <p>${ready ? "Squad ready. Formation and assigned roles will shape movement, protection, healing, and target priority." : "Form a complete three-hero squad before entering the arena."}</p>
       <button class="combat-overlay__primary" type="button" data-combat-action="start"${ready ? "" : " disabled"}>START 3V3 TEST</button>
     `;
   }
@@ -125,7 +125,7 @@ export class CombatOverlay {
       <button class="combat-overlay__combatant" type="button" data-team="${combatant.team.toLowerCase()}" data-action="${combatant.action.toLowerCase()}"${combatant.team === "Hero" ? ` data-combat-hero="${combatant.id}" aria-pressed="${selected}"` : " disabled"}>
         <span class="combat-overlay__combatant-row"><strong>${combatant.label}</strong><span>${combatant.action}</span></span>
         <span class="combat-overlay__health"><i style="--health:${health}%"></i></span>
-        <small>${Math.ceil(combatant.hp)} / ${Math.round(combatant.stats.maxHp)} HP · ATK ${Math.round(combatant.stats.attack)} · DEF ${Math.round(combatant.stats.defense)}</small>
+        <small>${combatant.team === "Hero" ? `${combatant.formation.toUpperCase()} · ${combatant.tacticalRole.toUpperCase()} · ` : ""}${Math.ceil(combatant.hp)} / ${Math.round(combatant.stats.maxHp)} HP · ATK ${Math.round(combatant.stats.attack)} · DEF ${Math.round(combatant.stats.defense)}</small>
       </button>
     `;
   }

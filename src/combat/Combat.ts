@@ -11,6 +11,7 @@ export type CombatAction =
 export type UtilityAction = "Attack" | "Defend" | "Heal" | "Protect" | "Reposition" | "Retreat";
 export type CombatResult = "Defeat" | "Idle" | "Running" | "Victory" | "Withdrawn";
 export type CombatTeam = "Enemy" | "Hero";
+export type TacticalRole = "Defender" | "Medic" | "Ranged" | "Skirmisher" | "Striker";
 
 export interface CombatStats {
   attack: number;
@@ -37,12 +38,14 @@ export interface CombatantSnapshot {
   actionScores: readonly Readonly<ActionScoreSnapshot>[];
   decisionReason: string;
   defending: boolean;
+  formation: FormationPosition;
   hp: number;
   id: string;
   label: string;
   position: CombatPosition;
   role: string;
   stats: CombatStats;
+  tacticalRole: TacticalRole;
   team: CombatTeam;
 }
 
@@ -59,3 +62,4 @@ export interface CombatSnapshot {
   result: CombatResult;
   tick: number;
 }
+import type { FormationPosition } from "../squads/Squad";

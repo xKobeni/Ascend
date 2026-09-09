@@ -4,15 +4,20 @@ import type {
   CombatAction,
   CombatPosition,
   CombatStats,
+  TacticalRole,
   UtilityAction,
 } from "./Combat";
+import type { FormationPosition } from "../squads/Squad";
+import { getPreferredRange } from "./FormationSystem";
 
 export interface UtilityTarget {
   action: CombatAction;
+  formation: FormationPosition;
   hp: number;
   id: string;
   position: Readonly<CombatPosition>;
   stats: Readonly<CombatStats>;
+  tacticalRole: TacticalRole;
 }
 
 export interface UtilityActor extends UtilityTarget {
@@ -46,19 +51,25 @@ export function scoreCombatActions(
 ): UtilityDecision {
   const livingAllies = allies.filter((ally) => ally.hp > 0 && ally.action !== "Retreat");
   const livingOpponents = opponents.filter((opponent) => opponent.hp > 0 && opponent.action !== "Retreat");
-  const nearestEnemy = nearest(actor.position, livingOpponents);
+  const preferredEnemy = selectTacticalTarget(actor, livingOpponents, livingAllies);
   const vulnerableAlly = [...livingAllies]
     .filter((ally) => ally.id !== actor.id)
-    .sort((left, right) => allyDanger(right, livingOpponents) - allyDanger(left, livingOpponents))[0] ?? null;
+    .sort(
+      (left, right) =>
+        allyDanger(right, livingOpponents) + formationRisk(right.formation) -
+        allyDanger(left, livingOpponents) - formationRisk(left.formation),
+    )[0] ?? null;
   const woundedAlly = [...livingAllies]
     .filter((ally) => ally.hp / ally.stats.maxHp < 0.92)
     .sort((left, right) => left.hp / left.stats.maxHp - right.hp / right.stats.maxHp)[0] ?? null;
 
   const health = ratio(actor.hp, actor.stats.maxHp);
   const missingHealth = 1 - health;
-  const enemyDistance = nearestEnemy ? distance(actor.position, nearestEnemy.position) : Number.POSITIVE_INFINITY;
-  const proximity = nearestEnemy ? clamp01(1 - enemyDistance / 12) : 0;
-  const threat = nearestEnemy ? clamp01(nearestEnemy.stats.attack / Math.max(1, actor.stats.defense * 3.2)) : 0;
+  const enemyDistance = preferredEnemy ? distance(actor.position, preferredEnemy.position) : Number.POSITIVE_INFINITY;
+  const proximity = preferredEnemy ? clamp01(1 - enemyDistance / 12) : 0;
+  const threat = preferredEnemy ? clamp01(preferredEnemy.stats.attack / Math.max(1, actor.stats.defense * 3.2)) : 0;
+  const preferredRange = getPreferredRange(actor.tacticalRole);
+  const rangeError = Math.abs(enemyDistance - preferredRange);
   const bravery = actor.personality.bravery;
   const aggression = actor.personality.aggression;
   const discipline = actor.personality.discipline;
@@ -77,11 +88,12 @@ export function scoreCombatActions(
         [aggression * 24, "aggression"],
         [bravery * 18, "bravery"],
         [actor.role === "Damage" ? 22 : 0, "damage role"],
+        [actor.tacticalRole === "Ranged" ? 14 : 0, "ranged priority"],
         [proximity * 18, "close target"],
       ]),
       score: 24 + aggression * 24 + bravery * 18 + (actor.role === "Damage" ? 22 : 0) + proximity * 18 + (isReckless ? 9 : 0),
-      targetId: nearestEnemy?.id ?? null,
-      valid: Boolean(nearestEnemy && enemyDistance <= actor.stats.range),
+      targetId: preferredEnemy?.id ?? null,
+      valid: Boolean(preferredEnemy && enemyDistance <= actor.stats.range),
     },
     Defend: {
       reason: dominantReason([
@@ -89,10 +101,11 @@ export function scoreCombatActions(
         [threat * 24, "enemy threat"],
         [discipline * 18, "discipline"],
         [actor.role === "Vanguard" ? 12 : 0, "vanguard role"],
+        [actor.tacticalRole === "Defender" ? 18 : 0, "frontline duty"],
       ]),
-      score: 10 + missingHealth * 42 + threat * 24 + discipline * 18 + (actor.role === "Vanguard" ? 12 : 0),
+      score: 10 + missingHealth * 42 + threat * 24 + discipline * 18 + (actor.role === "Vanguard" ? 12 : 0) + (actor.tacticalRole === "Defender" ? 18 : 0),
       targetId: null,
-      valid: Boolean(nearestEnemy && enemyDistance <= actor.stats.range * 1.35),
+      valid: Boolean(preferredEnemy && enemyDistance <= actor.stats.range * 1.35),
     },
     Retreat: {
       reason: dominantReason([
@@ -104,7 +117,7 @@ export function scoreCombatActions(
       score: 2 + missingHealth * 72 + (1 - bravery) * 34 + threat * 16 + (isCowardly ? 16 : 0) - loyalty * 8,
       targetId: null,
       valid: Boolean(
-        nearestEnemy &&
+        preferredEnemy &&
         (health <= (isCowardly ? 0.82 : 0.68) || (threat >= 0.92 && health < 0.9)),
       ),
     },
@@ -115,31 +128,37 @@ export function scoreCombatActions(
         [empathy * 18, "empathy"],
         [loyalty * 16, "loyalty"],
         [isProtective ? 22 : 0, "protective trait"],
+        [actor.tacticalRole === "Defender" ? 28 : 0, "defender duty"],
       ]),
-      score: 4 + allyRisk * 44 + bond * 24 + empathy * 18 + loyalty * 16 + (isProtective ? 22 : 0) + (actor.role === "Vanguard" ? 12 : 0),
+      score: 4 + allyRisk * 44 + bond * 24 + empathy * 18 + loyalty * 16 + (isProtective ? 22 : 0) + (actor.tacticalRole === "Defender" ? 28 : 0),
       targetId: vulnerableAlly?.id ?? null,
-      valid: Boolean(vulnerableAlly && (allyRisk >= 0.3 || isProtective)),
+      valid: Boolean(
+        vulnerableAlly &&
+        (vulnerableAlly.formation !== "Front" || actor.tacticalRole === "Defender") &&
+        (allyRisk >= 0.3 || isProtective),
+      ),
     },
     Heal: {
       reason: dominantReason([
         [woundedRatio * 62, "wounded ally"],
         [actor.medicine * 5, "medicine skill"],
         [actor.role === "Support" ? 30 : 0, "support role"],
+        [actor.tacticalRole === "Medic" ? 28 : 0, "medic priority"],
         [empathy * 14, "empathy"],
       ]),
-      score: woundedRatio * 62 + actor.medicine * 5 + (actor.role === "Support" ? 30 : 0) + empathy * 14,
+      score: woundedRatio * 62 + actor.medicine * 5 + (actor.role === "Support" ? 30 : 0) + (actor.tacticalRole === "Medic" ? 28 : 0) + empathy * 14,
       targetId: woundedAlly?.id ?? null,
-      valid: Boolean(woundedAlly && actor.medicine > 0),
+      valid: Boolean(woundedAlly && actor.medicine > 0 && actor.tacticalRole === "Medic"),
     },
     Reposition: {
       reason: dominantReason([
-        [Math.min(enemyDistance, 12) * 4.6, "target distance"],
+        [Math.min(rangeError, 12) * 6, "formation spacing"],
         [actor.personality.discipline * 14, "discipline"],
         [actor.stats.speed * 5, "mobility"],
       ]),
-      score: 34 + Math.min(enemyDistance, 12) * 4.6 + actor.personality.discipline * 14 + actor.stats.speed * 5,
-      targetId: nearestEnemy?.id ?? null,
-      valid: Boolean(nearestEnemy && enemyDistance > actor.stats.range * 0.9),
+      score: 30 + Math.min(rangeError, 12) * 6 + actor.personality.discipline * 14 + actor.stats.speed * 5,
+      targetId: preferredEnemy?.id ?? null,
+      valid: Boolean(preferredEnemy && rangeError > 0.65),
     },
   };
 
@@ -159,6 +178,33 @@ export function scoreCombatActions(
     scores,
     targetId: raw[action].targetId,
   };
+}
+
+function selectTacticalTarget<T extends UtilityTarget>(
+  actor: Readonly<UtilityActor>,
+  opponents: readonly Readonly<T>[],
+  allies: readonly Readonly<UtilityTarget>[],
+): Readonly<T> | null {
+  if (actor.tacticalRole === "Defender") {
+    const backline = allies
+      .filter((ally) => ally.id !== actor.id && ally.formation === "Back")
+      .sort((left, right) => ratio(left.hp, left.stats.maxHp) - ratio(right.hp, right.stats.maxHp))[0];
+    if (backline) {
+      return nearest(backline.position, opponents);
+    }
+  }
+  if (actor.tacticalRole === "Ranged" || actor.tacticalRole === "Striker") {
+    return [...opponents].sort(
+      (left, right) =>
+        ratio(left.hp, left.stats.maxHp) - ratio(right.hp, right.stats.maxHp) ||
+        distance(actor.position, left.position) - distance(actor.position, right.position),
+    )[0] ?? null;
+  }
+  return nearest(actor.position, opponents);
+}
+
+function formationRisk(formation: FormationPosition): number {
+  return formation === "Back" ? 0.12 : formation === "Middle" ? 0.05 : 0;
 }
 
 function allyDanger(ally: Readonly<UtilityTarget>, opponents: readonly Readonly<UtilityTarget>[]): number {

@@ -10,6 +10,12 @@ import type {
   CombatStats,
 } from "./Combat";
 import { scoreCombatActions } from "./UtilityAI";
+import {
+  applyFormationStats,
+  getFormationStart,
+  getPreferredRange,
+  getTacticalRole,
+} from "./FormationSystem";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
@@ -56,23 +62,26 @@ export class CombatSimulation {
         return;
       }
       const lane = (index - 1) * 4.2;
-      const formationX = entry.member.formation === "Front" ? -5.5 : entry.member.formation === "Middle" ? -8 : -10.5;
+      const tacticalRole = getTacticalRole(entry.member.role, entry.member.formation);
+      const stats = applyFormationStats(this.getHeroStats(entry.hero, entry.member.role), tacticalRole);
       this.combatants.push({
         action: "Idle",
         actionScores: [],
         attackCooldown: index * 0.12,
         decisionReason: "Awaiting first evaluation",
         defending: false,
-        hp: this.getHeroStats(entry.hero, entry.member.role).maxHp,
+        formation: entry.member.formation,
+        hp: stats.maxHp,
         id: entry.hero.id,
         label: entry.hero.name,
         medicine: entry.hero.skills.medicine,
         personality: entry.hero.personality,
-        position: { x: formationX, z: lane },
+        position: getFormationStart(entry.member.formation, lane),
         retreatLogged: false,
         relationships: entry.hero.relationships,
         role: entry.member.role,
-        stats: this.getHeroStats(entry.hero, entry.member.role),
+        stats,
+        tacticalRole,
         team: "Hero",
         traits: entry.hero.traits,
       });
@@ -93,6 +102,7 @@ export class CombatSimulation {
         attackCooldown: 0.2 + index * 0.12,
         decisionReason: "Simple enemy behavior",
         defending: false,
+        formation: "Front",
         hp: stats.maxHp,
         id: `rift-stalker-${index + 1}`,
         label,
@@ -110,11 +120,17 @@ export class CombatSimulation {
         relationships: {},
         role: "Skirmisher",
         stats,
+        tacticalRole: "Skirmisher",
         team: "Enemy",
         traits: [],
       });
     });
     this.result = "Running";
+    const formationSummary = this.combatants
+      .filter((combatant) => combatant.team === "Hero")
+      .map((combatant) => `${combatant.formation} ${combatant.tacticalRole}`)
+      .join(" · ");
+    this.addLog(`Formation locked · ${formationSummary}.`, "neutral");
     this.addLog("Sandbox engagement started · 3 heroes versus 3 Rift Stalkers.", "neutral");
     return true;
   }
@@ -216,8 +232,12 @@ export class CombatSimulation {
       }
       return;
     }
-    if ((plan.action === "Move" || plan.action === "Reposition") && target) {
+    if (plan.action === "Move" && target) {
       this.moveToward(actor, target.position);
+      return;
+    }
+    if (plan.action === "Reposition" && target) {
+      this.moveToPreferredRange(actor, target.position);
       return;
     }
     if (plan.action === "Protect" && target && target.hp > 0) {
@@ -227,7 +247,8 @@ export class CombatSimulation {
       return;
     }
     if (plan.action === "Heal" && target && target.hp > 0) {
-      if (this.getDistance(actor.position, target.position) > 2.5) {
+      const healRange = Math.max(2.5, actor.stats.range);
+      if (this.getDistance(actor.position, target.position) > healRange) {
         this.moveToward(actor, target.position);
         return;
       }
@@ -266,6 +287,23 @@ export class CombatSimulation {
     actor.position.z += (dz / distance) * distanceToMove;
   }
 
+  private moveToPreferredRange(actor: Combatant, target: Readonly<CombatPosition>): void {
+    const dx = target.x - actor.position.x;
+    const dz = target.z - actor.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= 0) {
+      return;
+    }
+    const preferredRange = getPreferredRange(actor.tacticalRole);
+    const direction = distance > preferredRange ? 1 : -1;
+    const distanceToMove = Math.min(actor.stats.speed * COMBAT_TICK_SECONDS, Math.abs(distance - preferredRange));
+    actor.position.x += (dx / distance) * distanceToMove * direction;
+    actor.position.z += (dz / distance) * distanceToMove * direction;
+    const maximumX = actor.tacticalRole === "Defender" ? 1.5 : 14;
+    actor.position.x = Math.min(maximumX, Math.max(-14, actor.position.x));
+    actor.position.z = Math.min(15, Math.max(-15, actor.position.z));
+  }
+
   private calculateDamage(attacker: Readonly<Combatant>, target: Readonly<Combatant>): number {
     const hasProtector = this.combatants.some(
       (candidate) =>
@@ -275,7 +313,19 @@ export class CombatSimulation {
         candidate.action === "Protect" &&
         this.getDistance(candidate.position, target.position) <= 2.4,
     );
-    const defenseMultiplier = (target.defending ? 1.65 : 1) + (hasProtector ? 0.45 : 0);
+    const hasFrontlineCover =
+      target.team === "Hero" &&
+      target.formation !== "Front" &&
+      this.combatants.some(
+        (candidate) =>
+          candidate.team === target.team &&
+          candidate.tacticalRole === "Defender" &&
+          candidate.hp > 0 &&
+          candidate.position.x > target.position.x &&
+          this.getDistance(candidate.position, target.position) <= 8,
+      );
+    const defenseMultiplier =
+      (target.defending ? 1.65 : 1) + (hasProtector ? 0.45 : 0) + (hasFrontlineCover ? 0.3 : 0);
     const effectiveDefense = target.stats.defense * defenseMultiplier;
     return Math.max(1, Math.round(attacker.stats.attack - effectiveDefense * 0.72));
   }
