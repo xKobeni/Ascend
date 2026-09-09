@@ -15,6 +15,7 @@ export class Game {
   private readonly debugOverlay: DebugOverlay;
   private readonly events = new EventBus<GameEvents>();
   private readonly renderer: Renderer;
+  private selectedHeroId: string | null = null;
   private readonly selectionOverlay: SelectionOverlay;
   private readonly simulation = new Simulation();
   private readonly unsubscribeEvents: Array<() => void> = [];
@@ -29,6 +30,7 @@ export class Game {
       this.events.on("contextLost", () => this.debugOverlay.setRendererStatus("lost")),
       this.events.on("contextRestored", () => this.debugOverlay.setRendererStatus("ready")),
       this.events.on("selectionChanged", (selection) => {
+        this.selectedHeroId = selection?.category === "hero" ? selection.id : null;
         const hero = selection?.category === "hero" ? this.simulation.getHero(selection.id) : undefined;
         this.selectionOverlay.setSelection(selection, hero);
       }),
@@ -68,6 +70,12 @@ export class Game {
       this.simulation.getSnapshot(),
       this.renderer.getCameraDiagnostics(),
     );
+    if (this.selectedHeroId) {
+      const selectedHero = this.simulation.getHero(this.selectedHeroId);
+      if (selectedHero) {
+        this.selectionOverlay.updateHeroRuntime(selectedHero);
+      }
+    }
     this.animationFrameId = requestAnimationFrame(this.frame);
   };
 

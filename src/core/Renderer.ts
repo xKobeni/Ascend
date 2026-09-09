@@ -29,7 +29,7 @@ export class Renderer {
     events: {
       emit<Key extends keyof RendererEvents>(event: Key, payload: RendererEvents[Key]): void;
     },
-    heroes: readonly Readonly<Hero>[],
+    private readonly heroes: readonly Readonly<Hero>[],
   ) {
     this.scene = new THREE.Scene();
 
@@ -72,6 +72,8 @@ export class Renderer {
   render(timestampSeconds: number, deltaSeconds: number): void {
     this.cameraController.update(deltaSeconds);
     this.baseScene.update(timestampSeconds);
+    this.heroRenderer.update(this.heroes, timestampSeconds, deltaSeconds);
+    this.selectionRaycaster.update();
     this.renderer.render(this.scene, this.camera);
   }
 

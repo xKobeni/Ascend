@@ -134,6 +134,23 @@ kbd {
   font: 11px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
+.hero-panel__status {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 3px 7px;
+  border: 1px solid rgb(114 194 207 / 28%);
+  border-radius: 4px;
+  background: rgb(70 122 131 / 18%);
+  color: #bcdde2;
+  font: 10px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-panel__status[data-activity="walking"] {
+  border-color: rgb(221 171 91 / 32%);
+  background: rgb(124 88 39 / 18%);
+  color: #e2c58f;
+}
+
 .hero-panel section {
   margin-top: 11px;
 }

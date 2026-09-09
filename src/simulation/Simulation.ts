@@ -1,17 +1,27 @@
 import type { Hero } from "../heroes/Hero";
 import { HeroManager } from "../heroes/HeroManager";
+import type { DayPeriod } from "../heroes/HeroRoutineSystem";
+
+const STARTING_MINUTE = 7 * 60;
+const GAME_MINUTES_PER_REAL_SECOND = 12;
 
 export interface SimulationSnapshot {
+  day: number;
   elapsedSeconds: number;
   heroCount: number;
+  minuteOfDay: number;
+  period: DayPeriod;
   tick: number;
 }
 
 export class Simulation {
   private readonly heroManager = new HeroManager();
   private readonly state: SimulationSnapshot = {
+    day: 1,
     elapsedSeconds: 0,
     heroCount: 5,
+    minuteOfDay: STARTING_MINUTE,
+    period: "Morning",
     tick: 0,
   };
 
@@ -22,6 +32,11 @@ export class Simulation {
   step(deltaSeconds: number): void {
     this.state.tick += 1;
     this.state.elapsedSeconds += deltaSeconds;
+    const totalGameMinutes = STARTING_MINUTE + this.state.elapsedSeconds * GAME_MINUTES_PER_REAL_SECOND;
+    this.state.day = Math.floor(totalGameMinutes / (24 * 60)) + 1;
+    this.state.minuteOfDay = totalGameMinutes % (24 * 60);
+    this.state.period = this.heroManager.getDayPeriod(this.state.minuteOfDay);
+    this.heroManager.step(deltaSeconds, this.state.minuteOfDay);
   }
 
   getSnapshot(): Readonly<SimulationSnapshot> {

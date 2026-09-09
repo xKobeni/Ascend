@@ -45,6 +45,7 @@ export class SelectionOverlay {
       <span class="selection-overlay__detail" data-selection="detail"></span>
       <div class="hero-panel" data-selection="hero" hidden>
         <div class="hero-panel__identity" data-hero="identity"></div>
+        <div class="hero-panel__status" data-hero="status"></div>
         <section>
           <span class="hero-panel__heading">Traits</span>
           <div class="hero-panel__traits" data-hero="traits"></div>
@@ -90,9 +91,19 @@ export class SelectionOverlay {
     this.element.remove();
   }
 
+  updateHeroRuntime(hero: Readonly<Hero>): void {
+    const status = this.requireHeroElement("status");
+    status.textContent =
+      hero.movement.activity === "Walking" && hero.movement.destinationLabel
+        ? `Walking → ${hero.movement.destinationLabel}`
+        : hero.movement.activity;
+    status.dataset.activity = hero.movement.activity.toLowerCase();
+  }
+
   private renderHero(hero: Readonly<Hero>): void {
     const identity = this.requireHeroElement("identity");
     identity.textContent = `${hero.previousOccupation} · Age ${hero.age}`;
+    this.updateHeroRuntime(hero);
 
     const traits = this.requireHeroElement("traits");
     traits.replaceChildren(

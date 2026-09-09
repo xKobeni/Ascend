@@ -2,8 +2,17 @@ import * as THREE from "three";
 
 import type { HairStyle, Hero } from "../../heroes/Hero";
 
+export interface HeroRig {
+  leftArm: THREE.Mesh;
+  leftLeg: THREE.Mesh;
+  rightArm: THREE.Mesh;
+  rightLeg: THREE.Mesh;
+  root: THREE.Group;
+  torso: THREE.Mesh;
+}
+
 export class HeroMeshGenerator {
-  create(hero: Readonly<Hero>): THREE.Group {
+  create(hero: Readonly<Hero>): HeroRig {
     const group = new THREE.Group();
     group.name = hero.name;
 
@@ -31,21 +40,25 @@ export class HeroMeshGenerator {
 
     this.addHair(group, hero.appearance.hairStyle, hair);
 
+    const legs: THREE.Mesh[] = [];
     for (const x of [-0.23, 0.23]) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.13, 0.82, 7), trousers);
       leg.position.set(x * hero.appearance.bodyWidth, 0.58, 0);
       group.add(leg);
+      legs.push(leg);
 
       const boot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.18, 0.38), boots);
       boot.position.set(x * hero.appearance.bodyWidth, 0.13, 0.07);
       group.add(boot);
     }
 
+    const arms: THREE.Mesh[] = [];
     for (const x of [-1, 1]) {
       const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.105, 0.88, 7), clothing);
       arm.position.set(x * (0.5 * hero.appearance.bodyWidth), 1.38, 0);
       arm.rotation.z = x * -0.09;
       group.add(arm);
+      arms.push(arm);
 
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 6), skin);
       hand.position.set(x * (0.54 * hero.appearance.bodyWidth), 0.93, 0);
@@ -59,7 +72,12 @@ export class HeroMeshGenerator {
         object.receiveShadow = true;
       }
     });
-    return group;
+    const [leftLeg, rightLeg] = legs;
+    const [leftArm, rightArm] = arms;
+    if (!leftLeg || !rightLeg || !leftArm || !rightArm) {
+      throw new Error(`Hero rig for ${hero.name} is incomplete.`);
+    }
+    return { leftArm, leftLeg, rightArm, rightLeg, root: group, torso };
   }
 
   private addHair(group: THREE.Group, style: HairStyle, material: THREE.Material): void {

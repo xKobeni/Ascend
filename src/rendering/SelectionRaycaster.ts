@@ -19,6 +19,7 @@ export class SelectionRaycaster {
   private readonly pointer = new THREE.Vector2();
   private pointerDownPosition: { x: number; y: number } | null = null;
   private readonly raycaster = new THREE.Raycaster();
+  private selectedRoot: THREE.Object3D | null = null;
 
   constructor(
     private readonly camera: THREE.Camera,
@@ -51,6 +52,14 @@ export class SelectionRaycaster {
     highlightMaterials.forEach((material) => material.dispose());
   }
 
+  update(): void {
+    if (!this.selectedRoot) {
+      return;
+    }
+    this.bounds.setFromObject(this.selectedRoot).expandByScalar(0.08);
+    this.highlight.box = this.bounds;
+  }
+
   private pick(clientX: number, clientY: number): THREE.Object3D | null {
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.set(
@@ -75,11 +84,13 @@ export class SelectionRaycaster {
   private select(clientX: number, clientY: number): void {
     const root = this.findSelectionRoot(this.pick(clientX, clientY));
     if (!root) {
+      this.selectedRoot = null;
       this.highlight.visible = false;
       this.onSelection(null);
       return;
     }
 
+    this.selectedRoot = root;
     this.bounds.setFromObject(root).expandByScalar(0.08);
     this.highlight.box = this.bounds;
     this.highlight.visible = true;

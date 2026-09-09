@@ -12,6 +12,7 @@ export class DebugOverlay {
   private readonly heroValue: HTMLElement;
   private readonly rendererValue: HTMLElement;
   private readonly cameraValue: HTMLElement;
+  private readonly routineValue: HTMLElement;
 
   constructor(container: HTMLElement) {
     this.element = document.createElement("aside");
@@ -19,10 +20,11 @@ export class DebugOverlay {
     this.element.dataset.renderStatus = "ready";
     this.element.setAttribute("aria-label", "Development diagnostics");
     this.element.innerHTML = `
-      <div class="debug-overlay__title">ASCENT // PHASE 3</div>
+      <div class="debug-overlay__title">ASCENT // PHASE 4</div>
       <div class="debug-overlay__row"><span>FPS</span><span class="debug-overlay__value" data-debug="fps">0</span></div>
       <div class="debug-overlay__row"><span>SIM TICK</span><span class="debug-overlay__value" data-debug="tick">0</span></div>
-      <div class="debug-overlay__row"><span>GAME TIME</span><span class="debug-overlay__value" data-debug="time">00:00</span></div>
+      <div class="debug-overlay__row"><span>WORLD TIME</span><span class="debug-overlay__value" data-debug="time">DAY 1 · 07:00</span></div>
+      <div class="debug-overlay__row"><span>ROUTINE</span><span class="debug-overlay__value" data-debug="routine">MORNING</span></div>
       <div class="debug-overlay__row"><span>HEROES</span><span class="debug-overlay__value" data-debug="heroes">0</span></div>
       <div class="debug-overlay__row"><span>CAMERA</span><span class="debug-overlay__value" data-debug="camera">0, 0</span></div>
       <div class="debug-overlay__row"><span>RENDERER</span><span class="debug-overlay__value" data-debug="renderer">READY</span></div>
@@ -34,6 +36,7 @@ export class DebugOverlay {
     this.heroValue = this.requireValue("heroes");
     this.cameraValue = this.requireValue("camera");
     this.rendererValue = this.requireValue("renderer");
+    this.routineValue = this.requireValue("routine");
     container.appendChild(this.element);
   }
 
@@ -52,7 +55,8 @@ export class DebugOverlay {
 
     this.fpsValue.textContent = String(this.framesPerSecond);
     this.tickValue.textContent = String(snapshot.tick);
-    this.timeValue.textContent = this.formatTime(snapshot.elapsedSeconds);
+    this.timeValue.textContent = this.formatTime(snapshot.day, snapshot.minuteOfDay);
+    this.routineValue.textContent = snapshot.period.toUpperCase();
     this.heroValue.textContent = String(snapshot.heroCount);
     this.cameraValue.textContent = `${camera.targetX.toFixed(1)}, ${camera.targetZ.toFixed(1)} · ${Math.round(camera.yawDegrees)}° · ${camera.distance.toFixed(0)}m`;
   }
@@ -66,11 +70,10 @@ export class DebugOverlay {
     this.element.remove();
   }
 
-  private formatTime(elapsedSeconds: number): string {
-    const totalSeconds = Math.floor(elapsedSeconds);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  private formatTime(day: number, minuteOfDay: number): string {
+    const hours = Math.floor(minuteOfDay / 60);
+    const minutes = Math.floor(minuteOfDay % 60);
+    return `DAY ${day} · ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   }
 
   private requireValue(name: string): HTMLElement {

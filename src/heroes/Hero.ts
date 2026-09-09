@@ -37,6 +37,26 @@ export interface Personality {
 
 export type HiddenPotential = Record<keyof HeroAttributes, number>;
 
+export type HeroActivity =
+  | "Eating"
+  | "Idle"
+  | "Resting"
+  | "Socializing"
+  | "Training"
+  | "Walking";
+
+export interface HeroMovement {
+  activity: HeroActivity;
+  destinationId: string | null;
+  destinationLabel: string | null;
+  facingRadians: number;
+  position: {
+    x: number;
+    z: number;
+  };
+  targetActivity: Exclude<HeroActivity, "Walking">;
+}
+
 export type PreviousOccupation =
   | "Farmer"
   | "Hunter"
@@ -55,6 +75,7 @@ export interface Hero {
   id: string;
   level: number;
   morale: number;
+  movement: HeroMovement;
   name: string;
   personality: Personality;
   previousOccupation: PreviousOccupation;

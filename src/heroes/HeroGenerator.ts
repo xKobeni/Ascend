@@ -4,6 +4,7 @@ import type {
   Hero,
   HeroAppearance,
   HeroAttributes,
+  HeroMovement,
   HeroSkills,
   HiddenPotential,
   Personality,
@@ -23,7 +24,7 @@ export class HeroGenerator {
     this.names = new NameGenerator(random);
   }
 
-  generate(): Hero {
+  generate(initialMovement: HeroMovement): Hero {
     const occupation = this.random.pick(OCCUPATIONS);
     const attributes = this.generateAttributes(occupation);
     const skills = this.generateSkills(occupation);
@@ -38,6 +39,7 @@ export class HeroGenerator {
       id: crypto.randomUUID(),
       level: 1,
       morale: 100,
+      movement: initialMovement,
       name: this.names.generate(),
       personality,
       previousOccupation: occupation.name,
