@@ -4,6 +4,7 @@ import type { DayPeriod } from "../heroes/HeroRoutineSystem";
 import type { TrainingType } from "../heroes/Hero";
 import type { FormationPosition, SquadRole } from "../squads/Squad";
 import { SquadSystem } from "../squads/SquadSystem";
+import { CombatSimulation } from "../combat/CombatSimulation";
 
 const STARTING_MINUTE = 7 * 60;
 const GAME_MINUTES_PER_REAL_SECOND = 12;
@@ -18,6 +19,7 @@ export interface SimulationSnapshot {
 }
 
 export class Simulation {
+  private readonly combatSimulation = new CombatSimulation();
   private readonly heroManager = new HeroManager();
   private readonly squadSystem = new SquadSystem();
   private readonly state: SimulationSnapshot = {
@@ -35,6 +37,10 @@ export class Simulation {
 
   step(deltaSeconds: number): void {
     this.state.tick += 1;
+    if (this.getCombatSnapshot().result !== "Idle") {
+      this.combatSimulation.step(deltaSeconds);
+      return;
+    }
     this.state.elapsedSeconds += deltaSeconds;
     const totalGameMinutes = STARTING_MINUTE + this.state.elapsedSeconds * GAME_MINUTES_PER_REAL_SECOND;
     this.state.day = Math.floor(totalGameMinutes / (24 * 60)) + 1;
@@ -94,5 +100,17 @@ export class Simulation {
 
   getSocialEvents() {
     return this.heroManager.getSocialEvents();
+  }
+
+  getCombatSnapshot() {
+    return this.combatSimulation.getSnapshot();
+  }
+
+  startCombatSandbox(): boolean {
+    return this.combatSimulation.start(this.getSquad(), this.getHeroes());
+  }
+
+  exitCombatSandbox(): void {
+    this.combatSimulation.stop();
   }
 }

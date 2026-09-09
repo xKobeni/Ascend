@@ -4,6 +4,7 @@ import { ControlsHint } from "../ui/ControlsHint";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
 import { SocialLogOverlay } from "../ui/SocialLogOverlay";
 import { SquadOverlay } from "../ui/SquadOverlay";
+import { CombatOverlay } from "../ui/CombatOverlay";
 import { EventBus } from "./EventBus";
 import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
@@ -13,6 +14,7 @@ type GameEvents = RendererEvents;
 export class Game {
   private animationFrameId: number | null = null;
   private readonly clock = new GameClock();
+  private readonly combatOverlay: CombatOverlay;
   private readonly controlsHint: ControlsHint;
   private readonly debugOverlay: DebugOverlay;
   private readonly events = new EventBus<GameEvents>();
@@ -53,6 +55,15 @@ export class Game {
         },
       },
     );
+    this.combatOverlay = new CombatOverlay(
+      container,
+      () => this.simulation.getCombatSnapshot(),
+      () => this.simulation.getSquadEvaluation().isComplete,
+      {
+        exit: () => this.simulation.exitCombatSandbox(),
+        start: () => this.simulation.startCombatSandbox(),
+      },
+    );
 
     this.unsubscribeEvents.push(
       this.events.on("contextLost", () => this.debugOverlay.setRendererStatus("lost")),
@@ -84,6 +95,7 @@ export class Game {
     this.unsubscribeEvents.forEach((unsubscribe) => unsubscribe());
     this.events.clear();
     this.controlsHint.dispose();
+    this.combatOverlay.dispose();
     this.debugOverlay.dispose();
     this.selectionOverlay.dispose();
     this.socialLogOverlay.dispose();
@@ -94,7 +106,10 @@ export class Game {
 
   private readonly frame = (timestampMs: number): void => {
     const clockFrame = this.clock.advance(timestampMs, (deltaSeconds) => this.simulation.step(deltaSeconds));
-    this.renderer.render(timestampMs / 1_000, clockFrame.frameDeltaSeconds);
+    const combatSnapshot = this.simulation.getCombatSnapshot();
+    const combatMode = combatSnapshot.result !== "Idle";
+    this.container.dataset.mode = combatMode ? "combat" : "refuge";
+    this.renderer.render(timestampMs / 1_000, clockFrame.frameDeltaSeconds, combatSnapshot);
     this.debugOverlay.update(
       timestampMs,
       this.simulation.getSnapshot(),
@@ -102,6 +117,7 @@ export class Game {
     );
     this.socialLogOverlay.update(this.simulation.getSocialEvents());
     this.squadOverlay.updateEvaluation();
+    this.combatOverlay.update();
     if (this.selectedHeroId) {
       const selectedHero = this.simulation.getHero(this.selectedHeroId);
       if (selectedHero) {

@@ -470,6 +470,199 @@ kbd {
   padding: 4px 7px;
 }
 
+.combat-overlay {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  z-index: 6;
+  color: #dce8e9;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.combat-overlay button {
+  border: 1px solid rgb(119 186 196 / 30%);
+  border-radius: 4px;
+  background: rgb(42 72 78 / 72%);
+  color: #cce0e3;
+  font: inherit;
+  cursor: pointer;
+}
+
+.combat-overlay button:hover:not(:disabled),
+.combat-overlay button:focus-visible {
+  border-color: rgb(128 208 219 / 60%);
+  outline: none;
+}
+
+.combat-overlay button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.combat-overlay__toggle {
+  display: block;
+  margin-left: auto;
+  padding: 7px 10px;
+  letter-spacing: 0.1em;
+  backdrop-filter: blur(8px);
+}
+
+.combat-overlay__toggle[data-active="true"] {
+  border-color: rgb(211 115 91 / 56%);
+  color: #e0a18f;
+}
+
+.combat-overlay__panel {
+  width: min(410px, calc(100vw - 32px));
+  max-height: calc(100vh - 78px);
+  margin-bottom: 7px;
+  overflow-y: auto;
+  padding: 11px;
+  border: 1px solid rgb(159 224 234 / 28%);
+  border-radius: 7px;
+  background: rgb(7 12 17 / 94%);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 40%);
+  backdrop-filter: blur(10px);
+}
+
+.combat-overlay__panel[hidden] {
+  display: none;
+}
+
+.combat-overlay__panel header,
+.combat-overlay__panel header > div,
+.combat-overlay__actions,
+.combat-overlay__panel article > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.combat-overlay__panel header {
+  color: #78c8d4;
+  letter-spacing: 0.1em;
+}
+
+.combat-overlay__panel header strong {
+  color: #d1b77f;
+}
+
+.combat-overlay__panel header > button {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+}
+
+.combat-overlay__panel p {
+  margin: 12px 0;
+  color: #91a3a8;
+}
+
+.combat-overlay__primary {
+  width: 100%;
+  padding: 8px;
+}
+
+.combat-overlay__teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.combat-overlay__teams > section > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #73878d;
+  letter-spacing: 0.1em;
+}
+
+.combat-overlay__panel article {
+  margin-top: 5px;
+  padding: 6px;
+  border: 1px solid rgb(126 164 170 / 15%);
+  border-radius: 4px;
+  background: rgb(62 83 88 / 10%);
+}
+
+.combat-overlay__panel article[data-action="dead"],
+.combat-overlay__panel article[data-action="retreat"] {
+  opacity: 0.52;
+}
+
+.combat-overlay__panel article span,
+.combat-overlay__panel article small {
+  color: #819398;
+}
+
+.combat-overlay__panel article small {
+  display: block;
+  margin-top: 4px;
+  font-size: 8px;
+}
+
+.combat-overlay__health {
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(118 139 143 / 20%);
+}
+
+.combat-overlay__health i {
+  display: block;
+  width: var(--health);
+  height: 100%;
+  background: #72b99f;
+}
+
+.combat-overlay__panel article[data-team="enemy"] .combat-overlay__health i {
+  background: #cb6f60;
+}
+
+.combat-overlay__log {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid rgb(126 164 170 / 14%);
+  list-style: none;
+}
+
+.combat-overlay__log li {
+  display: grid;
+  grid-template-columns: 35px 1fr;
+  gap: 5px;
+  color: #8ea0a5;
+}
+
+.combat-overlay__log b {
+  color: #657e84;
+}
+
+.combat-overlay__log li[data-tone="danger"] {
+  color: #d98a78;
+}
+
+.combat-overlay__log li[data-tone="success"] {
+  color: #82c7b2;
+}
+
+.combat-overlay__actions {
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.combat-overlay__actions button {
+  padding: 6px 8px;
+}
+
+#app[data-mode="combat"] .selection-overlay,
+#app[data-mode="combat"] .social-log,
+#app[data-mode="combat"] .squad-overlay {
+  display: none;
+}
+
 .hero-panel__status {
   display: inline-block;
   margin-top: 7px;
@@ -694,6 +887,20 @@ kbd {
   .squad-overlay__evaluation,
   .squad-overlay__roster {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .combat-overlay {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .combat-overlay__panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 68px);
+  }
+
+  .combat-overlay__teams {
+    grid-template-columns: 1fr;
   }
 }
 

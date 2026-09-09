@@ -5,6 +5,8 @@ import { ProceduralBaseScene } from "../rendering/ProceduralBaseScene";
 import { SelectionRaycaster, type SelectionDetails } from "../rendering/SelectionRaycaster";
 import { HeroRenderer } from "../rendering/heroes/HeroRenderer";
 import type { Hero } from "../heroes/Hero";
+import type { CombatSnapshot } from "../combat/Combat";
+import { CombatArenaScene } from "../rendering/combat/CombatArenaScene";
 
 export interface RendererEvents {
   contextLost: undefined;
@@ -16,6 +18,9 @@ export class Renderer {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly cameraController: CameraController;
   private readonly baseScene: ProceduralBaseScene;
+  private readonly combatArena: CombatArenaScene;
+  private readonly combatScene: THREE.Scene;
+  private combatMode = false;
   private readonly heroRenderer: HeroRenderer;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
@@ -32,6 +37,7 @@ export class Renderer {
     private readonly heroes: readonly Readonly<Hero>[],
   ) {
     this.scene = new THREE.Scene();
+    this.combatScene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 100);
 
@@ -45,6 +51,7 @@ export class Renderer {
     this.container.appendChild(this.renderer.domElement);
 
     this.baseScene = new ProceduralBaseScene(this.scene);
+    this.combatArena = new CombatArenaScene(this.combatScene);
     const selectableRoots = [...this.baseScene.selectableRoots];
     this.heroRenderer = new HeroRenderer(this.scene, heroes, selectableRoots);
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
@@ -69,8 +76,28 @@ export class Renderer {
     this.resize();
   }
 
-  render(timestampSeconds: number, deltaSeconds: number): void {
+  render(
+    timestampSeconds: number,
+    deltaSeconds: number,
+    combatSnapshot: Readonly<CombatSnapshot>,
+  ): void {
     this.cameraController.update(deltaSeconds);
+    const combatMode = combatSnapshot.result !== "Idle";
+    if (combatMode !== this.combatMode) {
+      this.combatMode = combatMode;
+      this.selectionRaycaster.setEnabled(!combatMode);
+      this.renderer.domElement.setAttribute(
+        "aria-label",
+        combatMode
+          ? "ASCENT combat sandbox. Use W A S D to pan, Q and E to rotate, and the mouse wheel to zoom."
+          : "ASCENT refuge. Use W A S D to pan, Q and E to rotate, and the mouse wheel to zoom.",
+      );
+    }
+    if (combatMode) {
+      this.combatArena.update(combatSnapshot, timestampSeconds, this.camera);
+      this.renderer.render(this.combatScene, this.camera);
+      return;
+    }
     this.baseScene.update(timestampSeconds);
     this.heroRenderer.update(this.heroes, timestampSeconds, deltaSeconds);
     this.selectionRaycaster.update();
@@ -89,6 +116,7 @@ export class Renderer {
     this.cameraController.dispose();
     this.heroRenderer.dispose();
     this.baseScene.dispose();
+    this.combatArena.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

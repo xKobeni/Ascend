@@ -20,6 +20,7 @@ export class SelectionRaycaster {
   private pointerDownPosition: { x: number; y: number } | null = null;
   private readonly raycaster = new THREE.Raycaster();
   private selectedRoot: THREE.Object3D | null = null;
+  private enabled = true;
 
   constructor(
     private readonly camera: THREE.Camera,
@@ -60,7 +61,24 @@ export class SelectionRaycaster {
     this.highlight.box = this.bounds;
   }
 
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) {
+      return;
+    }
+    this.enabled = enabled;
+    this.pointerDownPosition = null;
+    this.canvas.style.cursor = "default";
+    if (!enabled) {
+      this.selectedRoot = null;
+      this.highlight.visible = false;
+      this.onSelection(null);
+    }
+  }
+
   private pick(clientX: number, clientY: number): THREE.Object3D | null {
+    if (!this.enabled) {
+      return null;
+    }
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.set(
       ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -98,10 +116,16 @@ export class SelectionRaycaster {
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
+    if (!this.enabled) {
+      return;
+    }
     this.pointerDownPosition = { x: event.clientX, y: event.clientY };
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
+    if (!this.enabled) {
+      return;
+    }
     if (!this.pointerDownPosition) {
       return;
     }
