@@ -28,7 +28,10 @@ export class Game {
     this.unsubscribeEvents.push(
       this.events.on("contextLost", () => this.debugOverlay.setRendererStatus("lost")),
       this.events.on("contextRestored", () => this.debugOverlay.setRendererStatus("ready")),
-      this.events.on("selectionChanged", (selection) => this.selectionOverlay.setSelection(selection)),
+      this.events.on("selectionChanged", (selection) => {
+        const hero = selection?.category === "hero" ? this.simulation.getHero(selection.id) : undefined;
+        this.selectionOverlay.setSelection(selection, hero);
+      }),
     );
   }
 

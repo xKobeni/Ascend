@@ -20,4 +20,8 @@ export class HeroManager {
   getAll(): readonly Hero[] {
     return [...this.heroes.values()];
   }
+
+  getById(id: string): Readonly<Hero> | undefined {
+    return this.heroes.get(id);
+  }
 }

@@ -9,18 +9,55 @@ export interface HeroAppearance {
   skinTone: string;
 }
 
-export type HeroSkills = Record<string, number>;
-export type Personality = Record<string, number>;
+export interface HeroAttributes {
+  agility: number;
+  endurance: number;
+  intelligence: number;
+  leadership: number;
+  strength: number;
+  willpower: number;
+}
+
+export interface HeroSkills {
+  defense: number;
+  leadership: number;
+  medicine: number;
+  spear: number;
+  sword: number;
+}
+
+export interface Personality {
+  aggression: number;
+  ambition: number;
+  bravery: number;
+  discipline: number;
+  empathy: number;
+  loyalty: number;
+}
+
+export type HiddenPotential = Record<keyof HeroAttributes, number>;
+
+export type PreviousOccupation =
+  | "Farmer"
+  | "Hunter"
+  | "Mechanic"
+  | "Nurse"
+  | "Soldier"
+  | "Student"
+  | "Teacher";
 
 export interface Hero {
   age: number;
   appearance: HeroAppearance;
+  attributes: HeroAttributes;
   health: number;
+  hiddenPotential: HiddenPotential;
   id: string;
   level: number;
   morale: number;
   name: string;
   personality: Personality;
+  previousOccupation: PreviousOccupation;
   rank: number;
   relationships: Record<string, number>;
   skills: HeroSkills;

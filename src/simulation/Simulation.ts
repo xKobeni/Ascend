@@ -31,4 +31,8 @@ export class Simulation {
   getHeroes(): readonly Readonly<Hero>[] {
     return this.heroManager.getAll();
   }
+
+  getHero(id: string): Readonly<Hero> | undefined {
+    return this.heroManager.getById(id);
+  }
 }
