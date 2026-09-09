@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Production output
+dist/
+
+# Local tooling
+*.local
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
