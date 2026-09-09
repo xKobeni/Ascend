@@ -12,6 +12,7 @@ export class CombatOverlay {
   private readonly toggle: HTMLButtonElement;
   private lastRenderKey = "";
   private previousResult = "Idle";
+  private selectedHeroId: string | null = null;
 
   constructor(
     container: HTMLElement,
@@ -40,6 +41,12 @@ export class CombatOverlay {
 
   update(): void {
     const snapshot = this.getSnapshot();
+    const heroes = snapshot.combatants.filter((combatant) => combatant.team === "Hero");
+    if (snapshot.result === "Idle") {
+      this.selectedHeroId = null;
+    } else if (!heroes.some((hero) => hero.id === this.selectedHeroId)) {
+      this.selectedHeroId = heroes[0]?.id ?? null;
+    }
     if (snapshot.result !== "Idle" && this.previousResult === "Idle") {
       this.expanded = true;
     }
@@ -49,6 +56,7 @@ export class CombatOverlay {
       this.canStart(),
       snapshot.result,
       snapshot.tick,
+      this.selectedHeroId,
       ...snapshot.combatants.map((combatant) => `${combatant.id}:${Math.ceil(combatant.hp)}:${combatant.action}`),
     ].join("|");
     if (renderKey === this.lastRenderKey) {
@@ -93,12 +101,14 @@ export class CombatOverlay {
   private renderCombat(snapshot: Readonly<CombatSnapshot>): string {
     const heroes = snapshot.combatants.filter((combatant) => combatant.team === "Hero");
     const enemies = snapshot.combatants.filter((combatant) => combatant.team === "Enemy");
+    const selectedHero = heroes.find((hero) => hero.id === this.selectedHeroId) ?? heroes[0];
     const ended = snapshot.result !== "Running";
     return `
       <div class="combat-overlay__teams">
-        <section><span>HERO SQUAD</span>${heroes.map((combatant) => this.renderCombatant(combatant)).join("")}</section>
+        <section><span>HERO SQUAD</span>${heroes.map((combatant) => this.renderCombatant(combatant, combatant.id === selectedHero?.id)).join("")}</section>
         <section><span>RIFT HOSTILES</span>${enemies.map((combatant) => this.renderCombatant(combatant)).join("")}</section>
       </div>
+      ${selectedHero ? this.renderUtilityDebug(selectedHero) : ""}
       <ol class="combat-overlay__log" aria-live="polite">
         ${snapshot.log.slice(0, 5).map((entry) => `<li data-tone="${entry.tone}"><b>T${entry.tick}</b>${entry.message}</li>`).join("")}
       </ol>
@@ -109,20 +119,45 @@ export class CombatOverlay {
     `;
   }
 
-  private renderCombatant(combatant: Readonly<CombatantSnapshot>): string {
+  private renderCombatant(combatant: Readonly<CombatantSnapshot>, selected = false): string {
     const health = Math.max(0, Math.round((combatant.hp / combatant.stats.maxHp) * 100));
     return `
-      <article data-team="${combatant.team.toLowerCase()}" data-action="${combatant.action.toLowerCase()}">
-        <div><strong>${combatant.label}</strong><span>${combatant.action}</span></div>
-        <div class="combat-overlay__health"><i style="--health:${health}%"></i></div>
+      <button class="combat-overlay__combatant" type="button" data-team="${combatant.team.toLowerCase()}" data-action="${combatant.action.toLowerCase()}"${combatant.team === "Hero" ? ` data-combat-hero="${combatant.id}" aria-pressed="${selected}"` : " disabled"}>
+        <span class="combat-overlay__combatant-row"><strong>${combatant.label}</strong><span>${combatant.action}</span></span>
+        <span class="combat-overlay__health"><i style="--health:${health}%"></i></span>
         <small>${Math.ceil(combatant.hp)} / ${Math.round(combatant.stats.maxHp)} HP · ATK ${Math.round(combatant.stats.attack)} · DEF ${Math.round(combatant.stats.defense)}</small>
-      </article>
+      </button>
+    `;
+  }
+
+  private renderUtilityDebug(hero: Readonly<CombatantSnapshot>): string {
+    return `
+      <section class="combat-overlay__utility" aria-label="${hero.label} utility action scores">
+        <div class="combat-overlay__utility-heading"><span>UTILITY // ${hero.label}</span><strong>${hero.action}</strong></div>
+        <small>${hero.decisionReason}</small>
+        <div class="combat-overlay__scores">
+          ${hero.actionScores.map((entry) => `
+            <div data-valid="${entry.valid}" data-chosen="${entry.action === hero.action}">
+              <span>${entry.action}</span>
+              <i><b style="--score:${entry.score}%"></b></i>
+              <strong>${entry.score}</strong>
+              <small>${entry.valid ? entry.reason : "unavailable"}</small>
+            </div>
+          `).join("")}
+        </div>
+      </section>
     `;
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>("button");
     if (!button) {
+      return;
+    }
+    if (button.dataset.combatHero) {
+      this.selectedHeroId = button.dataset.combatHero;
+      this.lastRenderKey = "";
+      this.update();
       return;
     }
     if (button === this.toggle) {

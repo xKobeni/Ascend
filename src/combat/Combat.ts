@@ -1,4 +1,14 @@
-export type CombatAction = "Attack" | "Dead" | "Defend" | "Idle" | "Move" | "Retreat";
+export type CombatAction =
+  | "Attack"
+  | "Dead"
+  | "Defend"
+  | "Heal"
+  | "Idle"
+  | "Move"
+  | "Protect"
+  | "Reposition"
+  | "Retreat";
+export type UtilityAction = "Attack" | "Defend" | "Heal" | "Protect" | "Reposition" | "Retreat";
 export type CombatResult = "Defeat" | "Idle" | "Running" | "Victory" | "Withdrawn";
 export type CombatTeam = "Enemy" | "Hero";
 
@@ -15,8 +25,17 @@ export interface CombatPosition {
   z: number;
 }
 
+export interface ActionScoreSnapshot {
+  action: UtilityAction;
+  reason: string;
+  score: number;
+  valid: boolean;
+}
+
 export interface CombatantSnapshot {
   action: CombatAction;
+  actionScores: readonly Readonly<ActionScoreSnapshot>[];
+  decisionReason: string;
   defending: boolean;
   hp: number;
   id: string;

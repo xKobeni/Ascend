@@ -531,7 +531,8 @@ kbd {
 .combat-overlay__panel header,
 .combat-overlay__panel header > div,
 .combat-overlay__actions,
-.combat-overlay__panel article > div:first-child {
+.combat-overlay__combatant-row,
+.combat-overlay__utility-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -577,7 +578,10 @@ kbd {
   letter-spacing: 0.1em;
 }
 
-.combat-overlay__panel article {
+.combat-overlay__combatant {
+  display: block;
+  width: 100%;
+  text-align: left;
   margin-top: 5px;
   padding: 6px;
   border: 1px solid rgb(126 164 170 / 15%);
@@ -585,17 +589,27 @@ kbd {
   background: rgb(62 83 88 / 10%);
 }
 
-.combat-overlay__panel article[data-action="dead"],
-.combat-overlay__panel article[data-action="retreat"] {
+.combat-overlay__combatant[aria-pressed="true"] {
+  border-color: rgb(128 208 219 / 52%);
+  background: rgb(65 116 124 / 24%);
+}
+
+.combat-overlay__combatant:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.combat-overlay__combatant[data-action="dead"],
+.combat-overlay__combatant[data-action="retreat"] {
   opacity: 0.52;
 }
 
-.combat-overlay__panel article span,
-.combat-overlay__panel article small {
+.combat-overlay__combatant span,
+.combat-overlay__combatant small {
   color: #819398;
 }
 
-.combat-overlay__panel article small {
+.combat-overlay__combatant small {
   display: block;
   margin-top: 4px;
   font-size: 8px;
@@ -616,8 +630,75 @@ kbd {
   background: #72b99f;
 }
 
-.combat-overlay__panel article[data-team="enemy"] .combat-overlay__health i {
+.combat-overlay__combatant[data-team="enemy"] .combat-overlay__health i {
   background: #cb6f60;
+}
+
+.combat-overlay__utility {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(126 164 170 / 14%);
+}
+
+.combat-overlay__utility-heading {
+  color: #78c8d4;
+  letter-spacing: 0.08em;
+}
+
+.combat-overlay__utility > small {
+  display: block;
+  margin-top: 3px;
+  color: #87999e;
+}
+
+.combat-overlay__scores {
+  display: grid;
+  gap: 3px;
+  margin-top: 7px;
+}
+
+.combat-overlay__scores > div {
+  display: grid;
+  grid-template-columns: 66px 1fr 24px 82px;
+  align-items: center;
+  gap: 6px;
+  color: #9eafb3;
+}
+
+.combat-overlay__scores > div[data-valid="false"] {
+  opacity: 0.38;
+}
+
+.combat-overlay__scores > div[data-chosen="true"] {
+  color: #d8ecef;
+}
+
+.combat-overlay__scores i {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(118 139 143 / 18%);
+}
+
+.combat-overlay__scores b {
+  display: block;
+  width: var(--score);
+  height: 100%;
+  background: #67aeba;
+}
+
+.combat-overlay__scores strong {
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.combat-overlay__scores small {
+  overflow: hidden;
+  color: #6f858b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .combat-overlay__log {

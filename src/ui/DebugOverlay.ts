@@ -20,7 +20,7 @@ export class DebugOverlay {
     this.element.dataset.renderStatus = "ready";
     this.element.setAttribute("aria-label", "Development diagnostics");
     this.element.innerHTML = `
-      <div class="debug-overlay__title">ASCENT // PHASE 9</div>
+      <div class="debug-overlay__title">ASCENT // PHASE 10</div>
       <div class="debug-overlay__row"><span>FPS</span><span class="debug-overlay__value" data-debug="fps">0</span></div>
       <div class="debug-overlay__row"><span>SIM TICK</span><span class="debug-overlay__value" data-debug="tick">0</span></div>
       <div class="debug-overlay__row"><span>WORLD TIME</span><span class="debug-overlay__value" data-debug="time">DAY 1 · 07:00</span></div>

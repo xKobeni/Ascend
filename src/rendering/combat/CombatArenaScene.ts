@@ -195,14 +195,19 @@ export class CombatArenaScene {
     rendered.healthFill.position.x = -(1 - healthRatio) * 0.775;
     rendered.healthRoot.visible = combatant.hp > 0 && combatant.position.x > -14.8;
 
-    const pulse = combatant.action === "Attack" ? 1 + Math.sin(timestampSeconds * 18) * 0.07 : 1;
+    const pulse = combatant.action === "Attack" || combatant.action === "Heal"
+      ? 1 + Math.sin(timestampSeconds * 18) * 0.07
+      : 1;
     rendered.body.scale.set(pulse, 1, pulse);
     if (combatant.hp <= 0) {
       rendered.root.rotation.z = THREE.MathUtils.lerp(rendered.root.rotation.z, Math.PI / 2, 0.16);
       rendered.root.position.y = 0.28;
     } else {
       rendered.root.rotation.z = 0;
-      rendered.root.position.y = combatant.action === "Move" ? 0.12 + Math.abs(Math.sin(timestampSeconds * 9 + Number(rendered.root.userData.phase))) * 0.08 : 0.12;
+      const isMoving = combatant.action === "Move" || combatant.action === "Reposition" || combatant.action === "Protect" || combatant.action === "Heal";
+      rendered.root.position.y = isMoving
+        ? 0.12 + Math.abs(Math.sin(timestampSeconds * 9 + Number(rendered.root.userData.phase))) * 0.08
+        : 0.12;
     }
     rendered.root.visible = !(combatant.action === "Retreat" && combatant.position.x <= -14.8);
   }

@@ -9,10 +9,15 @@ import type {
   CombatSnapshot,
   CombatStats,
 } from "./Combat";
+import { scoreCombatActions } from "./UtilityAI";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
+  medicine: number;
+  personality: Hero["personality"];
+  relationships: Hero["relationships"];
   retreatLogged: boolean;
+  traits: readonly string[];
 }
 
 interface PlannedAction {
@@ -54,16 +59,22 @@ export class CombatSimulation {
       const formationX = entry.member.formation === "Front" ? -5.5 : entry.member.formation === "Middle" ? -8 : -10.5;
       this.combatants.push({
         action: "Idle",
+        actionScores: [],
         attackCooldown: index * 0.12,
+        decisionReason: "Awaiting first evaluation",
         defending: false,
         hp: this.getHeroStats(entry.hero, entry.member.role).maxHp,
         id: entry.hero.id,
         label: entry.hero.name,
+        medicine: entry.hero.skills.medicine,
+        personality: entry.hero.personality,
         position: { x: formationX, z: lane },
         retreatLogged: false,
+        relationships: entry.hero.relationships,
         role: entry.member.role,
         stats: this.getHeroStats(entry.hero, entry.member.role),
         team: "Hero",
+        traits: entry.hero.traits,
       });
     });
 
@@ -78,16 +89,29 @@ export class CombatSimulation {
       };
       this.combatants.push({
         action: "Idle",
+        actionScores: [],
         attackCooldown: 0.2 + index * 0.12,
+        decisionReason: "Simple enemy behavior",
         defending: false,
         hp: stats.maxHp,
         id: `rift-stalker-${index + 1}`,
         label,
+        medicine: 0,
+        personality: {
+          aggression: 0.7,
+          ambition: 0,
+          bravery: 0.7,
+          discipline: 0.45,
+          empathy: 0,
+          loyalty: 0,
+        },
         position: { x: 7.5 + index * 0.6, z: (index - 1) * 4.2 },
         retreatLogged: false,
+        relationships: {},
         role: "Skirmisher",
         stats,
         team: "Enemy",
+        traits: [],
       });
     });
     this.result = "Running";
@@ -136,17 +160,33 @@ export class CombatSimulation {
       if (plan.action === "Defend" && plan.actor.action !== "Defend") {
         this.addLog(`${plan.actor.label} braced to reduce incoming damage.`, "neutral");
       }
+      if (plan.action === "Protect" && plan.actor.action !== "Protect" && plan.target) {
+        this.addLog(`${plan.actor.label} moved to protect ${plan.target.label}.`, "success");
+      }
       plan.actor.action = plan.action;
-      plan.actor.defending = plan.action === "Defend";
+      plan.actor.defending = plan.action === "Defend" || plan.action === "Protect";
     });
     plans.forEach((plan) => this.executePlan(plan));
     this.updateResult();
   }
 
   private planAction(actor: Combatant, index: number): PlannedAction {
-    if (actor.team === "Hero" && actor.hp / actor.stats.maxHp <= 0.45) {
-      return { action: "Retreat", actor, target: null };
+    if (actor.team === "Hero") {
+      const allies = this.combatants.filter((candidate) => candidate.team === actor.team);
+      const opponents = this.combatants.filter((candidate) => candidate.team !== actor.team);
+      const decision = scoreCombatActions(actor, allies, opponents);
+      actor.actionScores = decision.scores;
+      actor.decisionReason = decision.reason;
+      return {
+        action: decision.action,
+        actor,
+        target: this.combatants.find((candidate) => candidate.id === decision.targetId) ?? null,
+      };
     }
+    return this.planSimpleEnemyAction(actor, index);
+  }
+
+  private planSimpleEnemyAction(actor: Combatant, index: number): PlannedAction {
     const target = this.findNearestOpponent(actor);
     if (!target) {
       return { action: "Idle", actor, target: null };
@@ -176,8 +216,28 @@ export class CombatSimulation {
       }
       return;
     }
-    if (plan.action === "Move" && target) {
+    if ((plan.action === "Move" || plan.action === "Reposition") && target) {
       this.moveToward(actor, target.position);
+      return;
+    }
+    if (plan.action === "Protect" && target && target.hp > 0) {
+      if (this.getDistance(actor.position, target.position) > 1.65) {
+        this.moveToward(actor, target.position);
+      }
+      return;
+    }
+    if (plan.action === "Heal" && target && target.hp > 0) {
+      if (this.getDistance(actor.position, target.position) > 2.5) {
+        this.moveToward(actor, target.position);
+        return;
+      }
+      if (actor.attackCooldown <= 0) {
+        const healing = Math.max(5, Math.round(5 + actor.medicine * 2.5));
+        const restored = Math.min(healing, target.stats.maxHp - target.hp);
+        target.hp += restored;
+        actor.attackCooldown = 1.1;
+        this.addLog(`${actor.label} restored ${restored} HP to ${target.label}.`, "success");
+      }
       return;
     }
     if (plan.action !== "Attack" || !target || target.hp <= 0 || actor.attackCooldown > 0) {
@@ -207,7 +267,16 @@ export class CombatSimulation {
   }
 
   private calculateDamage(attacker: Readonly<Combatant>, target: Readonly<Combatant>): number {
-    const effectiveDefense = target.stats.defense * (target.defending ? 1.65 : 1);
+    const hasProtector = this.combatants.some(
+      (candidate) =>
+        candidate.team === target.team &&
+        candidate.id !== target.id &&
+        candidate.hp > 0 &&
+        candidate.action === "Protect" &&
+        this.getDistance(candidate.position, target.position) <= 2.4,
+    );
+    const defenseMultiplier = (target.defending ? 1.65 : 1) + (hasProtector ? 0.45 : 0);
+    const effectiveDefense = target.stats.defense * defenseMultiplier;
     return Math.max(1, Math.round(attacker.stats.attack - effectiveDefense * 0.72));
   }
 
