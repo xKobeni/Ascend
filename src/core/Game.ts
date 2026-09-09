@@ -3,6 +3,7 @@ import { DebugOverlay } from "../ui/DebugOverlay";
 import { ControlsHint } from "../ui/ControlsHint";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
 import { SocialLogOverlay } from "../ui/SocialLogOverlay";
+import { SquadOverlay } from "../ui/SquadOverlay";
 import { EventBus } from "./EventBus";
 import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
@@ -20,6 +21,7 @@ export class Game {
   private readonly selectionOverlay: SelectionOverlay;
   private readonly simulation = new Simulation();
   private readonly socialLogOverlay: SocialLogOverlay;
+  private readonly squadOverlay: SquadOverlay;
   private readonly unsubscribeEvents: Array<() => void> = [];
 
   constructor(private readonly container: HTMLElement) {
@@ -30,6 +32,27 @@ export class Game {
       this.simulation.queueTraining(heroId, type);
     });
     this.socialLogOverlay = new SocialLogOverlay(container);
+    this.squadOverlay = new SquadOverlay(
+      container,
+      this.simulation.getHeroes(),
+      () => this.simulation.getSquad(),
+      () => this.simulation.getSquadEvaluation(),
+      {
+        addHero: (heroId) => {
+          this.simulation.addHeroToSquad(heroId);
+        },
+        removeHero: (heroId) => {
+          this.simulation.removeHeroFromSquad(heroId);
+        },
+        rename: (name) => this.simulation.renameSquad(name),
+        setFormation: (heroId, formation) => {
+          this.simulation.setSquadFormation(heroId, formation);
+        },
+        setRole: (heroId, role) => {
+          this.simulation.setSquadRole(heroId, role);
+        },
+      },
+    );
 
     this.unsubscribeEvents.push(
       this.events.on("contextLost", () => this.debugOverlay.setRendererStatus("lost")),
@@ -64,6 +87,7 @@ export class Game {
     this.debugOverlay.dispose();
     this.selectionOverlay.dispose();
     this.socialLogOverlay.dispose();
+    this.squadOverlay.dispose();
     this.renderer.dispose();
     this.container.replaceChildren();
   }
@@ -77,6 +101,7 @@ export class Game {
       this.renderer.getCameraDiagnostics(),
     );
     this.socialLogOverlay.update(this.simulation.getSocialEvents());
+    this.squadOverlay.updateEvaluation();
     if (this.selectedHeroId) {
       const selectedHero = this.simulation.getHero(this.selectedHeroId);
       if (selectedHero) {

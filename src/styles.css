@@ -217,6 +217,227 @@ kbd {
   color: #82c7b2;
 }
 
+.squad-overlay {
+  position: fixed;
+  inset: 16px auto auto 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  color: #dce8e9;
+  font: 10px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.squad-overlay__toggle {
+  display: block;
+  margin: 0 auto;
+  padding: 7px 11px;
+  border: 1px solid rgb(119 186 196 / 28%);
+  border-radius: 5px;
+  background: rgb(7 12 17 / 78%);
+  color: #b9c9cc;
+  font: inherit;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.squad-overlay__toggle[data-ready="true"] {
+  border-color: rgb(112 199 167 / 48%);
+  color: #91cfba;
+}
+
+.squad-overlay__panel {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 86px);
+  margin-top: 8px;
+  overflow-y: auto;
+  padding: 13px;
+  border: 1px solid rgb(159 224 234 / 30%);
+  border-radius: 7px;
+  background: rgb(7 12 17 / 95%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 42%);
+  backdrop-filter: blur(10px);
+}
+
+.squad-overlay__panel[hidden] {
+  display: none;
+}
+
+.squad-overlay__panel header,
+.squad-overlay__meta,
+.squad-member__identity,
+.squad-overlay__roster > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.squad-overlay__panel header > div {
+  flex: 1;
+}
+
+.squad-overlay__eyebrow,
+.squad-overlay__heading {
+  display: block;
+  margin-bottom: 4px;
+  color: #78c8d4;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.squad-overlay__panel input,
+.squad-member select {
+  width: 100%;
+  border: 1px solid rgb(123 161 168 / 28%);
+  border-radius: 4px;
+  background: rgb(31 47 53 / 78%);
+  color: #e2ecee;
+  font: inherit;
+}
+
+.squad-overlay__panel input {
+  padding: 5px 7px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.squad-overlay__panel button {
+  border: 1px solid rgb(119 186 196 / 28%);
+  border-radius: 4px;
+  background: rgb(73 117 125 / 16%);
+  color: #c8dadd;
+  font: inherit;
+  cursor: pointer;
+}
+
+.squad-overlay__panel button:hover:not(:disabled),
+.squad-overlay__panel button:focus-visible,
+.squad-overlay__panel input:focus-visible,
+.squad-member select:focus-visible {
+  border-color: rgb(128 208 219 / 55%);
+  outline: none;
+}
+
+.squad-overlay__panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.squad-overlay__panel header > button {
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+}
+
+.squad-overlay__meta {
+  margin-top: 9px;
+  color: #82949a;
+  font-size: 9px;
+}
+
+.squad-overlay__meta strong {
+  color: #d1b77f;
+}
+
+.squad-overlay__meta strong[data-ready="true"] {
+  color: #82c7b2;
+}
+
+.squad-overlay__evaluation {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.squad-overlay__evaluation > div {
+  padding: 7px;
+  border: 1px solid rgb(126 164 170 / 16%);
+  border-radius: 4px;
+  background: rgb(66 90 96 / 10%);
+}
+
+.squad-overlay__evaluation span,
+.squad-overlay__evaluation strong {
+  display: block;
+}
+
+.squad-overlay__evaluation span {
+  color: #72868c;
+  font-size: 8px;
+}
+
+.squad-overlay__evaluation strong {
+  margin-top: 2px;
+  color: #dce8e9;
+  font-size: 14px;
+}
+
+.squad-overlay__panel section {
+  margin-top: 12px;
+}
+
+.squad-overlay__members {
+  display: grid;
+  gap: 7px;
+}
+
+.squad-overlay__empty {
+  padding: 10px;
+  border: 1px dashed rgb(126 164 170 / 20%);
+  color: #74858a;
+  text-align: center;
+}
+
+.squad-member {
+  display: grid;
+  grid-template-columns: 1fr 28px;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgb(126 164 170 / 18%);
+  border-radius: 5px;
+  background: rgb(54 75 81 / 10%);
+}
+
+.squad-member__identity {
+  justify-content: flex-start;
+}
+
+.squad-member__identity span {
+  color: #7f9298;
+  font-size: 9px;
+}
+
+.squad-member label {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  grid-column: 1 / -1;
+  gap: 7px;
+  align-items: center;
+  color: #788b90;
+  font-size: 9px;
+}
+
+.squad-member select {
+  padding: 4px 6px;
+}
+
+.squad-overlay__roster {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+}
+
+.squad-overlay__roster > div {
+  padding: 4px 0;
+  color: #aebbc0;
+}
+
+.squad-overlay__roster button {
+  padding: 4px 7px;
+}
+
 .hero-panel__status {
   display: inline-block;
   margin-top: 7px;
@@ -428,6 +649,19 @@ kbd {
     width: calc(100% - 24px);
     max-height: 104px;
     overflow: hidden;
+  }
+
+  .squad-overlay {
+    top: 10px;
+  }
+
+  .squad-overlay__panel {
+    max-height: calc(100vh - 68px);
+  }
+
+  .squad-overlay__evaluation,
+  .squad-overlay__roster {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
