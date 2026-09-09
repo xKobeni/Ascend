@@ -4,12 +4,15 @@ import { HeroGenerator } from "./HeroGenerator";
 import { NeedsSystem } from "./NeedsSystem";
 import { RelationshipSystem } from "./RelationshipSystem";
 import { HeroRoutineSystem } from "./HeroRoutineSystem";
+import { TrainingSystem } from "./TrainingSystem";
+import type { TrainingType } from "./Hero";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
   private readonly needsSystem = new NeedsSystem();
   private readonly relationshipSystem = new RelationshipSystem();
   private readonly routineSystem = new HeroRoutineSystem();
+  private readonly trainingSystem = new TrainingSystem();
   private readonly usedNames = new Set<string>();
 
   constructor(private readonly generator = new HeroGenerator()) {}
@@ -37,6 +40,11 @@ export class HeroManager {
     return this.heroes.get(id);
   }
 
+  queueTraining(heroId: string, type: TrainingType): boolean {
+    const hero = this.heroes.get(heroId);
+    return hero ? this.trainingSystem.queueTraining(hero, type) : false;
+  }
+
   step(
     deltaSeconds: number,
     gameMinutes: number,
@@ -44,8 +52,16 @@ export class HeroManager {
     minuteOfDay: number,
   ): void {
     const heroes = [...this.heroes.values()];
+    this.trainingSystem.prepare(heroes);
     this.needsSystem.step(heroes, gameMinutes);
-    this.routineSystem.step(heroes, deltaSeconds, minuteOfDay, this.needsSystem);
+    this.routineSystem.step(
+      heroes,
+      deltaSeconds,
+      minuteOfDay,
+      this.needsSystem,
+      this.trainingSystem,
+    );
+    this.trainingSystem.step(heroes, gameMinutes, this.needsSystem);
     this.relationshipSystem.step(heroes, gameMinutes, day, minuteOfDay);
   }
 

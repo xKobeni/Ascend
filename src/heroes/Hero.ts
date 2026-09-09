@@ -46,6 +46,20 @@ export interface HeroNeeds {
   stress: number;
 }
 
+export type TrainingType = "Defense Training" | "Strength Training" | "Weapon Training";
+
+export interface TrainingAssignment {
+  progress: number;
+  type: TrainingType;
+}
+
+export interface HeroTraining {
+  active: TrainingAssignment | null;
+  injuryCheckMinutes: number;
+  lastOutcome: string | null;
+  queue: TrainingType[];
+}
+
 export type HeroActivity =
   | "Eating"
   | "Idle"
@@ -57,7 +71,7 @@ export type HeroActivity =
 export interface HeroMovement {
   activity: HeroActivity;
   decisionReason: string | null;
-  decisionSource: "Need" | "Schedule";
+  decisionSource: "Need" | "Schedule" | "Training";
   destinationId: string | null;
   destinationLabel: string | null;
   facingRadians: number;
@@ -93,4 +107,5 @@ export interface Hero {
   relationships: Record<string, number>;
   skills: HeroSkills;
   traits: string[];
+  training: HeroTraining;
 }

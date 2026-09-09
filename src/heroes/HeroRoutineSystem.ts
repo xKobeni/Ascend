@@ -6,6 +6,7 @@ import {
 } from "../base/NavigationPoints";
 import type { Hero, HeroActivity } from "./Hero";
 import type { NeedsSystem } from "./NeedsSystem";
+import type { TrainingSystem } from "./TrainingSystem";
 
 export type DayPeriod = "Day" | "Evening" | "Morning" | "Night";
 
@@ -15,15 +16,25 @@ export class HeroRoutineSystem {
     deltaSeconds: number,
     minuteOfDay: number,
     needsSystem: NeedsSystem,
+    trainingSystem: TrainingSystem,
   ): void {
     const scheduledActivity = this.getScheduledActivity(minuteOfDay);
     heroes.forEach((hero, index) => {
-      const decision = needsSystem.chooseActivity(hero, scheduledActivity);
+      const hasTrainingAssignment = trainingSystem.hasAssignment(hero);
+      const decision = needsSystem.chooseActivity(
+        hero,
+        hasTrainingAssignment ? "Training" : scheduledActivity,
+        hasTrainingAssignment,
+      );
+      const decisionSource =
+        hasTrainingAssignment && decision.source === "Schedule" ? "Training" : decision.source;
+      const decisionReason =
+        decisionSource === "Training" ? "Player-assigned training" : decision.reason;
       this.assignRoutineIfNeeded(
         hero,
         decision.activity,
-        decision.source,
-        decision.reason,
+        decisionSource,
+        decisionReason,
         index,
       );
       this.moveHero(hero, deltaSeconds);
@@ -60,7 +71,7 @@ export class HeroRoutineSystem {
   private assignRoutineIfNeeded(
     hero: Hero,
     activity: ScheduledActivity,
-    decisionSource: "Need" | "Schedule",
+    decisionSource: "Need" | "Schedule" | "Training",
     decisionReason: string | null,
     heroIndex: number,
   ): void {

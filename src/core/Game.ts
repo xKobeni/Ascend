@@ -26,7 +26,9 @@ export class Game {
     this.renderer = new Renderer(container, this.events, this.simulation.getHeroes());
     this.debugOverlay = new DebugOverlay(container);
     this.controlsHint = new ControlsHint(container);
-    this.selectionOverlay = new SelectionOverlay(container);
+    this.selectionOverlay = new SelectionOverlay(container, (heroId, type) => {
+      this.simulation.queueTraining(heroId, type);
+    });
     this.socialLogOverlay = new SocialLogOverlay(container);
 
     this.unsubscribeEvents.push(

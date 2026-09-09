@@ -1,6 +1,7 @@
 import type { Hero } from "../heroes/Hero";
 import { HeroManager } from "../heroes/HeroManager";
 import type { DayPeriod } from "../heroes/HeroRoutineSystem";
+import type { TrainingType } from "../heroes/Hero";
 
 const STARTING_MINUTE = 7 * 60;
 const GAME_MINUTES_PER_REAL_SECOND = 12;
@@ -54,6 +55,10 @@ export class Simulation {
 
   getHero(id: string): Readonly<Hero> | undefined {
     return this.heroManager.getById(id);
+  }
+
+  queueTraining(heroId: string, type: TrainingType): boolean {
+    return this.heroManager.queueTraining(heroId, type);
   }
 
   getSocialEvents() {

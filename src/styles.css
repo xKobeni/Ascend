@@ -245,6 +245,10 @@ kbd {
   color: #dfbd7f;
 }
 
+.hero-panel__decision[data-source="training"] {
+  color: #82c7b2;
+}
+
 .hero-panel section {
   margin-top: 11px;
 }
@@ -289,6 +293,64 @@ kbd {
 
 .hero-panel__grid strong {
   color: #dbe9eb;
+}
+
+.hero-panel__training [data-hero="training-active"] {
+  color: #dce8e9;
+  font: 10px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-panel__training-progress {
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(120 145 150 / 18%);
+}
+
+.hero-panel__training-progress i {
+  display: block;
+  width: var(--training-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: #67aeba;
+}
+
+.hero-panel__training-queue,
+.hero-panel__training-outcome {
+  margin-top: 5px;
+  color: #839399;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-panel__training-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.hero-panel__training-actions button {
+  min-width: 0;
+  padding: 5px 3px;
+  border: 1px solid rgb(119 186 196 / 28%);
+  border-radius: 4px;
+  background: rgb(73 117 125 / 16%);
+  color: #c8dadd;
+  font: 9px/1.2 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  cursor: pointer;
+}
+
+.hero-panel__training-actions button:hover:not(:disabled),
+.hero-panel__training-actions button:focus-visible {
+  border-color: rgb(128 208 219 / 55%);
+  background: rgb(73 130 139 / 28%);
+  outline: none;
+}
+
+.hero-panel__training-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 
 .hero-panel__meters {

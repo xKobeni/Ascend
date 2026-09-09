@@ -51,6 +51,12 @@ export class HeroGenerator {
       relationships: {},
       skills,
       traits: this.generateTraits(attributes, personality),
+      training: {
+        active: null,
+        injuryCheckMinutes: 0,
+        lastOutcome: null,
+        queue: [],
+      },
     };
   }
 

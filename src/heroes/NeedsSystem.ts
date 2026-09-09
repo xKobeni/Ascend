@@ -15,7 +15,11 @@ export class NeedsSystem {
     heroes.forEach((hero) => this.updateHero(hero, gameHours));
   }
 
-  chooseActivity(hero: Readonly<Hero>, scheduledActivity: ScheduledActivity): HeroDecision {
+  chooseActivity(
+    hero: Readonly<Hero>,
+    scheduledActivity: ScheduledActivity,
+    isPlayerDirected = false,
+  ): HeroDecision {
     const { needs, movement } = hero;
 
     if (
@@ -40,17 +44,30 @@ export class NeedsSystem {
       return this.needDecision("Socializing", "Low social need");
     }
 
+    const hungerThreshold = isPlayerDirected ? 35 : 56;
+    const fatigueThreshold = isPlayerDirected ? 78 : 58;
+    const stressThreshold = isPlayerDirected ? 88 : 72;
+    const healthThreshold = isPlayerDirected ? 38 : 48;
+    const socialThreshold = isPlayerDirected ? 25 : 55;
     const choices = [
-      { activity: "Eating" as const, reason: "Low hunger", urgency: 56 - needs.hunger },
+      {
+        activity: "Eating" as const,
+        reason: "Low hunger",
+        urgency: hungerThreshold - needs.hunger,
+      },
       {
         activity: "Resting" as const,
         reason: this.getRestReason(needs),
-        urgency: Math.max(needs.fatigue - 58, needs.stress - 72, 48 - needs.health),
+        urgency: Math.max(
+          needs.fatigue - fatigueThreshold,
+          needs.stress - stressThreshold,
+          healthThreshold - needs.health,
+        ),
       },
       {
         activity: "Socializing" as const,
         reason: "Low social need",
-        urgency: 55 - needs.social,
+        urgency: socialThreshold - needs.social,
       },
     ].sort((left, right) => right.urgency - left.urgency);
 
