@@ -5,6 +5,7 @@ import type {
   HeroAppearance,
   HeroAttributes,
   HeroMovement,
+  HeroNeeds,
   HeroSkills,
   HiddenPotential,
   Personality,
@@ -24,7 +25,11 @@ export class HeroGenerator {
     this.names = new NameGenerator(random);
   }
 
-  generate(initialMovement: HeroMovement, usedNames?: ReadonlySet<string>): Hero {
+  generate(
+    initialMovement: HeroMovement,
+    rosterIndex: number,
+    usedNames?: ReadonlySet<string>,
+  ): Hero {
     const occupation = this.random.pick(OCCUPATIONS);
     const attributes = this.generateAttributes(occupation);
     const skills = this.generateSkills(occupation);
@@ -34,19 +39,42 @@ export class HeroGenerator {
       age: this.random.integer(18, 58),
       appearance: this.generateAppearance(),
       attributes,
-      health: 100,
       hiddenPotential: this.generateHiddenPotential(),
       id: crypto.randomUUID(),
       level: 1,
-      morale: 100,
       movement: initialMovement,
       name: this.names.generate(usedNames),
+      needs: this.generateNeeds(rosterIndex),
       personality,
       previousOccupation: occupation.name,
       rank: 1,
       relationships: {},
       skills,
       traits: this.generateTraits(attributes, personality),
+    };
+  }
+
+  private generateNeeds(rosterIndex: number): HeroNeeds {
+    const profiles: readonly HeroNeeds[] = [
+      { fatigue: 26, health: 100, hunger: 34, morale: 68, social: 72, stress: 18 },
+      { fatigue: 72, health: 96, hunger: 70, morale: 61, social: 65, stress: 32 },
+      { fatigue: 31, health: 100, hunger: 68, morale: 58, social: 32, stress: 25 },
+      { fatigue: 24, health: 100, hunger: 74, morale: 76, social: 71, stress: 14 },
+      { fatigue: 44, health: 84, hunger: 62, morale: 52, social: 56, stress: 64 },
+    ];
+    const profile = profiles[rosterIndex % profiles.length];
+    if (!profile) {
+      throw new Error(`No needs profile exists for hero index ${rosterIndex}.`);
+    }
+    const vary = (value: number): number =>
+      Math.min(100, Math.max(0, value + this.random.float(-3, 3)));
+    return {
+      fatigue: vary(profile.fatigue),
+      health: vary(profile.health),
+      hunger: vary(profile.hunger),
+      morale: vary(profile.morale),
+      social: vary(profile.social),
+      stress: vary(profile.stress),
     };
   }
 

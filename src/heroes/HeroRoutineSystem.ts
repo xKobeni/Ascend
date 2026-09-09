@@ -5,14 +5,27 @@ import {
   type ScheduledActivity,
 } from "../base/NavigationPoints";
 import type { Hero, HeroActivity } from "./Hero";
+import type { NeedsSystem } from "./NeedsSystem";
 
 export type DayPeriod = "Day" | "Evening" | "Morning" | "Night";
 
 export class HeroRoutineSystem {
-  step(heroes: readonly Hero[], deltaSeconds: number, minuteOfDay: number): void {
+  step(
+    heroes: readonly Hero[],
+    deltaSeconds: number,
+    minuteOfDay: number,
+    needsSystem: NeedsSystem,
+  ): void {
     const scheduledActivity = this.getScheduledActivity(minuteOfDay);
     heroes.forEach((hero, index) => {
-      this.assignRoutineIfNeeded(hero, scheduledActivity, index);
+      const decision = needsSystem.chooseActivity(hero, scheduledActivity);
+      this.assignRoutineIfNeeded(
+        hero,
+        decision.activity,
+        decision.source,
+        decision.reason,
+        index,
+      );
       this.moveHero(hero, deltaSeconds);
     });
   }
@@ -47,9 +60,15 @@ export class HeroRoutineSystem {
   private assignRoutineIfNeeded(
     hero: Hero,
     activity: ScheduledActivity,
+    decisionSource: "Need" | "Schedule",
+    decisionReason: string | null,
     heroIndex: number,
   ): void {
-    if (hero.movement.targetActivity === activity) {
+    if (
+      hero.movement.targetActivity === activity &&
+      hero.movement.decisionSource === decisionSource &&
+      hero.movement.decisionReason === decisionReason
+    ) {
       return;
     }
 
@@ -58,6 +77,8 @@ export class HeroRoutineSystem {
       throw new Error(`No ${activity} navigation point exists for hero index ${heroIndex}.`);
     }
     hero.movement.targetActivity = activity;
+    hero.movement.decisionSource = decisionSource;
+    hero.movement.decisionReason = decisionReason;
     hero.movement.destinationId = destination.id;
     hero.movement.destinationLabel = destination.label;
     hero.movement.activity = "Walking";

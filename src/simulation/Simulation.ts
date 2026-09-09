@@ -36,7 +36,11 @@ export class Simulation {
     this.state.day = Math.floor(totalGameMinutes / (24 * 60)) + 1;
     this.state.minuteOfDay = totalGameMinutes % (24 * 60);
     this.state.period = this.heroManager.getDayPeriod(this.state.minuteOfDay);
-    this.heroManager.step(deltaSeconds, this.state.minuteOfDay);
+    this.heroManager.step(
+      deltaSeconds,
+      deltaSeconds * GAME_MINUTES_PER_REAL_SECOND,
+      this.state.minuteOfDay,
+    );
   }
 
   getSnapshot(): Readonly<SimulationSnapshot> {

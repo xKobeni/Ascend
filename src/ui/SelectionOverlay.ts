@@ -1,4 +1,10 @@
-import type { Hero, HeroAttributes, HeroSkills, Personality } from "../heroes/Hero";
+import type {
+  Hero,
+  HeroAttributes,
+  HeroNeeds,
+  HeroSkills,
+  Personality,
+} from "../heroes/Hero";
 import type { SelectionDetails } from "../rendering/SelectionRaycaster";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
@@ -27,6 +33,19 @@ const PERSONALITY_LABELS: ReadonlyArray<[keyof Personality, string]> = [
   ["ambition", "Ambition"],
 ];
 
+const NEED_LABELS: ReadonlyArray<[
+  keyof HeroNeeds,
+  string,
+  "high-good" | "low-good",
+]> = [
+  ["hunger", "Hunger", "high-good"],
+  ["fatigue", "Fatigue", "low-good"],
+  ["morale", "Morale", "high-good"],
+  ["health", "Health", "high-good"],
+  ["stress", "Stress", "low-good"],
+  ["social", "Social", "high-good"],
+];
+
 export class SelectionOverlay {
   private readonly element: HTMLElement;
   private readonly category: HTMLElement;
@@ -46,6 +65,11 @@ export class SelectionOverlay {
       <div class="hero-panel" data-selection="hero" hidden>
         <div class="hero-panel__identity" data-hero="identity"></div>
         <div class="hero-panel__status" data-hero="status"></div>
+        <div class="hero-panel__decision" data-hero="decision" hidden></div>
+        <section>
+          <span class="hero-panel__heading">Needs</span>
+          <div class="hero-panel__meters hero-panel__needs" data-hero="needs"></div>
+        </section>
         <section>
           <span class="hero-panel__heading">Traits</span>
           <div class="hero-panel__traits" data-hero="traits"></div>
@@ -98,6 +122,13 @@ export class SelectionOverlay {
         ? `Walking → ${hero.movement.destinationLabel}`
         : hero.movement.activity;
     status.dataset.activity = hero.movement.activity.toLowerCase();
+    const decision = this.requireHeroElement("decision");
+    decision.textContent = hero.movement.decisionReason
+      ? `Need override · ${hero.movement.decisionReason}`
+      : "Scheduled routine";
+    decision.hidden = false;
+    decision.dataset.source = hero.movement.decisionSource.toLowerCase();
+    this.renderNeeds(hero);
   }
 
   private renderHero(hero: Readonly<Hero>): void {
@@ -128,6 +159,28 @@ export class SelectionOverlay {
         if (meter) {
           meter.style.setProperty("--meter-value", `${percentage}%`);
         }
+        return row;
+      }),
+    );
+  }
+
+  private renderNeeds(hero: Readonly<Hero>): void {
+    const needs = this.requireHeroElement("needs");
+    needs.replaceChildren(
+      ...NEED_LABELS.map(([key, label, direction]) => {
+        const row = document.createElement("div");
+        row.className = "hero-panel__meter hero-panel__need";
+        const percentage = Math.round(hero.needs[key]);
+        const condition = direction === "high-good" ? percentage : 100 - percentage;
+        row.dataset.condition = condition < 35 ? "critical" : condition < 60 ? "warning" : "stable";
+
+        const name = document.createElement("span");
+        const value = document.createElement("span");
+        const meter = document.createElement("i");
+        name.textContent = label;
+        value.textContent = `${percentage}%`;
+        meter.style.setProperty("--meter-value", `${percentage}%`);
+        row.append(name, value, meter);
         return row;
       }),
     );

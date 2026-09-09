@@ -1,10 +1,12 @@
 import { createInitialMovement } from "../base/NavigationPoints";
 import type { Hero } from "./Hero";
 import { HeroGenerator } from "./HeroGenerator";
+import { NeedsSystem } from "./NeedsSystem";
 import { HeroRoutineSystem } from "./HeroRoutineSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
+  private readonly needsSystem = new NeedsSystem();
   private readonly routineSystem = new HeroRoutineSystem();
   private readonly usedNames = new Set<string>();
 
@@ -12,7 +14,11 @@ export class HeroManager {
 
   generateInitialRoster(count: number): readonly Hero[] {
     while (this.heroes.size < count) {
-      const hero = this.generator.generate(createInitialMovement(this.heroes.size), this.usedNames);
+      const hero = this.generator.generate(
+        createInitialMovement(this.heroes.size),
+        this.heroes.size,
+        this.usedNames,
+      );
       this.usedNames.add(hero.name);
       this.heroes.set(hero.id, hero);
     }
@@ -27,8 +33,10 @@ export class HeroManager {
     return this.heroes.get(id);
   }
 
-  step(deltaSeconds: number, minuteOfDay: number): void {
-    this.routineSystem.step([...this.heroes.values()], deltaSeconds, minuteOfDay);
+  step(deltaSeconds: number, gameMinutes: number, minuteOfDay: number): void {
+    const heroes = [...this.heroes.values()];
+    this.needsSystem.step(heroes, gameMinutes);
+    this.routineSystem.step(heroes, deltaSeconds, minuteOfDay, this.needsSystem);
   }
 
   getDayPeriod(minuteOfDay: number) {

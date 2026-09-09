@@ -55,6 +55,8 @@ export function createInitialMovement(index: number): HeroMovement {
   }
   return {
     activity: "Idle",
+    decisionReason: null,
+    decisionSource: "Schedule",
     destinationId: null,
     destinationLabel: null,
     facingRadians: Math.atan2(-spawnPoint.x, -spawnPoint.z),

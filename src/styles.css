@@ -151,6 +151,17 @@ kbd {
   color: #e2c58f;
 }
 
+.hero-panel__decision {
+  margin-top: 5px;
+  color: #84969b;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.hero-panel__decision[data-source="need"] {
+  color: #dfbd7f;
+}
+
 .hero-panel section {
   margin-top: 11px;
 }
@@ -221,6 +232,14 @@ kbd {
   height: 2px;
   border-radius: 2px;
   content: "";
+}
+
+.hero-panel__need[data-condition="warning"] i {
+  background: #c69b59;
+}
+
+.hero-panel__need[data-condition="critical"] i {
+  background: #c56f61;
 }
 
 .hero-panel__meter::after {
