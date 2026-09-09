@@ -76,6 +76,7 @@ export class SelectionOverlay {
       <span class="selection-overlay__detail" data-selection="detail"></span>
       <div class="hero-panel" data-selection="hero" hidden>
         <div class="hero-panel__identity" data-hero="identity"></div>
+        <div class="hero-panel__path" data-hero="path"></div>
         <div class="hero-panel__status" data-hero="status"></div>
         <div class="hero-panel__decision" data-hero="decision" hidden></div>
         <section>
@@ -208,7 +209,11 @@ export class SelectionOverlay {
 
   private renderHero(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
     const identity = this.requireHeroElement("identity");
-    identity.textContent = `${hero.previousOccupation} · Age ${hero.age}`;
+    identity.textContent = `Origin · ${hero.origin.occupation} (${hero.origin.category}) · Age ${hero.age}`;
+    const path = this.requireHeroElement("path");
+    const reputation = hero.reputation.title ?? "Unproven";
+    path.textContent = `Class · ${hero.heroClass}  |  Refuge role · ${hero.socialRole}  |  Reputation · ${reputation}`;
+    path.title = `Origin aptitudes: ${hero.origin.aptitudes.join(", ")}`;
     this.updateHeroRuntime(hero, heroes);
 
     const traits = this.requireHeroElement("traits");
@@ -246,16 +251,23 @@ export class SelectionOverlay {
         .filter((other) => other.id !== hero.id)
         .sort(
           (left, right) =>
-            (hero.relationships[right.id] ?? 0) - (hero.relationships[left.id] ?? 0),
+            (hero.relationships[right.id]?.metrics.affinity ?? 0) -
+            (hero.relationships[left.id]?.metrics.affinity ?? 0),
         )
         .map((other) => {
-          const value = Math.round(hero.relationships[other.id] ?? 0);
+          const profile = hero.relationships[other.id];
+          if (!profile) {
+            return document.createDocumentFragment();
+          }
+          const { affinity, respect, trust } = profile.metrics;
           const row = document.createElement("div");
           const name = document.createElement("span");
           const relationship = document.createElement("span");
           name.textContent = other.name;
-          relationship.textContent = `${getRelationshipLabel(value)} · ${value > 0 ? "+" : ""}${value}`;
-          row.dataset.relationship = getRelationshipLabel(value).toLowerCase().replace(" ", "-");
+          const label = getRelationshipLabel(profile);
+          relationship.innerHTML = `<strong>${label}</strong><small>A ${affinity > 0 ? "+" : ""}${affinity} · T ${trust} · R ${respect}</small>`;
+          relationship.title = `Affinity ${affinity}, Trust ${trust}, Respect ${respect}, Rivalry ${profile.metrics.rivalry}, Fear ${profile.metrics.fear}, Jealousy ${profile.metrics.jealousy}`;
+          row.dataset.relationship = label.toLowerCase().replace(" ", "-");
           row.append(name, relationship);
           return row;
         }),

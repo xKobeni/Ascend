@@ -84,7 +84,7 @@ export class SquadOverlay {
         <button type="button" data-squad-action="close" aria-label="Close squad editor">×</button>
       </header>
       <div class="squad-overlay__meta">
-        <span>Doctrine · ${squad.doctrine}</span>
+        <span>Doctrine · ${squad.doctrine} · Chemistry <b data-squad="chemistry">${evaluation.chemistry} ${evaluation.cohesion}%</b> · Trust <b data-squad="trust">${evaluation.trust}%</b></span>
         <strong data-squad="status">${evaluation.isComplete ? "READY" : `${squad.members.length} OF ${SQUAD_SIZE}`}</strong>
       </div>
       <div class="squad-overlay__evaluation" data-squad="evaluation"></div>
@@ -105,13 +105,17 @@ export class SquadOverlay {
   private renderEvaluation(evaluation: Readonly<SquadEvaluation>): void {
     const container = this.panel.querySelector<HTMLElement>("[data-squad='evaluation']");
     const status = this.panel.querySelector<HTMLElement>("[data-squad='status']");
-    if (!container || !status) {
+    const chemistry = this.panel.querySelector<HTMLElement>("[data-squad='chemistry']");
+    const trust = this.panel.querySelector<HTMLElement>("[data-squad='trust']");
+    if (!container || !status || !chemistry || !trust) {
       return;
     }
     status.textContent = evaluation.isComplete
       ? "READY"
       : `${this.getSquad().members.length} OF ${SQUAD_SIZE}`;
     status.dataset.ready = String(evaluation.isComplete);
+    chemistry.textContent = `${evaluation.chemistry} ${evaluation.cohesion}%`;
+    trust.textContent = `${evaluation.trust}%`;
     container.innerHTML = `
       <div><span>AVG LEVEL</span><strong>${evaluation.averageLevel.toFixed(1)}</strong></div>
       <div><span>COMBAT</span><strong>${evaluation.combatPower}</strong></div>
@@ -139,7 +143,7 @@ export class SquadOverlay {
         card.innerHTML = `
           <div class="squad-member__identity">
             <strong>${hero?.name ?? "Unknown hero"}</strong>
-            <span>Lv ${hero?.level ?? 0} · ${hero?.previousOccupation ?? "Unknown"}</span>
+            <span>Lv ${hero?.level ?? 0} · ${hero?.heroClass ?? "Unknown"} · ${hero?.origin.occupation ?? "Unknown"}</span>
           </div>
           <button type="button" data-squad-action="remove" data-hero-id="${member.heroId}" aria-label="Remove ${hero?.name ?? "hero"}">×</button>
           <label>Position<select data-squad-field="formation" data-hero-id="${member.heroId}">${this.renderOptions(FORMATIONS, member.formation)}</select></label>

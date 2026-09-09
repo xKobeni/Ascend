@@ -35,6 +35,55 @@ export interface Personality {
   loyalty: number;
 }
 
+export type OriginCategory =
+  | "Civilian"
+  | "Leadership"
+  | "Military"
+  | "Rare"
+  | "Skilled"
+  | "Underworld"
+  | "Wilderness";
+
+export type OriginRarity = "Common" | "Rare" | "Specialized";
+
+export interface HeroOrigin {
+  aptitudes: string[];
+  category: OriginCategory;
+  occupation: string;
+  rarity: OriginRarity;
+}
+
+export type HeroClass = "Unclassified";
+export type SocialRole = "Resident";
+
+export interface HeroReputation {
+  renown: number;
+  title: string | null;
+}
+
+export type RelationshipEventType = "argument" | "conversation" | "help" | "training";
+
+export interface RelationshipHistoryEntry {
+  day: number;
+  minuteOfDay: number;
+  summary: string;
+  type: RelationshipEventType;
+}
+
+export interface RelationshipMetrics {
+  affinity: number;
+  fear: number;
+  jealousy: number;
+  respect: number;
+  rivalry: number;
+  trust: number;
+}
+
+export interface RelationshipProfile {
+  history: RelationshipHistoryEntry[];
+  metrics: RelationshipMetrics;
+}
+
 export type HiddenPotential = Record<keyof HeroAttributes, number>;
 
 export interface HeroNeeds {
@@ -82,30 +131,24 @@ export interface HeroMovement {
   targetActivity: Exclude<HeroActivity, "Walking">;
 }
 
-export type PreviousOccupation =
-  | "Farmer"
-  | "Hunter"
-  | "Mechanic"
-  | "Nurse"
-  | "Soldier"
-  | "Student"
-  | "Teacher";
-
 export interface Hero {
   age: number;
   appearance: HeroAppearance;
   attributes: HeroAttributes;
   hiddenPotential: HiddenPotential;
+  heroClass: HeroClass;
   id: string;
   level: number;
   movement: HeroMovement;
   name: string;
   needs: HeroNeeds;
+  origin: HeroOrigin;
   personality: Personality;
-  previousOccupation: PreviousOccupation;
   rank: number;
-  relationships: Record<string, number>;
+  relationships: Record<string, RelationshipProfile>;
+  reputation: HeroReputation;
   skills: HeroSkills;
+  socialRole: SocialRole;
   traits: string[];
   training: HeroTraining;
 }

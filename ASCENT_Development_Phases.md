@@ -362,6 +362,12 @@ Teacher
 
 Occupations influence initial skills.
 
+Treat this as origin occupation, separate from future class and refuge social role. Expand the pool
+across civilian, skilled, underworld, military, leadership, wilderness, and rare backgrounds. Store
+origin category, rarity, and practical aptitudes. Civilian origins remain most common; rare origins
+use lower generation weights. All heroes still begin with class `Unclassified` and social role
+`Resident` until those later systems are implemented.
+
 ## Exit Criteria
 
 Two randomly generated heroes should feel mechanically different.
@@ -494,6 +500,9 @@ Create basic social simulation.
 
 Each hero tracks other heroes.
 
+Each directional entry stores affinity, trust, respect, fear, jealousy, rivalry, and a bounded event
+history. Labels are derived from this profile; they do not replace it.
+
 ### 6.2 Social Interaction
 
 Heroes occasionally interact.
@@ -520,6 +529,9 @@ Neutral
 Friend
 Close Friend
 ```
+
+Also support contextual summaries such as Companion, Trusted Friend, Rival, and Distrust when the
+underlying dimensions justify them. A rival can have high respect without high affinity.
 
 ### 6.5 Event Logging
 
@@ -633,6 +645,9 @@ Display:
 - Combat power
 - Healing
 - Defense
+
+Also display initial squad cohesion and trust derived from member relationships. These are
+descriptive during Phase 8; combat bonuses remain deferred until combat and Utility AI exist.
 
 ## Exit Criteria
 
@@ -1352,6 +1367,11 @@ Endurance 5
 Shield Skill 4
 ```
 
+Class possibilities are calculated from origin experience, training, stats, personality, combat
+experience, achievements, and discovered compatibility. Origin occupation may help satisfy a
+requirement but never selects a class automatically. Magical potential remains mostly hidden and
+rare.
+
 ### 23.4 Class Selection
 
 Only unlocked classes can be chosen.
@@ -1407,6 +1427,9 @@ Protect 20 allies
 
 Two heroes with similar stats can develop differently.
 
+Reserve hybrid branches for heroes with evidence in multiple disciplines, such as Spellblade,
+Arcane Guardian, Arcane Archer, Mystic Healer, Vanguard Commander, Scout Captain, and Paladin.
+
 ---
 
 # Phase 25 — Mentorship
@@ -1428,6 +1451,10 @@ Student improves faster.
 ### 25.3 Relationship Growth
 
 Mentorship increases relationship.
+
+Store mentor/protégé as a meaningful relationship bond. Shared training raises trust and respect;
+mentor death can later create grief, motivation, or a possible inherited technique through the
+memory system.
 
 ### 25.4 Skill Transfer
 
@@ -1618,6 +1645,12 @@ Events should use:
 - Morale
 - Memories
 
+### 30.2 Social Roles and Reputation
+
+Let repeated refuge behavior establish roles such as Quartermaster, Instructor, Caregiver, Scout,
+or Captain. Generate settlement reputation from witnessed history rather than assigning arbitrary
+titles. Reputation is public belief and may differ from personality or hidden traits.
+
 ## Exit Criteria
 
 Social events are generated from hero context, not pure randomness.
@@ -1639,6 +1672,10 @@ Track hero trust in Overseer.
 ### 31.2 Order Compliance
 
 Deployment can be refused.
+
+Calculate attitude toward authority from loyalty, trust, respect, fear, morale, and relevant
+relationship history. Surface an understandable state such as Obedient, Respectful, Neutral,
+Questioning, Defiant, or Rebellious.
 
 ### 31.3 Refusal Reasons
 
@@ -1680,6 +1717,10 @@ Refuse Retreat Without Friend
 ```
 
 Use Utility AI modifiers.
+
+Recognize combat bonds such as trusted teammate, shieldmate, life debt, survivor bond, mentor,
+protégé, found family, and nemesis. These labels must be earned from concrete history and remain
+directional where appropriate.
 
 ## Exit Criteria
 

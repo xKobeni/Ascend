@@ -30,7 +30,7 @@ export class HeroGenerator {
     rosterIndex: number,
     usedNames?: ReadonlySet<string>,
   ): Hero {
-    const occupation = this.random.pick(OCCUPATIONS);
+    const occupation = this.pickOccupation();
     const attributes = this.generateAttributes(occupation);
     const skills = this.generateSkills(occupation);
     const personality = this.generatePersonality();
@@ -40,16 +40,24 @@ export class HeroGenerator {
       appearance: this.generateAppearance(),
       attributes,
       hiddenPotential: this.generateHiddenPotential(),
+      heroClass: "Unclassified",
       id: crypto.randomUUID(),
       level: 1,
       movement: initialMovement,
       name: this.names.generate(usedNames),
       needs: this.generateNeeds(rosterIndex),
+      origin: {
+        aptitudes: [...occupation.aptitudes],
+        category: occupation.category,
+        occupation: occupation.name,
+        rarity: occupation.rarity,
+      },
       personality,
-      previousOccupation: occupation.name,
       rank: 1,
       relationships: {},
+      reputation: { renown: 0, title: null },
       skills,
+      socialRole: "Resident",
       traits: this.generateTraits(attributes, personality),
       training: {
         active: null,
@@ -58,6 +66,25 @@ export class HeroGenerator {
         queue: [],
       },
     };
+  }
+
+  private pickOccupation(): OccupationDefinition {
+    const totalWeight = OCCUPATIONS.reduce(
+      (total, occupation) => total + occupation.selectionWeight,
+      0,
+    );
+    let roll = this.random.float(0, totalWeight);
+    for (const occupation of OCCUPATIONS) {
+      roll -= occupation.selectionWeight;
+      if (roll <= 0) {
+        return occupation;
+      }
+    }
+    const fallback = OCCUPATIONS.at(-1);
+    if (!fallback) {
+      throw new Error("At least one origin occupation is required.");
+    }
+    return fallback;
   }
 
   private generateNeeds(rosterIndex: number): HeroNeeds {

@@ -134,6 +134,15 @@ kbd {
   font: 11px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
+.hero-panel__path {
+  margin-top: 5px;
+  padding: 6px 7px;
+  border-left: 2px solid rgb(120 200 212 / 42%);
+  background: rgb(74 111 117 / 10%);
+  color: #92a6ab;
+  font: 9px/1.5 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
 .hero-panel__relationships {
   display: grid;
   gap: 5px;
@@ -150,16 +159,34 @@ kbd {
 .hero-panel__relationships > div > span:last-child {
   color: #aab7ba;
   white-space: nowrap;
+  text-align: right;
 }
 
-.hero-panel__relationships [data-relationship="friend"] > span:last-child,
-.hero-panel__relationships [data-relationship="close-friend"] > span:last-child {
+.hero-panel__relationships > div > span:last-child strong,
+.hero-panel__relationships > div > span:last-child small {
+  display: block;
+}
+
+.hero-panel__relationships > div > span:last-child small {
+  margin-top: 1px;
+  color: #71858a;
+  font-size: 8px;
+  font-weight: 400;
+}
+
+.hero-panel__relationships [data-relationship="friend"] > span:last-child strong,
+.hero-panel__relationships [data-relationship="trusted-friend"] > span:last-child strong,
+.hero-panel__relationships [data-relationship="companion"] > span:last-child strong {
   color: #82c7b2;
 }
 
-.hero-panel__relationships [data-relationship="dislike"] > span:last-child,
-.hero-panel__relationships [data-relationship="enemy"] > span:last-child {
+.hero-panel__relationships [data-relationship="distrust"] > span:last-child strong,
+.hero-panel__relationships [data-relationship="enemy"] > span:last-child strong {
   color: #d98a78;
+}
+
+.hero-panel__relationships [data-relationship="rival"] > span:last-child strong {
+  color: #d1b77f;
 }
 
 .social-log {
@@ -342,6 +369,11 @@ kbd {
 
 .squad-overlay__meta strong[data-ready="true"] {
   color: #82c7b2;
+}
+
+.squad-overlay__meta b {
+  color: #aabbbf;
+  font-weight: 600;
 }
 
 .squad-overlay__evaluation {

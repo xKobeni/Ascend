@@ -2,6 +2,7 @@ import type { Hero } from "../heroes/Hero";
 import type {
   FormationPosition,
   Squad,
+  SquadChemistry,
   SquadEvaluation,
   SquadRole,
 } from "./Squad";
@@ -81,7 +82,16 @@ export class SquadSystem {
       .map(({ heroId }) => heroes.find((hero) => hero.id === heroId))
       .filter((hero): hero is Readonly<Hero> => hero !== undefined);
     if (members.length === 0) {
-      return { averageLevel: 0, combatPower: 0, defense: 0, healing: 0, isComplete: false };
+      return {
+        averageLevel: 0,
+        chemistry: "Unformed",
+        cohesion: 0,
+        combatPower: 0,
+        defense: 0,
+        healing: 0,
+        isComplete: false,
+        trust: 0,
+      };
     }
 
     const totals = members.reduce(
@@ -99,12 +109,70 @@ export class SquadSystem {
       { combatPower: 0, defense: 0, healing: 0, level: 0 },
     );
 
+    const social = this.evaluateChemistry(members);
     return {
       averageLevel: totals.level / members.length,
+      chemistry: this.getChemistryLabel(social.cohesion, members.length),
+      cohesion: social.cohesion,
       combatPower: Math.round(totals.combatPower),
       defense: Math.round(totals.defense),
       healing: Math.round(totals.healing),
       isComplete: members.length === SQUAD_SIZE,
+      trust: social.trust,
     };
+  }
+
+  private evaluateChemistry(members: readonly Readonly<Hero>[]): { cohesion: number; trust: number } {
+    if (members.length < 2) {
+      return { cohesion: 0, trust: 0 };
+    }
+    const profiles = members.flatMap((hero) =>
+      members
+        .filter((other) => other.id !== hero.id)
+        .map((other) => hero.relationships[other.id])
+        .filter((profile) => profile !== undefined),
+    );
+    if (profiles.length === 0) {
+      return { cohesion: 0, trust: 0 };
+    }
+    const totals = profiles.reduce(
+      (result, profile) => {
+        const { affinity, fear, jealousy, respect, trust } = profile.metrics;
+        const normalizedAffinity = (affinity + 100) / 2;
+        result.cohesion +=
+          normalizedAffinity * 0.25 +
+          trust * 0.35 +
+          respect * 0.25 +
+          (100 - fear) * 0.15 -
+          jealousy * 0.1;
+        result.trust += trust;
+        return result;
+      },
+      { cohesion: 0, trust: 0 },
+    );
+    return {
+      cohesion: this.clampPercentage(Math.round(totals.cohesion / profiles.length)),
+      trust: this.clampPercentage(Math.round(totals.trust / profiles.length)),
+    };
+  }
+
+  private getChemistryLabel(cohesion: number, memberCount: number): SquadChemistry {
+    if (memberCount < 2) {
+      return "Unformed";
+    }
+    if (cohesion >= 80) {
+      return "Bound";
+    }
+    if (cohesion >= 65) {
+      return "Cohesive";
+    }
+    if (cohesion >= 45) {
+      return "Developing";
+    }
+    return "Fragile";
+  }
+
+  private clampPercentage(value: number): number {
+    return Math.min(100, Math.max(0, value));
   }
 }

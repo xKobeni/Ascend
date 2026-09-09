@@ -1,8 +1,20 @@
 import { Random } from "../core/Random";
-import type { Hero } from "./Hero";
+import type {
+  Hero,
+  RelationshipEventType,
+  RelationshipMetrics,
+  RelationshipProfile,
+} from "./Hero";
 
-export type RelationshipLabel = "Close Friend" | "Dislike" | "Enemy" | "Friend" | "Neutral";
-export type SocialEventType = "argument" | "conversation" | "help" | "training";
+export type RelationshipLabel =
+  | "Companion"
+  | "Distrust"
+  | "Enemy"
+  | "Friend"
+  | "Neutral"
+  | "Rival"
+  | "Trusted Friend";
+export type SocialEventType = RelationshipEventType;
 
 export interface SocialEvent {
   actorId: string;
@@ -21,20 +33,28 @@ interface InteractionPair {
 }
 
 const MAX_EVENTS = 12;
+const MAX_RELATIONSHIP_HISTORY = 8;
 const INTERACTION_DISTANCE = 12;
 
-export function getRelationshipLabel(value: number): RelationshipLabel {
-  if (value <= -60) {
+export function getRelationshipLabel(profile: Readonly<RelationshipProfile>): RelationshipLabel {
+  const { affinity, respect, rivalry, trust } = profile.metrics;
+  if (affinity <= -60 || (affinity < -30 && trust <= 15)) {
     return "Enemy";
   }
-  if (value <= -20) {
-    return "Dislike";
+  if (rivalry >= 65 && respect >= 45) {
+    return "Rival";
   }
-  if (value >= 60) {
-    return "Close Friend";
+  if (trust <= 20 && affinity < 10) {
+    return "Distrust";
   }
-  if (value >= 20) {
+  if (trust >= 70 && affinity >= 45) {
+    return "Trusted Friend";
+  }
+  if (affinity >= 25) {
     return "Friend";
+  }
+  if (trust >= 45 && respect >= 45) {
+    return "Companion";
   }
   return "Neutral";
 }
@@ -59,7 +79,35 @@ export class RelationshipSystem {
           (other.personality.empathy - other.personality.aggression) * 8 +
           (heroIndex - otherIndex) * 1.5 +
           this.random.float(-8, 8);
-        hero.relationships[other.id] = this.clampRelationship(Math.round(affinity));
+        const trust =
+          28 + hero.personality.loyalty * 18 + other.personality.discipline * 12 + this.random.float(-8, 8);
+        const respect =
+          20 +
+          other.attributes.leadership * 2 +
+          other.skills.leadership * 2 +
+          other.personality.bravery * 14 +
+          this.random.float(-6, 6);
+        const fear =
+          other.personality.aggression * 22 +
+          other.attributes.strength * 1.5 -
+          hero.personality.bravery * 16 +
+          this.random.float(0, 5);
+        const rivalry =
+          (hero.personality.ambition + other.personality.ambition) * 12 +
+          Math.max(0, 5 - Math.abs(hero.level - other.level)) * 2 +
+          this.random.float(0, 8);
+
+        hero.relationships[other.id] = {
+          history: [],
+          metrics: {
+            affinity: this.clampSigned(Math.round(affinity)),
+            fear: this.clampUnsigned(Math.round(fear)),
+            jealousy: this.clampUnsigned(Math.round(this.random.float(0, 14))),
+            respect: this.clampUnsigned(Math.round(respect)),
+            rivalry: this.clampUnsigned(Math.round(rivalry)),
+            trust: this.clampUnsigned(Math.round(trust)),
+          },
+        };
       });
     });
   }
@@ -110,34 +158,38 @@ export class RelationshipSystem {
   private interact(pair: InteractionPair, day: number, minuteOfDay: number): void {
     const helperPair = this.getHelperPair(pair);
     if (helperPair) {
-      this.applyMutualModifier(helperPair.actor, helperPair.target, 5, 3);
-      this.addEvent(
+      const message = `${helperPair.actor.name} helped injured ${helperPair.target.name}.`;
+      this.applyMutualInteraction(
         helperPair.actor,
         helperPair.target,
+        { affinity: 3, respect: 2, trust: 3 },
+        { affinity: 5, respect: 3, trust: 6 },
         "help",
-        5,
-        `${helperPair.actor.name} helped injured ${helperPair.target.name}.`,
+        message,
         day,
         minuteOfDay,
       );
+      this.addEvent(helperPair.actor, helperPair.target, "help", 5, message, day, minuteOfDay);
       return;
     }
 
     if (pair.actor.movement.activity === "Training") {
-      this.applyMutualModifier(pair.actor, pair.target, 1, 1);
-      this.addEvent(
+      const message = `${pair.actor.name} trained with ${pair.target.name}.`;
+      this.applyMutualInteraction(
         pair.actor,
         pair.target,
+        { affinity: 1, respect: 2, rivalry: 2, trust: 1 },
+        { affinity: 1, respect: 2, rivalry: 2, trust: 1 },
         "training",
-        1,
-        `${pair.actor.name} trained with ${pair.target.name}.`,
+        message,
         day,
         minuteOfDay,
       );
+      this.addEvent(pair.actor, pair.target, "training", 1, message, day, minuteOfDay);
       return;
     }
 
-    const currentRelationship = pair.actor.relationships[pair.target.id] ?? 0;
+    const currentRelationship = this.getProfile(pair.actor, pair.target).metrics.affinity;
     const socialTemper =
       pair.actor.personality.empathy +
       pair.target.personality.empathy +
@@ -148,33 +200,37 @@ export class RelationshipSystem {
       (pair.actor.needs.stress + pair.target.needs.stress) / 180;
 
     if (socialTemper < -0.2) {
-      this.applyMutualModifier(pair.actor, pair.target, -4, -4);
       pair.actor.needs.morale = Math.max(0, pair.actor.needs.morale - 2);
       pair.target.needs.morale = Math.max(0, pair.target.needs.morale - 2);
       pair.actor.needs.stress = Math.min(100, pair.actor.needs.stress + 3);
       pair.target.needs.stress = Math.min(100, pair.target.needs.stress + 3);
-      this.addEvent(
+      const message = `${pair.actor.name} argued with ${pair.target.name}.`;
+      this.applyMutualInteraction(
         pair.actor,
         pair.target,
+        { affinity: -4, jealousy: 1, rivalry: 3, trust: -3 },
+        { affinity: -4, jealousy: 1, rivalry: 3, trust: -3 },
         "argument",
-        -4,
-        `${pair.actor.name} argued with ${pair.target.name}.`,
+        message,
         day,
         minuteOfDay,
       );
+      this.addEvent(pair.actor, pair.target, "argument", -4, message, day, minuteOfDay);
       return;
     }
 
-    this.applyMutualModifier(pair.actor, pair.target, 2, 2);
-    this.addEvent(
+    const message = `${pair.actor.name} shared a friendly conversation with ${pair.target.name}.`;
+    this.applyMutualInteraction(
       pair.actor,
       pair.target,
+      { affinity: 2, trust: 1 },
+      { affinity: 2, trust: 1 },
       "conversation",
-      2,
-      `${pair.actor.name} shared a friendly conversation with ${pair.target.name}.`,
+      message,
       day,
       minuteOfDay,
     );
+    this.addEvent(pair.actor, pair.target, "conversation", 2, message, day, minuteOfDay);
   }
 
   private getHelperPair(pair: InteractionPair): InteractionPair | null {
@@ -187,18 +243,50 @@ export class RelationshipSystem {
     return null;
   }
 
-  private applyMutualModifier(
+  private applyMutualInteraction(
     actor: Hero,
     target: Hero,
-    actorModifier: number,
-    targetModifier: number,
+    actorChanges: Partial<RelationshipMetrics>,
+    targetChanges: Partial<RelationshipMetrics>,
+    type: RelationshipEventType,
+    summary: string,
+    day: number,
+    minuteOfDay: number,
   ): void {
-    actor.relationships[target.id] = this.clampRelationship(
-      (actor.relationships[target.id] ?? 0) + actorModifier,
-    );
-    target.relationships[actor.id] = this.clampRelationship(
-      (target.relationships[actor.id] ?? 0) + targetModifier,
-    );
+    this.applyChanges(this.getProfile(actor, target), actorChanges);
+    this.applyChanges(this.getProfile(target, actor), targetChanges);
+    this.recordHistory(this.getProfile(actor, target), type, summary, day, minuteOfDay);
+    this.recordHistory(this.getProfile(target, actor), type, summary, day, minuteOfDay);
+  }
+
+  private applyChanges(
+    profile: RelationshipProfile,
+    changes: Partial<RelationshipMetrics>,
+  ): void {
+    (Object.keys(changes) as Array<keyof RelationshipMetrics>).forEach((metric) => {
+      const next = profile.metrics[metric] + (changes[metric] ?? 0);
+      profile.metrics[metric] =
+        metric === "affinity" ? this.clampSigned(next) : this.clampUnsigned(next);
+    });
+  }
+
+  private recordHistory(
+    profile: RelationshipProfile,
+    type: RelationshipEventType,
+    summary: string,
+    day: number,
+    minuteOfDay: number,
+  ): void {
+    profile.history.unshift({ day, minuteOfDay, summary, type });
+    profile.history.splice(MAX_RELATIONSHIP_HISTORY);
+  }
+
+  private getProfile(actor: Hero, target: Hero): RelationshipProfile {
+    const profile = actor.relationships[target.id];
+    if (!profile) {
+      throw new Error(`Relationship profile missing for ${actor.name} and ${target.name}.`);
+    }
+    return profile;
   }
 
   private addEvent(
@@ -231,7 +319,11 @@ export class RelationshipSystem {
     );
   }
 
-  private clampRelationship(value: number): number {
+  private clampSigned(value: number): number {
     return Math.min(100, Math.max(-100, value));
+  }
+
+  private clampUnsigned(value: number): number {
+    return Math.min(100, Math.max(0, value));
   }
 }

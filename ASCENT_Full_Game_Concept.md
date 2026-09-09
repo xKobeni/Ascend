@@ -453,6 +453,20 @@ Every recruit receives:
 - Starting rank
 - Preferred weapons
 
+Hero identity is intentionally split into three independent layers:
+
+```text
+Origin Occupation → what the hero did before the Rift
+Class             → what the hero becomes through training and experience
+Social Role       → what the hero becomes inside the refuge
+```
+
+An occupation can influence starting attributes, skills, and practical aptitudes, but it never
+locks a class. Civilian origins should remain common, specialized origins less common, and rare
+backgrounds such as Elite Knight, Arcane Scholar, or Veteran Commander should feel exceptional.
+Practical aptitudes such as tracking, repair, plant knowledge, logistics, and instruction give
+apparently weak recruits long-term value outside raw combat power.
+
 Example:
 
 ```text
@@ -726,7 +740,24 @@ Memories influence future behavior.
 
 # 17. Relationship System
 
-Every hero has relationships with others.
+Every hero has directional relationships with others. A relationship is not one opinion score; it
+is a profile containing:
+
+```ts
+interface RelationshipProfile {
+  affinity: number;   // -100 to +100
+  trust: number;      // 0 to 100
+  respect: number;    // 0 to 100
+  fear: number;       // 0 to 100
+  jealousy: number;   // 0 to 100
+  rivalry: number;    // 0 to 100
+  history: RelationshipEvent[];
+}
+```
+
+This allows a hero to dislike someone while still trusting and respecting their ability. Each
+conversation, argument, shared training session, rescue, loss, and mission should leave a bounded
+history entry so important relationship changes can be explained to the player.
 
 Range:
 
@@ -742,7 +773,7 @@ Marcus → Elias: +63
 Nia → Kara: -42
 ```
 
-Relationship labels:
+Relationship labels are derived summaries rather than the underlying state:
 
 - Enemy
 - Rival
@@ -754,6 +785,10 @@ Relationship labels:
 - Romantic Interest
 - Partner
 - Family-Like Bond
+
+Long-lived relationship types can include mentor/protégé, trusted teammate, shieldmate, life debt,
+survivor bond, found family, and nemesis. Romance remains subtle and serves the survival drama rather
+than becoming a separate dating system.
 
 Relationships need not be symmetrical.
 
@@ -775,6 +810,21 @@ A hero may:
 - Fight harder near a trusted leader
 
 This creates emergent squad behavior.
+
+## 18.1 Squad Chemistry
+
+Squads expose a readable cohesion and trust summary derived from the directional relationships of
+their members. Repeated safe training and successful expeditions can improve chemistry; distrust,
+fear, jealousy, grief, or unresolved conflict can weaken it. Combat effects such as rescue priority,
+formation stability, panic resistance, healing coordination, and retreat consistency are introduced
+only when their supporting combat systems exist.
+
+## 18.2 Settlement Reputation
+
+Reputation describes what the refuge believes about a hero, not necessarily who that hero truly is.
+Possible earned titles include Survivor, Coward, Prodigy, Protector, Reliable Captain, Monster
+Slayer, Butcher, Lucky One, and Living Legend. Reputation grows from witnessed events and expedition
+history and may later influence first impressions, authority, fear, and morale.
 
 ---
 
@@ -871,6 +921,22 @@ Classes emerge based on:
 - Training
 - Experience
 - Achievements
+
+Origin occupation contributes experience and possible affinities, but never determines class by
+itself. Magical compatibility is mostly hidden and rare. Initial branches should stay readable:
+
+```text
+Martial:   Fighter → Swordsman / Axeman / Brawler
+Defense:  Defender → Shieldbearer / Vanguard
+Spear:    Spearman → Lancer / Pikeman / Dragoon
+Ranged:   Archer → Ranger / Sharpshooter
+Rogue:    Rogue → Thief / Scout / Trickster
+Support:  Medic / Priest / Alchemist
+Command:  Leader → Squad Captain / Commander / Tactician
+```
+
+Hybrid classes require evidence from more than one discipline, for example Spellblade, Arcane
+Guardian, Arcane Archer, Mystic Healer, Vanguard Commander, Scout Captain, or Paladin.
 
 Example:
 
