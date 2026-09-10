@@ -23,6 +23,7 @@ export interface UtilityTarget {
 export interface UtilityActor extends UtilityTarget {
   medicine: number;
   personality: Readonly<Personality>;
+  preparedSkillIds: ReadonlySet<string>;
   relationships: Readonly<Record<string, Readonly<RelationshipProfile>>>;
   role: string;
   traits: readonly string[];
@@ -134,6 +135,7 @@ export function scoreCombatActions(
       targetId: vulnerableAlly?.id ?? null,
       valid: Boolean(
         vulnerableAlly &&
+        (actor.preparedSkillIds.has("interpose") || actor.preparedSkillIds.has("protective_instinct")) &&
         (vulnerableAlly.formation !== "Front" || actor.tacticalRole === "Defender") &&
         (allyRisk >= 0.3 || isProtective),
       ),
@@ -148,7 +150,12 @@ export function scoreCombatActions(
       ]),
       score: woundedRatio * 62 + actor.medicine * 5 + (actor.role === "Support" ? 30 : 0) + (actor.tacticalRole === "Medic" ? 28 : 0) + empathy * 14,
       targetId: woundedAlly?.id ?? null,
-      valid: Boolean(woundedAlly && actor.medicine > 0 && actor.tacticalRole === "Medic"),
+      valid: Boolean(
+        woundedAlly &&
+        actor.medicine > 0 &&
+        actor.tacticalRole === "Medic" &&
+        actor.preparedSkillIds.has("field_treatment"),
+      ),
     },
     Reposition: {
       reason: dominantReason([

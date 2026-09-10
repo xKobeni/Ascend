@@ -5,6 +5,12 @@ import type {
   OriginRarity,
 } from "./Hero";
 
+export interface OccupationVisualModifiers {
+  readonly armThickness?: number;
+  readonly hipWidth?: number;
+  readonly shoulderWidth?: number;
+}
+
 export interface OccupationDefinition {
   aptitudes: readonly string[];
   attributeModifiers: Partial<HeroAttributes>;
@@ -13,6 +19,7 @@ export interface OccupationDefinition {
   rarity: OriginRarity;
   selectionWeight: number;
   skillModifiers: Partial<HeroSkills>;
+  visualModifiers?: OccupationVisualModifiers;
 }
 
 export const OCCUPATIONS: readonly OccupationDefinition[] = [
@@ -42,6 +49,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Formation discipline", "Weapon familiarity", "Field endurance"],
     attributeModifiers: { endurance: 1, leadership: 1, strength: 1 },
     skillModifiers: { defense: 3, leadership: 1, sword: 3 },
+    visualModifiers: { shoulderWidth: 1.12, armThickness: 1.08 },
   },
   {
     name: "Student",
@@ -69,6 +77,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Tracking", "Fieldcraft", "Patient aim"],
     attributeModifiers: { agility: 2, endurance: 1 },
     skillModifiers: { defense: 1, spear: 3 },
+    visualModifiers: { armThickness: 1.05 },
   },
   {
     name: "Teacher",
@@ -96,6 +105,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Hard labor", "Timber knowledge"],
     attributeModifiers: { strength: 2, endurance: 1 },
     skillModifiers: { defense: 1 },
+    visualModifiers: { shoulderWidth: 1.08, armThickness: 1.1 },
   },
   {
     name: "Miner",
@@ -105,6 +115,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Stone sense", "Tunnel awareness", "Hard labor"],
     attributeModifiers: { endurance: 2, willpower: 1 },
     skillModifiers: { defense: 2 },
+    visualModifiers: { shoulderWidth: 1.06, armThickness: 1.08 },
   },
   {
     name: "Cook",
@@ -132,6 +143,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Metalworking", "Weapon appraisal", "Equipment repair"],
     attributeModifiers: { strength: 2, endurance: 1 },
     skillModifiers: { defense: 2, sword: 1 },
+    visualModifiers: { shoulderWidth: 1.1, armThickness: 1.12 },
   },
   {
     name: "Herbalist",
@@ -213,6 +225,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Threat assessment", "Weapon familiarity", "Independence"],
     attributeModifiers: { strength: 1, agility: 1, willpower: 1 },
     skillModifiers: { defense: 2, sword: 2 },
+    visualModifiers: { shoulderWidth: 1.06, armThickness: 1.06 },
   },
   {
     name: "Spy",
@@ -231,6 +244,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Vigilance", "Formation discipline", "Protection"],
     attributeModifiers: { endurance: 1, strength: 1 },
     skillModifiers: { defense: 3, spear: 2 },
+    visualModifiers: { shoulderWidth: 1.1, armThickness: 1.06 },
   },
   {
     name: "Scout",
@@ -330,6 +344,7 @@ export const OCCUPATIONS: readonly OccupationDefinition[] = [
     aptitudes: ["Advanced swordplay", "Command", "Protection"],
     attributeModifiers: { endurance: 2, leadership: 2, strength: 2 },
     skillModifiers: { defense: 4, leadership: 2, sword: 4 },
+    visualModifiers: { shoulderWidth: 1.15, armThickness: 1.1 },
   },
   {
     name: "Arcane Scholar",

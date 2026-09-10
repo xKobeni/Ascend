@@ -577,7 +577,11 @@ Combat-derived stats:
 
 ---
 
-# 13. Skills
+# 13. Hero Skill Forge
+
+`Hero Skill Forge` is the umbrella progression feature. It produces personal skill histories rather
+than fixed class skill trees. `HeroSkillGenerator` creates starting affinities and innate skills;
+progression, discovery, evolution, loadouts, and legacy inheritance remain separate systems.
 
 Skill categories:
 
@@ -614,6 +618,21 @@ Skill categories:
 - Intimidation
 
 Skills improve through use.
+
+Each hero owns individual skill records containing level, XP, proficiency, source, and mastery.
+Level represents developed power; proficiency represents current execution quality and may become
+rusty without deleting earned levels.
+
+Heroes distinguish between:
+
+- Known skills
+- Prepared active skills
+- Prepared passive skills
+- Automatic reactions and instincts
+
+Classes improve access to compatible definitions but never erase skills earned through occupation,
+training, combat, relationships, or earlier life history. Two heroes with the same class and weapon
+can therefore develop different techniques, branches, passives, and unique skills.
 
 ---
 
@@ -1012,7 +1031,7 @@ Classes should branch.
 
 ---
 
-# 24. Experience-Based Skill Unlocks
+# 24. Skill Discovery and Evolution
 
 Skills may unlock from behavior.
 
@@ -1041,6 +1060,14 @@ Can stabilize critically wounded allies during expeditions.
 ```
 
 This encourages emergent development.
+
+`SkillDiscoverySystem` evaluates typed training, combat, expedition, injury, relationship, memory,
+class, and equipment events. Conditions remain hidden until enough evidence reveals a possibility.
+It does not grant every eligible skill automatically.
+
+Skills can evolve linearly or branch according to how a hero used them. Mastered skills become
+eligible for evolution but do not guarantee one. Rare awakenings require meaningful supported
+conditions, and mentorship or death-linked legacy variants are added only after those systems exist.
 
 ---
 
@@ -2048,6 +2075,16 @@ heroes/
   MemorySystem.ts
   RelationshipSystem.ts
   NeedsSystem.ts
+
+skills/
+  Skill.ts
+  SkillDefinitionRegistry.ts
+  HeroSkillGenerator.ts
+  SkillProgressionSystem.ts
+  SkillLoadoutSystem.ts
+  SkillDiscoverySystem.ts
+  SkillEvolutionSystem.ts
+  SkillLegacySystem.ts
 
 training/
   TrainingSystem.ts

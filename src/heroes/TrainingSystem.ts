@@ -1,12 +1,21 @@
 import { Random } from "../core/Random";
 import type { Hero, TrainingAssignment, TrainingType } from "./Hero";
 import type { NeedsSystem } from "./NeedsSystem";
+import { SkillDiscoverySystem } from "../skills/SkillDiscoverySystem";
+import { SkillLoadoutSystem } from "../skills/SkillLoadoutSystem";
+import { SkillProgressionSystem } from "../skills/SkillProgressionSystem";
+import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 
 const MAX_TRAINING_SLOTS = 3;
 const INJURY_CHECK_INTERVAL_MINUTES = 60;
 
 export class TrainingSystem {
-  constructor(private readonly random = Random.fromEntropy()) {}
+  constructor(
+    private readonly skillProgression: SkillProgressionSystem,
+    private readonly skillDiscovery: SkillDiscoverySystem,
+    private readonly skillLoadout: SkillLoadoutSystem,
+    private readonly random = Random.fromEntropy(),
+  ) {}
 
   queueTraining(hero: Hero, type: TrainingType): boolean {
     const occupiedSlots = hero.training.queue.length + Number(hero.training.active !== null);
@@ -72,24 +81,35 @@ export class TrainingSystem {
     }
 
     if (assignment.type === "Defense Training") {
-      const previous = hero.skills.defense;
-      hero.skills.defense = Math.min(10, previous + 1);
-      hero.training.lastOutcome = this.describeImprovement(
-        "Defense",
-        previous,
-        hero.skills.defense,
-      );
+      this.completeSkillTraining(hero, "brace");
       return;
     }
 
     const skill = hero.skills.sword <= hero.skills.spear ? "sword" : "spear";
-    const previous = hero.skills[skill];
-    hero.skills[skill] = Math.min(10, previous + 1);
-    hero.training.lastOutcome = this.describeImprovement(
-      skill === "sword" ? "Sword" : "Spear",
-      previous,
-      hero.skills[skill],
+    this.completeSkillTraining(hero, `${skill}_mastery`);
+  }
+
+  private completeSkillTraining(hero: Hero, definitionId: string): void {
+    const discovered = this.skillDiscovery.tryDiscover(hero, definitionId, "training");
+    if (discovered) {
+      this.skillLoadout.autoPrepare(hero, definitionId);
+    }
+    const result = this.skillProgression.recordTrainingCompletion(
+      hero,
+      definitionId,
+      "Completed a deliberate training assignment.",
     );
+    if (!result) {
+      hero.training.lastOutcome = `${skillDefinitionRegistry.require(definitionId).name} could not improve yet.`;
+      return;
+    }
+    this.skillDiscovery.evaluateProgression(hero, definitionId, "training").forEach((skill) => {
+      this.skillLoadout.autoPrepare(hero, skill.definitionId);
+    });
+    const name = skillDefinitionRegistry.require(definitionId).name;
+    hero.training.lastOutcome = result.levelAfter > result.levelBefore
+      ? `${name} improved to ${result.levelAfter}.`
+      : `${name} gained ${result.gainedXp} XP.`;
   }
 
   private checkForInjury(hero: Hero, needsSystem: NeedsSystem): void {

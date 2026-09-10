@@ -822,6 +822,119 @@ kbd {
   color: #dbe9eb;
 }
 
+.hero-panel__skill-summary {
+  margin-bottom: 6px;
+  color: #95a8ad;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-panel__skill-list {
+  display: grid;
+  gap: 6px;
+}
+
+.hero-skill {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 7px;
+  padding: 6px 7px;
+  border: 1px solid rgb(124 168 175 / 18%);
+  border-radius: 5px;
+  background: rgb(59 78 82 / 13%);
+}
+
+.hero-skill[data-prepared="true"] {
+  border-color: rgb(110 193 178 / 32%);
+  background: rgb(53 104 93 / 14%);
+}
+
+.hero-skill__header {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  gap: 8px;
+  color: #dce8e9;
+  font: 10px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.hero-skill__header strong {
+  display: inline;
+}
+
+.hero-skill__header span,
+.hero-skill small {
+  color: #82969b;
+  font: 8px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  text-transform: capitalize;
+}
+
+.hero-skill small {
+  grid-column: 1;
+}
+
+.hero-skill__progress {
+  position: relative;
+  display: block;
+  grid-column: 1 / -1;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(120 145 150 / 18%);
+}
+
+.hero-skill__progress::after {
+  display: block;
+  width: var(--skill-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: #67aeba;
+  content: "";
+}
+
+.hero-skill .hero-skill__reason {
+  color: #a3b0b3;
+  text-transform: none;
+}
+
+.hero-skill button {
+  grid-row: 3 / span 3;
+  grid-column: 2;
+  align-self: end;
+  padding: 4px 5px;
+  border: 1px solid rgb(119 186 196 / 28%);
+  border-radius: 4px;
+  background: rgb(73 117 125 / 16%);
+  color: #c8dadd;
+  font: 8px/1.2 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  cursor: pointer;
+}
+
+.hero-skill button:hover:not(:disabled),
+.hero-skill button:focus-visible {
+  border-color: rgb(128 208 219 / 55%);
+  background: rgb(73 130 139 / 28%);
+  outline: none;
+}
+
+.hero-skill button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.hero-panel__skill-potential {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.hero-panel__skill-potential span {
+  padding: 3px 6px;
+  border: 1px dashed rgb(126 151 156 / 26%);
+  border-radius: 4px;
+  color: #72858a;
+  font: 9px/1.2 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
 .hero-panel__training [data-hero="training-active"] {
   color: #dce8e9;
   font: 10px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;

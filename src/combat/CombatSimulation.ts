@@ -16,14 +16,18 @@ import {
   getPreferredRange,
   getTacticalRole,
 } from "./FormationSystem";
+import type { SkillUsageEvent } from "../skills/Skill";
+import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
   medicine: number;
   personality: Hero["personality"];
+  preparedSkillIds: ReadonlySet<string>;
   relationships: Hero["relationships"];
   retreatLogged: boolean;
   traits: readonly string[];
+  weaponSkillId: "spear_mastery" | "sword_mastery" | null;
 }
 
 interface PlannedAction {
@@ -39,10 +43,15 @@ const MAX_LOG_ENTRIES = 10;
 export class CombatSimulation {
   private accumulatorSeconds = 0;
   private readonly combatants: Combatant[] = [];
+  private readonly lastSkillUsageTicks = new Map<string, number>();
   private readonly log: CombatLogEntry[] = [];
   private nextLogId = 1;
   private result: CombatResult = "Idle";
   private tick = 0;
+
+  constructor(
+    private readonly onSkillUsage: (event: Readonly<SkillUsageEvent>) => void = () => undefined,
+  ) {}
 
   start(squad: Readonly<Squad>, heroes: readonly Readonly<Hero>[]): boolean {
     if (squad.members.length !== 3) {
@@ -64,6 +73,9 @@ export class CombatSimulation {
       const lane = (index - 1) * 4.2;
       const tacticalRole = getTacticalRole(entry.member.role, entry.member.formation);
       const stats = applyFormationStats(this.getHeroStats(entry.hero, entry.member.role), tacticalRole);
+      const reactionSkills = Object.keys(entry.hero.skillForge.known).filter(
+        (definitionId) => skillDefinitionRegistry.get(definitionId)?.type === "reaction",
+      );
       this.combatants.push({
         action: "Idle",
         actionScores: [],
@@ -77,6 +89,11 @@ export class CombatSimulation {
         medicine: entry.hero.skills.medicine,
         personality: entry.hero.personality,
         position: getFormationStart(entry.member.formation, lane),
+        preparedSkillIds: new Set([
+          ...entry.hero.skillForge.loadout.active,
+          ...entry.hero.skillForge.loadout.passive,
+          ...reactionSkills,
+        ]),
         retreatLogged: false,
         relationships: entry.hero.relationships,
         role: entry.member.role,
@@ -84,6 +101,9 @@ export class CombatSimulation {
         tacticalRole,
         team: "Hero",
         traits: entry.hero.traits,
+        weaponSkillId: entry.hero.skills.spear >= entry.hero.skills.sword
+          ? "spear_mastery"
+          : "sword_mastery",
       });
     });
 
@@ -116,6 +136,7 @@ export class CombatSimulation {
           loyalty: 0,
         },
         position: { x: 7.5 + index * 0.6, z: (index - 1) * 4.2 },
+        preparedSkillIds: new Set(),
         retreatLogged: false,
         relationships: {},
         role: "Skirmisher",
@@ -123,6 +144,7 @@ export class CombatSimulation {
         tacticalRole: "Skirmisher",
         team: "Enemy",
         traits: [],
+        weaponSkillId: null,
       });
     });
     this.result = "Running";
@@ -175,9 +197,20 @@ export class CombatSimulation {
     plans.forEach((plan) => {
       if (plan.action === "Defend" && plan.actor.action !== "Defend") {
         this.addLog(`${plan.actor.label} braced to reduce incoming damage.`, "neutral");
+        this.recordCombatUsage(plan.actor, "brace", true, 2, "Braced against an immediate threat.");
       }
       if (plan.action === "Protect" && plan.actor.action !== "Protect" && plan.target) {
         this.addLog(`${plan.actor.label} moved to protect ${plan.target.label}.`, "success");
+        const protectionSkill = plan.actor.preparedSkillIds.has("interpose")
+          ? "interpose"
+          : "protective_instinct";
+        this.recordCombatUsage(
+          plan.actor,
+          protectionSkill,
+          true,
+          3,
+          `Protected ${plan.target.label}.`,
+        );
       }
       plan.actor.action = plan.action;
       plan.actor.defending = plan.action === "Defend" || plan.action === "Protect";
@@ -258,6 +291,13 @@ export class CombatSimulation {
         target.hp += restored;
         actor.attackCooldown = 1.1;
         this.addLog(`${actor.label} restored ${restored} HP to ${target.label}.`, "success");
+        this.recordCombatUsage(
+          actor,
+          "field_treatment",
+          restored > 0,
+          4,
+          `Treated ${target.label} during combat.`,
+        );
       }
       return;
     }
@@ -268,6 +308,16 @@ export class CombatSimulation {
     target.hp = Math.max(0, target.hp - damage);
     actor.attackCooldown = 0.75;
     this.addLog(`${actor.label} hit ${target.label} for ${damage}.`, actor.team === "Hero" ? "success" : "danger");
+    if (actor.weaponSkillId) {
+      this.recordCombatUsage(
+        actor,
+        actor.weaponSkillId,
+        damage > 0,
+        3,
+        `Landed a weapon attack against ${target.label}.`,
+        target.stats.attack / Math.max(1, actor.stats.attack),
+      );
+    }
     if (target.hp === 0) {
       target.action = "Dead";
       target.defending = false;
@@ -405,6 +455,37 @@ export class CombatSimulation {
     this.log.splice(MAX_LOG_ENTRIES);
   }
 
+  private recordCombatUsage(
+    actor: Readonly<Combatant>,
+    definitionId: string,
+    successful: boolean,
+    baseXp: number,
+    reason: string,
+    difficulty = 1,
+  ): void {
+    if (actor.team !== "Hero" || !actor.preparedSkillIds.has(definitionId)) {
+      return;
+    }
+    const usageKey = `${actor.id}:${definitionId}`;
+    const minimumTickGap = definitionId === "brace" || definitionId === "interpose" || definitionId === "protective_instinct"
+      ? 20
+      : 0;
+    const lastUsageTick = this.lastSkillUsageTicks.get(usageKey);
+    if (lastUsageTick !== undefined && this.tick - lastUsageTick < minimumTickGap) {
+      return;
+    }
+    this.lastSkillUsageTicks.set(usageKey, this.tick);
+    this.onSkillUsage({
+      baseXp,
+      definitionId,
+      difficulty,
+      heroId: actor.id,
+      reason,
+      source: "combat",
+      successful,
+    });
+  }
+
   private getDistance(left: Readonly<CombatPosition>, right: Readonly<CombatPosition>): number {
     return Math.hypot(left.x - right.x, left.z - right.z);
   }
@@ -413,6 +494,7 @@ export class CombatSimulation {
     this.accumulatorSeconds = 0;
     this.combatants.splice(0);
     this.log.splice(0);
+    this.lastSkillUsageTicks.clear();
     this.nextLogId = 1;
     this.result = "Idle";
     this.tick = 0;

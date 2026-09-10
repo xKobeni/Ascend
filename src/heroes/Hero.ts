@@ -1,9 +1,29 @@
-export type HairStyle = "bald" | "bun" | "cropped" | "mohawk" | "swept";
+import type { HeroSkillForge } from "../skills/Skill";
+
+export type HairStyle =
+  | "bald"
+  | "braided"
+  | "bun"
+  | "cropped"
+  | "curly"
+  | "long"
+  | "mohawk"
+  | "ponytail"
+  | "short"
+  | "slicked"
+  | "swept"
+  | "wild";
+
+export type HairLength = "short" | "medium" | "long";
+
+export type HeroGender = "female" | "male";
 
 export interface HeroAppearance {
   bodyWidth: number;
   clothingColor: string;
+  gender: HeroGender;
   hairColor: string;
+  hairLength: HairLength;
   hairStyle: HairStyle;
   height: number;
   skinTone: string;
@@ -147,6 +167,7 @@ export interface Hero {
   rank: number;
   relationships: Record<string, RelationshipProfile>;
   reputation: HeroReputation;
+  skillForge: HeroSkillForge;
   skills: HeroSkills;
   socialRole: SocialRole;
   traits: string[];

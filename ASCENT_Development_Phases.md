@@ -819,7 +819,145 @@ Changing formation changes battle outcomes.
 
 ---
 
-# Phase 12 — First Expedition
+# Phase 12 — Hero Skill Forge
+
+## Goal
+
+Replace the temporary flat skill values with individual, learnable skill records so heroes can
+begin developing distinct builds before the first expedition loop is added.
+
+`Hero Skill Forge` is the umbrella feature. Do not implement it as one catch-all class. Use these
+bounded systems:
+
+```text
+SkillDefinitionRegistry  Static definitions, prerequisites, rarity, and evolution links
+HeroSkillGenerator       Starting affinities, innate skills, and initial proficiency
+SkillProgressionSystem   Usage XP, levels, proficiency, and mastery
+SkillLoadoutSystem       Known skills versus prepared active and passive skills
+SkillDiscoverySystem     Condition evaluation for emergent unlocks
+SkillEvolutionSystem     Linear upgrades and behavior-shaped branches
+SkillLegacySystem        Mentor and death-linked inheritance added in later phases
+```
+
+## Tasks
+
+### 12.1 Skill Data Model
+
+Add per-hero skill instances:
+
+```ts
+interface HeroSkill {
+  definitionId: string;
+  level: number;
+  xp: number;
+  proficiency: number;
+  source: "innate" | "training" | "combat" | "mentor" | "awakening";
+  mastery: boolean;
+}
+```
+
+Keep definitions separate from hero-owned progress:
+
+```ts
+interface SkillDefinition {
+  id: string;
+  name: string;
+  type: "active" | "passive" | "reaction" | "utility";
+  category: "weapon" | "combat" | "survival" | "support" | "mental" | "unique";
+  rarity: "common" | "uncommon" | "rare" | "elite" | "unique" | "legendary";
+  maxLevel: number;
+  prerequisites?: SkillRequirement[];
+  evolutions?: string[];
+}
+```
+
+### 12.2 Definition Registry
+
+Seed a deliberately small vertical slice:
+
+- Sword and Spear Mastery
+- Basic Thrust, Lunge, Brace, Parry, and Interpose
+- Medicine, Field Treatment, Tracking, and Scouting
+- Fear Resistance, Battle Focus, and Protective Instinct
+
+Rarity describes availability and conditions, not guaranteed power.
+
+### 12.3 Hero Skill Generator
+
+Generate hidden affinities for weapon, defense, support, survival, and future magical disciplines.
+Use origin occupation, attributes, personality, and rare potential to select a few innate skills.
+Occupation influences the result but never determines a fixed build.
+
+### 12.4 Individual Progression
+
+Award skill XP from actual use instead of increasing every skill on hero level-up:
+
+```text
+Use technique → XP
+Successful result → bonus XP
+Stronger opponent or difficult task → bonus XP
+```
+
+Level controls raw strength. Proficiency controls execution speed, accuracy, cost, failure chance,
+and AI confidence. Mastery at maximum level enables a later evolution opportunity.
+
+### 12.5 Training and Combat Events
+
+Update Phase 7 training and the combat sandbox to emit typed skill-usage events. The progression
+system consumes those events; renderers and UI must never become authoritative skill state.
+
+### 12.6 Known Skills and Loadout
+
+Separate all known skills from the prepared combat loadout:
+
+```text
+Active slots: 4
+Passive slots: 4
+Reaction and instinct skills: automatic when valid
+```
+
+Utility AI may only score prepared active skills plus valid automatic reactions.
+
+### 12.7 Discovery and Evolution Hooks
+
+Create deterministic condition and event contracts for discovery, branching, and awakening, but
+only activate conditions supported by existing systems. Keep unknown possibilities displayed as
+`???`; do not expose hidden thresholds.
+
+### 12.8 Skill UI
+
+Show known skills, level, XP progress, proficiency, source, loadout state, and mastery. Preserve a
+compact summary for the existing Sword, Spear, Defense, Medicine, and Leadership values during the
+migration.
+
+### 12.9 Compatibility Migration
+
+Map the current flat `HeroSkills` values into equivalent skill instances without changing existing
+training, squad evaluation, Utility AI, or combat results until their consumers are deliberately
+moved to the new APIs.
+
+## Later Activation Map
+
+- Phase 13 expeditions: award Survival and Support usage and discovery events.
+- Phase 14 injuries: add injury-driven progression and recovery restrictions.
+- Phase 15 permanent death: emit legacy events, but do not copy skills directly.
+- Phase 16 memories: let memories satisfy discovery and awakening context.
+- Phase 17 trait evolution: unlock Mental and instinct skills from repeated behavior.
+- Phase 24 classes: provide easier access to specialized skills without erasing old skills.
+- Phase 25 branching classes: connect class paths to skill branches and mastery options.
+- Phase 26 mentorship: enable XP bonuses, technique transfer, and personalized variants.
+- Phase 35 hero history: record usage, breakthroughs, awakenings, and mastered skills.
+- Phase 42 balance: tune proficiency decay; skill level never decays.
+
+## Exit Criteria
+
+Two heroes using the same weapon can own different skills, improve those skills independently
+through training or combat, prepare different loadouts, and expose the reasons for every unlock.
+Existing Phase 0–11 behavior remains stable through the compatibility layer.
+
+---
+
+# Phase 13 — First Expedition
 
 ## Goal
 
@@ -827,7 +965,7 @@ Create the first complete gameplay loop.
 
 ## Tasks
 
-### 12.1 Expedition Screen
+### 13.1 Expedition Screen
 
 Display:
 
@@ -838,15 +976,15 @@ Rewards
 Threats
 ```
 
-### 12.2 Deploy Squad
+### 13.2 Deploy Squad
 
 Choose squad.
 
-### 12.3 Transition
+### 13.3 Transition
 
 Base → Expedition
 
-### 12.4 One Mission Type
+### 13.4 One Mission Type
 
 Start with:
 
@@ -854,7 +992,7 @@ Start with:
 Eliminate Enemies
 ```
 
-### 12.5 Victory
+### 13.5 Victory
 
 Rewards:
 
@@ -862,7 +1000,7 @@ Rewards:
 - Food
 - Rift Shards
 
-### 12.6 Defeat
+### 13.6 Defeat
 
 Consequences:
 
@@ -870,7 +1008,7 @@ Consequences:
 - Death
 - Lost resources
 
-### 12.7 Return
+### 13.7 Return
 
 Transition back to base.
 
@@ -889,7 +1027,7 @@ This is the first real vertical slice.
 
 ---
 
-# Phase 13 — Injury and Recovery
+# Phase 14 — Injury and Recovery
 
 ## Goal
 
@@ -897,7 +1035,7 @@ Make expedition consequences persistent.
 
 ## Tasks
 
-### 13.1 Injury Types
+### 14.1 Injury Types
 
 Start with:
 
@@ -908,7 +1046,7 @@ Burn
 Concussion
 ```
 
-### 13.2 Injury Effects
+### 14.2 Injury Effects
 
 Example:
 
@@ -918,15 +1056,15 @@ Attack -20%
 Training Speed -30%
 ```
 
-### 13.3 Infirmary
+### 14.3 Infirmary
 
 Hero must rest.
 
-### 13.4 Medicine
+### 14.4 Medicine
 
 Healing consumes medicine.
 
-### 13.5 Permanent Injuries
+### 14.5 Permanent Injuries
 
 Rare severe injuries create long-term effects.
 
@@ -936,7 +1074,7 @@ Expeditions affect heroes after combat ends.
 
 ---
 
-# Phase 14 — Permanent Death
+# Phase 15 — Permanent Death
 
 ## Goal
 
@@ -944,11 +1082,11 @@ Make hero loss meaningful.
 
 ## Tasks
 
-### 14.1 Death State
+### 15.1 Death State
 
 Dead heroes cannot return.
 
-### 14.2 Relationship Reactions
+### 15.2 Relationship Reactions
 
 Friends:
 
@@ -957,11 +1095,11 @@ Morale loss
 Memory created
 ```
 
-### 14.3 Memorial
+### 15.3 Memorial
 
 Create basic grave marker.
 
-### 14.4 Hero History
+### 15.4 Hero History
 
 Record:
 
@@ -971,7 +1109,7 @@ Record:
 - Rank
 - Cause of death
 
-### 14.5 Death Notifications
+### 15.5 Death Notifications
 
 Do not make them overly flashy.
 
@@ -981,7 +1119,7 @@ Losing a veteran visibly changes the base and the surviving heroes.
 
 ---
 
-# Phase 15 — Memory System
+# Phase 16 — Memory System
 
 ## Goal
 
@@ -989,7 +1127,7 @@ Allow experiences to shape heroes.
 
 ## Tasks
 
-### 15.1 Memory Data
+### 16.1 Memory Data
 
 Example:
 
@@ -1002,7 +1140,7 @@ interface HeroMemory {
 }
 ```
 
-### 15.2 Initial Memories
+### 16.2 Initial Memories
 
 Add:
 
@@ -1014,7 +1152,7 @@ CRITICAL_INJURY
 WON_BOSS
 ```
 
-### 15.3 Behavior Effects
+### 16.3 Behavior Effects
 
 Memories affect:
 
@@ -1023,7 +1161,7 @@ Memories affect:
 - Fear
 - Utility AI
 
-### 15.4 Memory Decay
+### 16.4 Memory Decay
 
 Minor memories fade.
 
@@ -1035,7 +1173,7 @@ Past events influence future behavior.
 
 ---
 
-# Phase 16 — Trait Evolution
+# Phase 17 — Trait Evolution
 
 ## Goal
 
@@ -1043,7 +1181,7 @@ Turn experiences into visible character development.
 
 ## Tasks
 
-### 16.1 Earned Traits
+### 17.1 Earned Traits
 
 Examples:
 
@@ -1055,7 +1193,7 @@ Protective
 Ruthless
 ```
 
-### 16.2 Trait Conditions
+### 17.2 Trait Conditions
 
 Example:
 
@@ -1064,11 +1202,11 @@ Survive 10 battles
 → Veteran
 ```
 
-### 16.3 Personality Drift
+### 17.3 Personality Drift
 
 Major events can slightly change personality.
 
-### 16.4 Trait UI
+### 17.4 Trait UI
 
 Show source:
 
@@ -1083,7 +1221,7 @@ Heroes visibly change because of what they experience.
 
 ---
 
-# Phase 17 — Recruitment System
+# Phase 18 — Recruitment System
 
 ## Goal
 
@@ -1091,19 +1229,19 @@ Add procedural hero acquisition.
 
 ## Tasks
 
-### 17.1 Dimensional Gate
+### 18.1 Dimensional Gate
 
 Create summon facility.
 
-### 17.2 Rift Shards
+### 18.2 Rift Shards
 
 Add recruitment currency.
 
-### 17.3 Recruitment
+### 18.3 Recruitment
 
 Generate new hero.
 
-### 17.4 Rank Distribution
+### 18.4 Rank Distribution
 
 Example:
 
@@ -1115,11 +1253,11 @@ Example:
 
 Do not add extreme ranks yet.
 
-### 17.5 Hidden Potential
+### 18.5 Hidden Potential
 
 Generate independently from visible rank.
 
-### 17.6 Recruitment Reveal
+### 18.6 Recruitment Reveal
 
 Show:
 
@@ -1135,7 +1273,7 @@ The player can recruit heroes without external assets.
 
 ---
 
-# Phase 18 — Hero Capacity and Dormitories
+# Phase 19 — Hero Capacity and Dormitories
 
 ## Goal
 
@@ -1143,7 +1281,7 @@ Make roster size part of base management.
 
 ## Tasks
 
-### 18.1 Population Limit
+### 19.1 Population Limit
 
 Example:
 
@@ -1151,11 +1289,11 @@ Example:
 8 / 10 Heroes
 ```
 
-### 18.2 Dormitory Capacity
+### 19.2 Dormitory Capacity
 
 Upgrade to increase hero capacity.
 
-### 18.3 Comfort
+### 19.3 Comfort
 
 Dorm quality affects morale and fatigue recovery.
 
@@ -1165,7 +1303,7 @@ Recruitment and base growth become connected.
 
 ---
 
-# Phase 19 — Resource Economy
+# Phase 20 — Resource Economy
 
 ## Goal
 
@@ -1183,19 +1321,19 @@ Metal
 Rift Shards
 ```
 
-### 19.1 Consumption
+### 20.1 Consumption
 
 Heroes consume food.
 
-### 19.2 Construction Cost
+### 20.2 Construction Cost
 
 Facilities consume materials.
 
-### 19.3 Healing Cost
+### 20.3 Healing Cost
 
 Medicine is consumed.
 
-### 19.4 Expedition Rewards
+### 20.4 Expedition Rewards
 
 Balance expected rewards.
 
@@ -1205,7 +1343,7 @@ Player must decide where resources are spent.
 
 ---
 
-# Phase 20 — Facility Construction
+# Phase 21 — Facility Construction
 
 ## Goal
 
@@ -1223,19 +1361,19 @@ Storage
 Smithy
 ```
 
-### 20.1 Placement Mode
+### 21.1 Placement Mode
 
 Ghost building follows cursor.
 
-### 20.2 Validation
+### 21.2 Validation
 
 Check overlap.
 
-### 20.3 Construction Progress
+### 21.3 Construction Progress
 
 Builders complete facility.
 
-### 20.4 Facility Renderer
+### 21.4 Facility Renderer
 
 Procedurally generate visuals.
 
@@ -1245,7 +1383,7 @@ The player can visibly expand the settlement.
 
 ---
 
-# Phase 21 — Equipment
+# Phase 22 — Equipment
 
 ## Goal
 
@@ -1253,7 +1391,7 @@ Add another meaningful hero-progression layer.
 
 ## Tasks
 
-### 21.1 Weapon Types
+### 22.1 Weapon Types
 
 Start with:
 
@@ -1264,7 +1402,7 @@ Bow
 Shield
 ```
 
-### 21.2 Equipment Stats
+### 22.2 Equipment Stats
 
 Add:
 
@@ -1272,15 +1410,15 @@ Add:
 - Defense
 - Range
 
-### 21.3 Inventory
+### 22.3 Inventory
 
 Base inventory.
 
-### 21.4 Hero Equipment
+### 22.4 Hero Equipment
 
 Equip items through hero panel.
 
-### 21.5 Visual Equipment
+### 22.5 Visual Equipment
 
 Attach primitive weapon meshes to heroes.
 
@@ -1290,7 +1428,7 @@ Equipment changes both stats and appearance.
 
 ---
 
-# Phase 22 — Smithy and Crafting
+# Phase 23 — Smithy and Crafting
 
 ## Goal
 
@@ -1298,7 +1436,7 @@ Connect resources to equipment progression.
 
 ## Tasks
 
-### 22.1 Recipes
+### 23.1 Recipes
 
 Example:
 
@@ -1308,15 +1446,15 @@ Iron Sword
 5 Scrap
 ```
 
-### 22.2 Crafting Time
+### 23.2 Crafting Time
 
 Items take time.
 
-### 22.3 Smith Skill
+### 23.3 Smith Skill
 
 Later allow hero crafting skill to affect quality.
 
-### 22.4 Quality Levels
+### 23.4 Quality Levels
 
 Keep simple:
 
@@ -1332,7 +1470,7 @@ Player can turn expedition resources into better equipment.
 
 ---
 
-# Phase 23 — Class System
+# Phase 24 — Class System
 
 ## Goal
 
@@ -1340,11 +1478,11 @@ Allow heroes to specialize organically.
 
 ## Tasks
 
-### 23.1 Unclassified State
+### 24.1 Unclassified State
 
 All new heroes begin unclassified.
 
-### 23.2 Basic Classes
+### 24.2 Basic Classes
 
 Add:
 
@@ -1356,7 +1494,7 @@ Medic
 Scout
 ```
 
-### 23.3 Requirements
+### 24.3 Requirements
 
 Example:
 
@@ -1372,11 +1510,11 @@ experience, achievements, and discovered compatibility. Origin occupation may he
 requirement but never selects a class automatically. Magical potential remains mostly hidden and
 rare.
 
-### 23.4 Class Selection
+### 24.4 Class Selection
 
 Only unlocked classes can be chosen.
 
-### 23.5 Class Bonuses
+### 24.5 Class Bonuses
 
 Add modest bonuses.
 
@@ -1386,7 +1524,7 @@ Hero development produces meaningful specialization.
 
 ---
 
-# Phase 24 — Branching Classes
+# Phase 25 — Branching Classes
 
 ## Goal
 
@@ -1408,11 +1546,11 @@ Guardian
 └── Commander
 ```
 
-### 24.1 Personality Requirements
+### 25.1 Personality Requirements
 
 Some paths depend on personality.
 
-### 24.2 Achievement Requirements
+### 25.2 Achievement Requirements
 
 Some depend on experiences.
 
@@ -1432,7 +1570,7 @@ Arcane Guardian, Arcane Archer, Mystic Healer, Vanguard Commander, Scout Captain
 
 ---
 
-# Phase 25 — Mentorship
+# Phase 26 — Mentorship
 
 ## Goal
 
@@ -1440,15 +1578,15 @@ Make veteran heroes valuable outside combat.
 
 ## Tasks
 
-### 25.1 Assign Mentor
+### 26.1 Assign Mentor
 
 Pair veteran and student.
 
-### 25.2 Training Bonus
+### 26.2 Training Bonus
 
 Student improves faster.
 
-### 25.3 Relationship Growth
+### 26.3 Relationship Growth
 
 Mentorship increases relationship.
 
@@ -1456,7 +1594,7 @@ Store mentor/protégé as a meaningful relationship bond. Shared training raises
 mentor death can later create grief, motivation, or a possible inherited technique through the
 memory system.
 
-### 25.4 Skill Transfer
+### 26.4 Skill Transfer
 
 Small chance to teach trait or technique.
 
@@ -1466,7 +1604,7 @@ Veterans shape future recruits.
 
 ---
 
-# Phase 26 — Multiple Expedition Types
+# Phase 27 — Multiple Expedition Types
 
 ## Goal
 
@@ -1492,7 +1630,7 @@ The same squad is not ideal for every mission.
 
 ---
 
-# Phase 27 — Procedural Expedition Generator
+# Phase 28 — Procedural Expedition Generator
 
 ## Goal
 
@@ -1536,7 +1674,7 @@ Different expeditions can be produced from data.
 
 ---
 
-# Phase 28 — Rift Progression
+# Phase 29 — Rift Progression
 
 ## Goal
 
@@ -1563,11 +1701,11 @@ Example:
 11–15 Frozen Kingdom
 ```
 
-### 28.1 Unlock Conditions
+### 29.1 Unlock Conditions
 
 Defeat guardian to advance.
 
-### 28.2 Increasing Risk
+### 29.2 Increasing Risk
 
 Higher depths introduce:
 
@@ -1581,7 +1719,7 @@ The player has a meaningful long-term goal.
 
 ---
 
-# Phase 29 — Bosses
+# Phase 30 — Bosses
 
 ## Goal
 
@@ -1589,11 +1727,11 @@ Create milestone battles.
 
 ## Tasks
 
-### 29.1 First Guardian
+### 30.1 First Guardian
 
 Build one boss.
 
-### 29.2 Boss AI
+### 30.2 Boss AI
 
 Add:
 
@@ -1602,7 +1740,7 @@ Add:
 - Target priority
 - Enrage
 
-### 29.3 Preparation
+### 30.3 Preparation
 
 Player should need:
 
@@ -1617,7 +1755,7 @@ Boss victory feels like a progression milestone.
 
 ---
 
-# Phase 30 — Social Events
+# Phase 31 — Social Events
 
 ## Goal
 
@@ -1636,7 +1774,7 @@ Celebration
 Grief
 ```
 
-### 30.1 Event Conditions
+### 31.1 Event Conditions
 
 Events should use:
 
@@ -1645,7 +1783,7 @@ Events should use:
 - Morale
 - Memories
 
-### 30.2 Social Roles and Reputation
+### 31.2 Social Roles and Reputation
 
 Let repeated refuge behavior establish roles such as Quartermaster, Instructor, Caregiver, Scout,
 or Captain. Generate settlement reputation from witnessed history rather than assigning arbitrary
@@ -1657,7 +1795,7 @@ Social events are generated from hero context, not pure randomness.
 
 ---
 
-# Phase 31 — Loyalty and Order Refusal
+# Phase 32 — Loyalty and Order Refusal
 
 ## Goal
 
@@ -1665,11 +1803,11 @@ Make heroes independent.
 
 ## Tasks
 
-### 31.1 Loyalty Stat
+### 32.1 Loyalty Stat
 
 Track hero trust in Overseer.
 
-### 31.2 Order Compliance
+### 32.2 Order Compliance
 
 Deployment can be refused.
 
@@ -1677,7 +1815,7 @@ Calculate attitude toward authority from loyalty, trust, respect, fear, morale, 
 relationship history. Surface an understandable state such as Obedient, Respectful, Neutral,
 Questioning, Defiant, or Rebellious.
 
-### 31.3 Refusal Reasons
+### 32.3 Refusal Reasons
 
 Examples:
 
@@ -1689,7 +1827,7 @@ Trauma
 Low Loyalty
 ```
 
-### 31.4 Consequences
+### 32.4 Consequences
 
 Forcing deployment may reduce loyalty.
 
@@ -1699,7 +1837,7 @@ Heroes no longer feel like perfectly obedient units.
 
 ---
 
-# Phase 32 — Advanced Combat Relationships
+# Phase 33 — Advanced Combat Relationships
 
 ## Goal
 
@@ -1728,7 +1866,7 @@ Relationships matter during actual combat.
 
 ---
 
-# Phase 33 — Tactical Doctrine Expansion
+# Phase 34 — Tactical Doctrine Expansion
 
 ## Goal
 
@@ -1760,7 +1898,7 @@ Players can meaningfully influence AI without direct control.
 
 ---
 
-# Phase 34 — Hero History
+# Phase 35 — Hero History
 
 ## Goal
 
@@ -1784,7 +1922,7 @@ Veterans have visible personal histories.
 
 ---
 
-# Phase 35 — Memorial and Graveyard
+# Phase 36 — Memorial and Graveyard
 
 ## Goal
 
@@ -1792,15 +1930,15 @@ Preserve dead heroes.
 
 ## Tasks
 
-### 35.1 Grave Generation
+### 36.1 Grave Generation
 
 Create grave mesh.
 
-### 35.2 Memorial Panel
+### 36.2 Memorial Panel
 
 Display hero history.
 
-### 35.3 Relationship Visitors
+### 36.3 Relationship Visitors
 
 Optional:
 
@@ -1812,7 +1950,7 @@ Dead heroes remain part of settlement history.
 
 ---
 
-# Phase 36 — Save System
+# Phase 37 — Save System
 
 ## Goal
 
@@ -1839,7 +1977,7 @@ Save:
 - Facilities
 - Time
 
-### 36.1 Version Save Format
+### 37.1 Version Save Format
 
 Add:
 
@@ -1847,7 +1985,7 @@ Add:
 saveVersion
 ```
 
-### 36.2 Auto Save
+### 37.2 Auto Save
 
 Save periodically and after expedition.
 
@@ -1857,7 +1995,7 @@ Reloading restores the same simulation state.
 
 ---
 
-# Phase 37 — UI Pass
+# Phase 38 — UI Pass
 
 ## Goal
 
@@ -1881,7 +2019,7 @@ Core game can be played without developer controls.
 
 ---
 
-# Phase 38 — Audio
+# Phase 39 — Audio
 
 ## Goal
 
@@ -1905,7 +2043,7 @@ Important actions have clear audio feedback.
 
 ---
 
-# Phase 39 — Visual Polish
+# Phase 40 — Visual Polish
 
 ## Goal
 
@@ -1928,7 +2066,7 @@ The game no longer looks like a raw Three.js prototype.
 
 ---
 
-# Phase 40 — Performance Optimization
+# Phase 41 — Performance Optimization
 
 ## Goal
 
@@ -1936,7 +2074,7 @@ Keep the browser version smooth.
 
 ## Tasks
 
-### 40.1 Instancing
+### 41.1 Instancing
 
 Use:
 
@@ -1951,7 +2089,7 @@ for:
 - Debris
 - Repeated props
 
-### 40.2 Object Pooling
+### 41.2 Object Pooling
 
 Use for:
 
@@ -1959,15 +2097,15 @@ Use for:
 - Effects
 - Enemies
 
-### 40.3 Simulation Frequency
+### 41.3 Simulation Frequency
 
 Do not update every system every render frame.
 
-### 40.4 LOD
+### 41.4 LOD
 
 Optional later.
 
-### 40.5 Profiling
+### 41.5 Profiling
 
 Measure before optimizing.
 
@@ -1977,7 +2115,7 @@ Stable performance at target roster and combat sizes.
 
 ---
 
-# Phase 41 — Balance Pass
+# Phase 42 — Balance Pass
 
 ## Goal
 
@@ -2012,7 +2150,7 @@ A normal campaign has tension without feeling unfair.
 
 ---
 
-# Phase 42 — Content Expansion
+# Phase 43 — Content Expansion
 
 Only begin major content production after the systems work.
 
@@ -2034,7 +2172,7 @@ Adding content should not require rewriting systems.
 
 ---
 
-# Phase 43 — Lore Layer
+# Phase 44 — Lore Layer
 
 ## Goal
 
@@ -2053,7 +2191,7 @@ Lore should support the simulation rather than dominate it.
 
 ---
 
-# Phase 44 — Advanced Systems
+# Phase 45 — Advanced Systems
 
 Possible later systems:
 

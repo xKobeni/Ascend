@@ -32,6 +32,8 @@ export class Game {
     this.controlsHint = new ControlsHint(container);
     this.selectionOverlay = new SelectionOverlay(container, (heroId, type) => {
       this.simulation.queueTraining(heroId, type);
+    }, (heroId, definitionId) => {
+      this.simulation.toggleSkillLoadout(heroId, definitionId);
     });
     this.socialLogOverlay = new SocialLogOverlay(container);
     this.squadOverlay = new SquadOverlay(

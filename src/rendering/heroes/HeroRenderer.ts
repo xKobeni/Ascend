@@ -124,10 +124,10 @@ export class HeroRenderer {
     deltaSeconds: number,
   ): void {
     anim.breathingPhase += deltaSeconds * (1.4 + hero.attributes.endurance * 0.08);
-    const breathIntensity = hero.movement.activity === "Resting" ? 0.025 : 0.012;
+    const breathIntensity = hero.movement.activity === "Resting" ? 0.02 : 0.01;
     const breath = Math.sin(anim.breathingPhase) * breathIntensity;
-    rig.torso.scale.y = 1 + breath;
-    rig.torso.scale.x = 1 - breath * 0.3;
+    rig.body.scale.y = 1 + breath;
+    rig.body.scale.x = 1 - breath * 0.3;
   }
 
   private updateActivityAnimation(
@@ -147,114 +147,110 @@ export class HeroRenderer {
     const agility = hero.attributes.agility;
 
     const movementSpeedMult = 0.8 + agility * 0.04;
-    const postureLean = (1 - discipline) * 0.08 - discipline * 0.04;
-    const energyMult = 1;
+    const postureLean = (1 - discipline) * 0.06 - discipline * 0.03;
 
-    let targetLeftArmX = 0;
-    let targetRightArmX = 0;
-    let targetLeftLegX = 0;
-    let targetRightLegX = 0;
-    let targetTorsoY = 0;
-    let targetTorsoZ = 0;
+    let targetArmLeftX = 0;
+    let targetArmRightX = 0;
+    let targetLegLeftX = 0;
+    let targetLegRightX = 0;
+    let targetBodyY = 0;
+    let targetBodyZ = 0;
     let targetRootY = 0.31;
     let targetRootZ = 0;
     let targetHeadX = 0;
     let targetHeadY = 0;
 
     if (activity === "Walking") {
-      const walkSpeed = 8 * movementSpeedMult * energyMult;
+      const walkSpeed = 8 * movementSpeedMult;
       anim.walkCycle += deltaSeconds * walkSpeed;
-      const swing = Math.sin(anim.walkCycle) * 0.65;
-      const hipSway = Math.sin(anim.walkCycle) * 0.04;
+      const swing = Math.sin(anim.walkCycle) * 0.5;
 
-      targetLeftArmX = swing * 0.9;
-      targetRightArmX = -swing * 0.9;
-      targetLeftLegX = -swing * 1.1;
-      targetRightLegX = swing * 1.1;
-      targetTorsoY = hipSway;
-      targetTorsoZ = postureLean * 0.5;
-      targetRootY = 0.31 + Math.abs(Math.sin(anim.walkCycle)) * 0.07;
-      targetHeadX = Math.sin(anim.walkCycle * 0.5) * 0.06;
-      targetHeadY = Math.sin(anim.walkCycle) * 0.03;
+      targetArmLeftX = swing * 0.7;
+      targetArmRightX = -swing * 0.7;
+      targetLegLeftX = -swing * 0.8;
+      targetLegRightX = swing * 0.8;
+      targetBodyY = Math.sin(anim.walkCycle) * 0.03;
+      targetRootY = 0.31 + Math.abs(Math.sin(anim.walkCycle)) * 0.05;
+      targetHeadX = Math.sin(anim.walkCycle * 0.5) * 0.05;
     } else if (activity === "Training") {
       const trainSpeed = 5.5 * movementSpeedMult;
-      const twist = Math.sin(cycle * trainSpeed) * 0.35;
-      const chop = Math.abs(Math.sin(cycle * trainSpeed * 0.5)) * 0.5;
+      const twist = Math.sin(cycle * trainSpeed) * 0.3;
+      const chop = Math.abs(Math.sin(cycle * trainSpeed * 0.5)) * 0.4;
 
-      targetLeftArmX = -0.3 + twist * 0.6;
-      targetRightArmX = -0.8 + chop;
-      targetLeftLegX = -0.15;
-      targetRightLegX = 0.2;
-      targetTorsoY = twist * 0.12;
-      targetTorsoZ = postureLean;
-      targetRootY = 0.31 + Math.abs(Math.sin(cycle * trainSpeed)) * 0.025;
-      targetHeadX = -0.1 + Math.sin(cycle * trainSpeed * 0.7) * 0.1;
+      targetArmLeftX = -0.2 + twist * 0.5;
+      targetArmRightX = -0.6 + chop;
+      targetLegLeftX = -0.1;
+      targetLegRightX = 0.15;
+      targetBodyY = twist * 0.1;
+      targetBodyZ = postureLean;
+      targetRootY = 0.31 + Math.abs(Math.sin(cycle * trainSpeed)) * 0.02;
+      targetHeadX = -0.1 + Math.sin(cycle * trainSpeed * 0.7) * 0.08;
     } else if (activity === "Eating") {
       const eatCycle = cycle * 2.6;
-      const reach = Math.sin(eatCycle) * 0.5;
+      const reach = Math.sin(eatCycle) * 0.4;
 
-      targetLeftArmX = -0.5 + reach * 0.3;
-      targetRightArmX = -0.9 + Math.abs(Math.sin(eatCycle + 0.8)) * 0.45;
-      targetLeftLegX = 0;
-      targetRightLegX = 0;
+      targetArmLeftX = -0.4 + reach * 0.2;
+      targetArmRightX = -0.7 + Math.abs(Math.sin(eatCycle + 0.8)) * 0.35;
+      targetLegLeftX = 0;
+      targetLegRightX = 0;
       targetRootY = 0.31;
-      targetHeadX = -0.15 + Math.sin(eatCycle * 0.5) * 0.08;
-      targetHeadY = Math.sin(eatCycle + 1.2) * 0.05;
+      targetHeadX = -0.12 + Math.sin(eatCycle * 0.5) * 0.06;
+      targetHeadY = Math.sin(eatCycle + 1.2) * 0.04;
     } else if (activity === "Socializing") {
       const socialCycle = cycle * 0.8;
-      const gesture = Math.sin(socialCycle) * 0.15;
-      const nod = Math.sin(socialCycle * 1.5) * 0.12;
+      const gesture = Math.sin(socialCycle) * 0.12;
+      const nod = Math.sin(socialCycle * 1.5) * 0.1;
 
-      targetLeftArmX = -0.15 + gesture;
-      targetRightArmX = -0.2 - gesture * 0.5;
-      targetLeftLegX = 0;
-      targetRightLegX = 0;
-      targetTorsoY = Math.sin(socialCycle * 0.6) * 0.05;
+      targetArmLeftX = -0.1 + gesture;
+      targetArmRightX = -0.15 - gesture * 0.4;
+      targetLegLeftX = 0;
+      targetLegRightX = 0;
+      targetBodyY = Math.sin(socialCycle * 0.6) * 0.04;
       targetRootY = 0.31;
       targetHeadX = nod;
-      targetHeadY = Math.sin(socialCycle * 0.4) * 0.06;
+      targetHeadY = Math.sin(socialCycle * 0.4) * 0.05;
     } else if (activity === "Resting") {
-      const restBreath = Math.sin(anim.breathingPhase * 0.8) * 0.015;
+      const restBreath = Math.sin(anim.breathingPhase * 0.8) * 0.012;
 
       anim.restShift += deltaSeconds * 0.3;
-      const restWiggle = Math.sin(anim.restShift) * 0.03;
+      const restWiggle = Math.sin(anim.restShift) * 0.02;
 
-      targetLeftArmX = 0.2 + restWiggle;
-      targetRightArmX = 0.15 - restWiggle;
-      targetLeftLegX = 0.1;
-      targetRightLegX = -0.05;
-      targetRootY = 0.55 + restBreath;
-      targetRootZ = 1.28;
-      targetHeadX = 0.3 + restWiggle * 0.5;
+      targetArmLeftX = 0.15 + restWiggle;
+      targetArmRightX = 0.12 - restWiggle;
+      targetLegLeftX = 0.08;
+      targetLegRightX = -0.04;
+      targetRootY = 0.48 + restBreath;
+      targetRootZ = 1.1;
+      targetHeadX = 0.25 + restWiggle * 0.4;
     } else {
       const idleCycle = cycle * 0.5;
       anim.idleLookTimer += deltaSeconds;
 
       if (anim.idleLookTimer > 3 + bravery * 2) {
         anim.idleLookTimer = 0;
-        anim.idleLookTarget = (Math.random() - 0.5) * 0.3;
+        anim.idleLookTarget = (Math.random() - 0.5) * 0.25;
       }
 
-      const weightShift = Math.sin(idleCycle * 0.7) * 0.03;
-      const breathe = Math.sin(anim.breathingPhase) * 0.01;
+      const weightShift = Math.sin(idleCycle * 0.7) * 0.025;
+      const breathe = Math.sin(anim.breathingPhase) * 0.008;
 
-      targetLeftArmX = -0.08 + weightShift;
-      targetRightArmX = -0.1 - weightShift;
-      targetLeftLegX = -0.02 + breathe;
-      targetRightLegX = 0.02 - breathe;
-      targetTorsoY = weightShift * 0.5;
-      targetTorsoZ = postureLean;
+      targetArmLeftX = -0.06 + weightShift;
+      targetArmRightX = -0.08 - weightShift;
+      targetLegLeftX = -0.02 + breathe;
+      targetLegRightX = 0.02 - breathe;
+      targetBodyY = weightShift * 0.4;
+      targetBodyZ = postureLean;
       targetRootY = 0.31 + breathe;
       targetHeadX = lerpAngle(0, anim.idleLookTarget, Math.min(1, deltaSeconds * 2));
-      targetHeadY = Math.sin(idleCycle * 1.3) * 0.04;
+      targetHeadY = Math.sin(idleCycle * 1.3) * 0.03;
     }
 
-    rig.leftArm.rotation.x = THREE.MathUtils.lerp(rig.leftArm.rotation.x, targetLeftArmX, t);
-    rig.rightArm.rotation.x = THREE.MathUtils.lerp(rig.rightArm.rotation.x, targetRightArmX, t);
-    rig.leftLeg.rotation.x = THREE.MathUtils.lerp(rig.leftLeg.rotation.x, targetLeftLegX, t);
-    rig.rightLeg.rotation.x = THREE.MathUtils.lerp(rig.rightLeg.rotation.x, targetRightLegX, t);
-    rig.torso.rotation.y = THREE.MathUtils.lerp(rig.torso.rotation.y, targetTorsoY, t);
-    rig.torso.rotation.z = THREE.MathUtils.lerp(rig.torso.rotation.z, targetTorsoZ, t);
+    rig.armLeft.rotation.x = THREE.MathUtils.lerp(rig.armLeft.rotation.x, targetArmLeftX, t);
+    rig.armRight.rotation.x = THREE.MathUtils.lerp(rig.armRight.rotation.x, targetArmRightX, t);
+    rig.legLeft.rotation.x = THREE.MathUtils.lerp(rig.legLeft.rotation.x, targetLegLeftX, t);
+    rig.legRight.rotation.x = THREE.MathUtils.lerp(rig.legRight.rotation.x, targetLegRightX, t);
+    rig.body.rotation.y = THREE.MathUtils.lerp(rig.body.rotation.y, targetBodyY, t);
+    rig.body.rotation.z = THREE.MathUtils.lerp(rig.body.rotation.z, targetBodyZ, t);
     rig.root.position.y = THREE.MathUtils.lerp(rig.root.position.y, targetRootY, t);
     rig.root.rotation.z = THREE.MathUtils.lerp(rig.root.rotation.z, targetRootZ, t);
     rig.head.rotation.x = THREE.MathUtils.lerp(rig.head.rotation.x, targetHeadX, t);

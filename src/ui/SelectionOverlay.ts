@@ -8,6 +8,9 @@ import type {
 } from "../heroes/Hero";
 import type { SelectionDetails } from "../rendering/SelectionRaycaster";
 import { getRelationshipLabel } from "../heroes/RelationshipSystem";
+import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
+import { ACTIVE_SKILL_SLOTS, PASSIVE_SKILL_SLOTS } from "../skills/SkillLoadoutSystem";
+import { getSkillXpToNextLevel } from "../skills/SkillProgressionSystem";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
   ["strength", "Strength"],
@@ -61,10 +64,12 @@ export class SelectionOverlay {
   private readonly label: HTMLElement;
   private readonly heroContent: HTMLElement;
   private selectedHeroId: string | null = null;
+  private skillForgeRenderSignature: string | null = null;
 
   constructor(
     container: HTMLElement,
     private readonly onQueueTraining: (heroId: string, type: TrainingType) => void,
+    private readonly onToggleSkillLoadout: (heroId: string, definitionId: string) => void,
   ) {
     this.element = document.createElement("aside");
     this.element.className = "selection-overlay";
@@ -95,6 +100,12 @@ export class SelectionOverlay {
           <span class="hero-panel__heading">Skills</span>
           <div class="hero-panel__grid" data-hero="skills"></div>
         </section>
+        <section class="hero-panel__skill-forge">
+          <span class="hero-panel__heading">Hero Skill Forge</span>
+          <div class="hero-panel__skill-summary" data-hero="skill-summary"></div>
+          <div class="hero-panel__skill-list" data-hero="skill-forge"></div>
+          <div class="hero-panel__skill-potential" data-hero="skill-potential"></div>
+        </section>
         <section class="hero-panel__training">
           <span class="hero-panel__heading">Training queue</span>
           <div data-hero="training-active"></div>
@@ -122,7 +133,7 @@ export class SelectionOverlay {
     this.detail = this.requireElement("detail");
     this.label = this.requireElement("label");
     this.heroContent = this.requireElement("hero");
-    this.element.addEventListener("click", this.handleTrainingClick);
+    this.element.addEventListener("click", this.handleClick);
     container.appendChild(this.element);
   }
 
@@ -132,7 +143,11 @@ export class SelectionOverlay {
     heroes: readonly Readonly<Hero>[] = [],
   ): void {
     this.element.hidden = selection === null;
-    this.selectedHeroId = selection?.category === "hero" ? selection.id : null;
+    const nextHeroId = selection?.category === "hero" ? selection.id : null;
+    if (nextHeroId !== this.selectedHeroId) {
+      this.skillForgeRenderSignature = null;
+    }
+    this.selectedHeroId = nextHeroId;
     if (!selection) {
       return;
     }
@@ -147,7 +162,7 @@ export class SelectionOverlay {
   }
 
   dispose(): void {
-    this.element.removeEventListener("click", this.handleTrainingClick);
+    this.element.removeEventListener("click", this.handleClick);
     this.element.remove();
   }
 
@@ -172,6 +187,7 @@ export class SelectionOverlay {
     this.renderRelationships(hero, heroes);
     this.renderValueGrid(this.requireHeroElement("attributes"), ATTRIBUTE_LABELS, hero.attributes);
     this.renderValueGrid(this.requireHeroElement("skills"), SKILL_LABELS, hero.skills);
+    this.renderSkillForge(hero);
   }
 
   private renderTraining(hero: Readonly<Hero>): void {
@@ -194,14 +210,112 @@ export class SelectionOverlay {
     });
   }
 
-  private readonly handleTrainingClick = (event: MouseEvent): void => {
-    const button = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-training-type]");
-    const type = button?.dataset.trainingType;
-    if (!button || !this.selectedHeroId || !this.isTrainingType(type)) {
+  private readonly handleClick = (event: MouseEvent): void => {
+    const target = event.target as Element | null;
+    const skillButton = target?.closest<HTMLButtonElement>("[data-skill-id]");
+    if (skillButton && this.selectedHeroId && skillButton.dataset.skillId) {
+      this.onToggleSkillLoadout(this.selectedHeroId, skillButton.dataset.skillId);
       return;
     }
-    this.onQueueTraining(this.selectedHeroId, type);
+    const button = target?.closest<HTMLButtonElement>("[data-training-type]");
+    const type = button?.dataset.trainingType;
+    if (button && this.selectedHeroId && this.isTrainingType(type)) {
+      this.onQueueTraining(this.selectedHeroId, type);
+    }
   };
+
+  private renderSkillForge(hero: Readonly<Hero>): void {
+    const knownSkills = Object.values(hero.skillForge.known).sort((left, right) => {
+      const leftDefinition = skillDefinitionRegistry.require(left.definitionId);
+      const rightDefinition = skillDefinitionRegistry.require(right.definitionId);
+      return leftDefinition.category.localeCompare(rightDefinition.category) ||
+        leftDefinition.name.localeCompare(rightDefinition.name);
+    });
+    const signature = JSON.stringify({
+      active: hero.skillForge.loadout.active,
+      hiddenPotentialSlots: hero.skillForge.hiddenPotentialSlots,
+      known: knownSkills.map((skill) => [
+        skill.definitionId,
+        skill.level,
+        skill.xp,
+        Math.round(skill.proficiency * 1000),
+        skill.mastery,
+      ]),
+      passive: hero.skillForge.loadout.passive,
+    });
+    if (signature === this.skillForgeRenderSignature) {
+      return;
+    }
+    this.skillForgeRenderSignature = signature;
+    const summary = this.requireHeroElement("skill-summary");
+    summary.textContent = `Known ${knownSkills.length} · Active ${hero.skillForge.loadout.active.length}/${ACTIVE_SKILL_SLOTS} · Passive ${hero.skillForge.loadout.passive.length}/${PASSIVE_SKILL_SLOTS}`;
+
+    const list = this.requireHeroElement("skill-forge");
+    list.replaceChildren(...knownSkills.map((skill) => {
+      const definition = skillDefinitionRegistry.require(skill.definitionId);
+      const prepared = definition.type === "reaction" ||
+        hero.skillForge.loadout.active.includes(skill.definitionId) ||
+        hero.skillForge.loadout.passive.includes(skill.definitionId);
+      const relevantLoadout = definition.type === "passive"
+        ? hero.skillForge.loadout.passive
+        : hero.skillForge.loadout.active;
+      const relevantCapacity = definition.type === "passive" ? PASSIVE_SKILL_SLOTS : ACTIVE_SKILL_SLOTS;
+      const xpTarget = getSkillXpToNextLevel(skill.level);
+      const progress = skill.mastery ? 100 : Math.min(100, Math.round(skill.xp / xpTarget * 100));
+      const card = document.createElement("article");
+      card.className = "hero-skill";
+      card.dataset.prepared = String(prepared);
+
+      const header = document.createElement("div");
+      header.className = "hero-skill__header";
+      const name = document.createElement("strong");
+      name.textContent = definition.name;
+      const level = document.createElement("span");
+      level.textContent = skill.mastery ? "Mastered" : `Lv ${skill.level}`;
+      header.append(name, level);
+
+      const metadata = document.createElement("small");
+      metadata.textContent = `${definition.category} · ${definition.type} · ${definition.rarity}`;
+      const meter = document.createElement("i");
+      meter.className = "hero-skill__progress";
+      meter.style.setProperty("--skill-progress", `${progress}%`);
+      const details = document.createElement("small");
+      details.textContent = skill.mastery
+        ? `Proficiency ${Math.round(skill.proficiency * 100)}% · ${skill.source}`
+        : `${skill.xp}/${xpTarget} XP · Proficiency ${Math.round(skill.proficiency * 100)}% · ${skill.source}`;
+      details.title = skill.discoveryReason;
+      const reason = document.createElement("small");
+      reason.className = "hero-skill__reason";
+      reason.textContent = skill.discoveryReason;
+
+      const action = document.createElement("button");
+      action.type = "button";
+      action.dataset.skillId = skill.definitionId;
+      action.textContent = definition.type === "reaction"
+        ? "Automatic"
+        : prepared
+          ? "Prepared"
+          : "Ready";
+      action.disabled = definition.type === "reaction" || (!prepared && relevantLoadout.length >= relevantCapacity);
+      action.title = definition.type === "reaction"
+        ? "Reactions trigger automatically when their conditions are met."
+        : prepared
+          ? "Remove this skill from the current loadout."
+          : action.disabled
+            ? "This loadout is full. Remove another skill first."
+            : "Prepare this skill for use.";
+      card.append(header, metadata, meter, details, reason, action);
+      return card;
+    }));
+
+    const potential = this.requireHeroElement("skill-potential");
+    potential.replaceChildren(...Array.from({ length: hero.skillForge.hiddenPotentialSlots }, () => {
+      const unknown = document.createElement("span");
+      unknown.textContent = "???";
+      unknown.title = "Undiscovered skill potential";
+      return unknown;
+    }));
+  }
 
   private isTrainingType(value: string | undefined): value is TrainingType {
     return value !== undefined && TRAINING_TYPES.includes(value as TrainingType);
@@ -209,7 +323,8 @@ export class SelectionOverlay {
 
   private renderHero(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
     const identity = this.requireHeroElement("identity");
-    identity.textContent = `Origin · ${hero.origin.occupation} (${hero.origin.category}) · Age ${hero.age}`;
+    const genderLabel = hero.appearance.gender === "female" ? "Female" : "Male";
+    identity.textContent = `${genderLabel} · ${hero.origin.occupation} (${hero.origin.category}) · Age ${hero.age}`;
     const path = this.requireHeroElement("path");
     const reputation = hero.reputation.title ?? "Unproven";
     path.textContent = `Class · ${hero.heroClass}  |  Refuge role · ${hero.socialRole}  |  Reputation · ${reputation}`;

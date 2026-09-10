@@ -19,8 +19,10 @@ export interface SimulationSnapshot {
 }
 
 export class Simulation {
-  private readonly combatSimulation = new CombatSimulation();
   private readonly heroManager = new HeroManager();
+  private readonly combatSimulation = new CombatSimulation((event) => {
+    this.heroManager.recordSkillUsage(event);
+  });
   private readonly squadSystem = new SquadSystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
@@ -68,6 +70,10 @@ export class Simulation {
 
   queueTraining(heroId: string, type: TrainingType): boolean {
     return this.heroManager.queueTraining(heroId, type);
+  }
+
+  toggleSkillLoadout(heroId: string, definitionId: string): boolean {
+    return this.heroManager.toggleSkillLoadout(heroId, definitionId);
   }
 
   getSquad() {
