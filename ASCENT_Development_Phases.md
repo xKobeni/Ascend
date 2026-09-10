@@ -50,6 +50,11 @@ placeholder panel before their gameplay phase exists.
 Phase 15 is complete. Phase 16 and later remain design context and require a new implementation
 approval boundary.
 
+Approved future technical direction: the existing standalone character-generator prototype will be
+adapted into ASCENT as the **Procedural Character Forge**. Its first player-facing activation is
+scheduled for Phase 18 recruitment. Until that phase is approved and implemented, it remains a
+development reference and does not add a new destination or player-facing character creator.
+
 ---
 
 # Phase 0 — Project Foundation
@@ -300,6 +305,33 @@ Clicking a hero should:
 ## Exit Criteria
 
 Five visually different procedural heroes exist and can be selected.
+
+## Future Extension Contract — Procedural Character Forge
+
+Phase 2 remains the authoritative baseline for generated hero identity and appearance. The
+standalone Forge prototype is an approved source of procedural techniques, not a replacement game
+client. Its reusable body proportions, modular low-poly geometry, hair variants, color controls,
+animation reference joints, seeded presets, and JSON configuration will be migrated incrementally.
+
+The integration must preserve these boundaries:
+
+- `HeroGenerator` owns gameplay identity, occupation, attributes, personality, traits, skills,
+  potential, and the initial appearance selection.
+- A plain `CharacterAppearanceConfig` carries visual parameters without gameplay state.
+- One explicit seeded `Random` stream produces reproducible appearance choices; generation code
+  must not use global `Math.random()`.
+- A reusable character-mesh factory consumes appearance data and returns disposable Three.js
+  objects; it never becomes the authoritative hero record.
+- Existing portrait generation and live Refuge rendering consume the same appearance configuration.
+- Prototype JSON may be imported through a validated compatibility adapter for development presets,
+  but browser `localStorage` is not an authoritative game-save format.
+- The project uses its installed Three.js package and local typography; the prototype's CDN script,
+  external fonts, editor shell, and glow-heavy presentation are not carried into the game client.
+
+Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 22 may activate
+visual equipment modules, and Phase 24 may activate class-linked presentation. Additional fantasy
+races, magical effects, and enemy tiers remain unapproved future content until their own gameplay
+and lore phases define them.
 
 ---
 
@@ -1358,7 +1390,11 @@ Add recruitment currency.
 
 ### 18.3 Recruitment
 
-Generate new hero.
+Generate a new hero through the Procedural Character Forge pipeline.
+
+The recruitment roll creates authoritative hero gameplay data first, then derives a validated
+visual configuration for both the live model and cached portrait. Store the generation seed or
+equivalent reproducible appearance signature with the hero.
 
 ### 18.4 Rank Distribution
 
@@ -1386,9 +1422,39 @@ Show:
 - Visible traits
 - Visible skills
 
+The reveal uses the recruited hero's real procedural model and portrait. It may frame the result
+ceremonially, but it must not expose unrestricted sliders that let the player bypass randomized
+recruitment, rank uncertainty, or hidden potential.
+
+### 18.7 Procedural Character Forge Integration
+
+Extract and adapt the approved parts of the standalone prototype:
+
+- Body height, bulk, head, shoulder, arm, and leg proportions
+- Human hair variants and appearance colors
+- Modular low-poly body construction and animation reference joints
+- Seeded appearance presets and validated JSON compatibility import
+- Shared model construction for Refuge heroes, portraits, and recruitment reveals
+- Explicit geometry, material, texture, renderer, and object-URL cleanup
+
+Keep prototype-only concepts dormant:
+
+- Fantasy races beyond the currently established recruit population
+- Player-selected classes before Phase 24
+- Weapons and armor progression before Phase 22
+- Enemy tiers, magical glow effects, and enemy-authoring controls
+- The prototype's standalone sidebar, persistent editor layout, and localStorage save behavior
+
+An optional Forge workbench may exist inside the `F3` developer drawer for appearance testing. It
+is developer tooling, not a fifth player destination and not proof that deferred gameplay systems
+are implemented.
+
 ## Exit Criteria
 
-The player can recruit heroes without external assets.
+The player can recruit visually distinct heroes without external character assets. A fixed seed or
+saved appearance signature reproduces the same model and portrait, repeated generation does not
+leak WebGL resources, and recruitment does not expose deferred class, equipment, race, or enemy
+systems.
 
 ---
 
@@ -1541,6 +1607,9 @@ Equip items through hero panel.
 
 Attach primitive weapon meshes to heroes.
 
+Reuse validated weapon, shield, armor, and attachment techniques from the Procedural Character
+Forge prototype. Equipment data remains authoritative; the Forge only renders the equipped state.
+
 ## Exit Criteria
 
 Equipment changes both stats and appearance.
@@ -1636,6 +1705,9 @@ Only unlocked classes can be chosen.
 ### 24.5 Class Bonuses
 
 Add modest bonuses.
+
+Class-specific silhouettes or presentation may activate compatible Procedural Character Forge
+modules only after the class is unlocked. Visual presets must never grant a class or its bonuses.
 
 ## Exit Criteria
 

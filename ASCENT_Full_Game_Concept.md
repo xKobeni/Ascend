@@ -121,6 +121,11 @@ records, and Refuge memorials are active. Recruitment, broad memories, facilitie
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
+The standalone character-generator prototype is accepted as the technical and visual foundation
+for a future **Procedural Character Forge**. It is not currently a new playable destination. Its
+first player-facing use belongs to Dimensional Gate recruitment, while equipment and class modules
+remain locked to their later gameplay phases.
+
 ---
 
 # 5. Design Pillars
@@ -505,6 +510,48 @@ Potential:
 ```
 
 The hero may initially appear poor for combat but become essential as a medic.
+
+## 9.1 Procedural Character Forge
+
+ASCENT adapts the reusable core of the existing character-generator prototype into a modular
+Procedural Character Forge. The Forge creates the visual embodiment of generated people; it does
+not replace the hero simulation or decide gameplay facts from mesh choices.
+
+Its initial appearance vocabulary includes:
+
+- Height, bulk, and individual head, shoulder, arm, and leg proportions
+- Skin tone, hair style, hair color, clothing color, and restrained accent color
+- Modular low-poly body construction
+- Shared animation reference joints
+- A reproducible seed or appearance signature
+
+The generation pipeline is:
+
+```text
+Seeded Hero Generation
+        ↓
+Authoritative Hero Data
+        ↓
+Validated CharacterAppearanceConfig
+        ↓
+Shared Character Mesh Factory
+        ↓
+Refuge Model / Cached Portrait / Recruitment Reveal
+```
+
+All random decisions use an owned seeded generator so the same input can reproduce the same hero.
+The configuration is plain data and is validated before rendering. Three.js geometry is a visual
+result only and never stores authoritative stats, class, equipment, potential, relationships, or
+history.
+
+The prototype's JSON presets may support a developer-only Forge workbench for testing silhouettes
+and appearance ranges. This tooling belongs in the developer drawer and does not create a fifth
+player navigation destination.
+
+Prototype concepts activate only when the game supports them. Human appearance generation joins
+recruitment first; visual weapons and armor join equipment later; class-linked silhouettes join the
+class system later. Additional fantasy races, magical glow treatments, and enemy tiers remain
+future proposals rather than current canon.
 
 ---
 
@@ -1530,6 +1577,15 @@ Former Occupation:
 Nurse
 ```
 
+The Dimensional Gate uses the Procedural Character Forge to produce each recruit's real low-poly
+model and cached portrait from the same validated appearance configuration. Recruitment remains a
+discovery system: the player receives a person with an origin, strengths, limitations, and hidden
+potential rather than designing an optimal hero through unrestricted appearance or class sliders.
+
+Appearance variation communicates identity, not power. Body shape, hair, or color never reveals
+hidden potential or silently changes rank. Later equipment and class visuals reflect authoritative
+systems only after those systems are implemented.
+
 ---
 
 # 42. Recruitment Philosophy
@@ -1881,18 +1937,36 @@ around every edge of the viewport.
 Hero appearance can use:
 
 ```ts
-interface HeroAppearance {
+interface CharacterAppearanceConfig {
+  schemaVersion: number;
+  appearanceSeed: number;
   height: number;
   bodyWidth: number;
+  headScale: number;
+  shoulderScale: number;
+  armScale: number;
+  legScale: number;
   skinTone: string;
   hairStyle: string;
   hairColor: string;
   clothingColor: string;
-  equipmentStyle: string;
+  accentColor: string;
 }
 ```
 
-Equipment visibly changes the model.
+This extends the current hero appearance data without invalidating existing heroes. Prototype
+`bulk` values map through a compatibility adapter to `bodyWidth`. Values are clamped to readable
+silhouette ranges and validated before mesh construction. The live Refuge model, roster portrait,
+and recruitment reveal must all depict the same configuration.
+
+The mesh factory may internally support modular armor, weapons, racial features, and effects, but
+those modules remain inactive until their authoritative gameplay and lore systems are introduced.
+When equipment is implemented, equipment visibly changes the model because the equipment system
+requests the correct visual attachments—not because appearance data grants inventory.
+
+Rebuilding a preview must dispose replaced geometry, materials, textures, renderer resources, and
+temporary object URLs. The production implementation uses the project's installed Three.js version
+and local interface typography rather than prototype CDN scripts or external fonts.
 
 ---
 
@@ -2144,6 +2218,15 @@ Three.js
 ```
 
 Never let a Three.js mesh become the authoritative hero data.
+
+The Procedural Character Forge follows the same rule:
+
+```text
+HeroGenerator → Hero + CharacterAppearanceConfig → CharacterMeshFactory → Disposable Mesh
+```
+
+The Forge editor, if enabled for development, reads and writes validated presets only. It does not
+write directly into live hero state or replace the versioned save system.
 
 ---
 

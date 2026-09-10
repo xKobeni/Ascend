@@ -1,0 +1,1259 @@
+This will be the new character generation 
+check this for refference
+
+
+Aika fantasy forge prototype · HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AIKA Fantasy Forge — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #100d0a;
+    --panel: #17130f;
+    --panel-2: #1d1712;
+    --line: #332a20;
+    --ember: #c9702f;
+    --ember-bright: #e8934f;
+    --brass: #b6924f;
+    --parchment: #d8c9a8;
+    --text: #e7ddc9;
+    --text-dim: #9a8f78;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ height:100%; margin:0; background:var(--bg); color:var(--text); font-family:'Inter', sans-serif; overflow:hidden; }
+ 
+  .app{ display:grid; grid-template-columns: 340px 1fr; grid-template-rows: 1fr 92px; height:100vh; width:100vw; }
+ 
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    grid-row: 1 / 2; grid-column: 1 / 2;
+    background: linear-gradient(180deg, var(--panel), #120e0a);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 18px 16px 24px;
+  }
+  .sidebar::-webkit-scrollbar{ width:8px; }
+  .sidebar::-webkit-scrollbar-thumb{ background:#3a2f22; border-radius:4px; }
+ 
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .brand-mark{ width:34px; height:34px; border-radius:3px; background: conic-gradient(from 220deg, var(--ember), var(--brass), var(--ember)); display:flex; align-items:center; justify-content:center; font-family:'Cinzel'; font-weight:900; color:#140f0a; font-size:16px; flex-shrink:0; }
+  .brand-text .t1{ font-family:'Cinzel'; font-weight:700; font-size:15px; letter-spacing:0.04em; color:var(--parchment); line-height:1.1; }
+  .brand-text .t2{ font-size:10.5px; color:var(--text-dim); letter-spacing:0.06em; }
+ 
+  .section{ margin-bottom: 20px; }
+  .section-title{ font-family:'Cinzel'; font-size:11.5px; font-weight:700; letter-spacing:0.08em; color:var(--brass); margin: 0 0 9px 2px; display:flex; align-items:center; gap:7px;}
+  .section-title::before{ content:""; width:10px; height:1px; background: var(--brass); opacity:0.6; }
+  .section-title .reset-mini{ margin-left:auto; font-size:9.5px; color:var(--text-dim); cursor:pointer; letter-spacing:0; text-transform:none; font-weight:500; }
+  .section-title .reset-mini:hover{ color:var(--ember-bright); }
+ 
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; }
+ 
+  .chip-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:6px; }
+  .chip-grid.cols3{ grid-template-columns: repeat(3, 1fr); }
+ 
+  button.opt{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-family:'Inter'; font-size:11.5px; font-weight:500;
+    padding: 8px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color .12s, color .12s, background .12s;
+    text-align:center;
+    line-height:1.25;
+  }
+  button.opt:hover{ border-color:#54452f; color:var(--text); }
+  button.opt.active{
+    background: linear-gradient(180deg, #2c2013, #221808);
+    border-color: var(--ember);
+    color: var(--ember-bright);
+    box-shadow: inset 0 0 0 1px rgba(232,147,79,0.25), 0 0 10px rgba(201,112,47,0.18);
+  }
+ 
+  .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .row label{ font-size:11.5px; color:var(--text-dim); }
+  .row .val{ font-size:11px; color:var(--brass); font-variant-numeric: tabular-nums; }
+ 
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:3px; background:#3a2f22; border-radius:2px; margin: 4px 0 12px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+    background: var(--ember-bright); border:2px solid #1a1208; cursor:pointer; margin-top:-1px;
+  }
+ 
+  .color-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .color-row .lbl{ font-size:12px; color:var(--text-dim); }
+  .swatch-input{ width:30px; height:26px; border-radius:3px; border:1px solid var(--line); background:none; padding:0; cursor:pointer; }
+ 
+  select.dd{
+    width:100%; background: var(--panel-2); border:1px solid var(--line); color:var(--text);
+    font-family:'Inter'; font-size:12.5px; padding:7px 8px; border-radius:3px; margin-bottom:4px;
+  }
+  optgroup{ font-family:'Inter'; font-style:normal; color:var(--brass); }
+ 
+  .divider{ height:1px; background: var(--line); margin: 16px 0; }
+ 
+  /* ---------- VIEWPORT ---------- */
+  .viewport{ grid-row: 1/2; grid-column: 2/3; position:relative; background: radial-gradient(ellipse at 50% 35%, #1c150e 0%, #0c0906 75%); overflow:hidden; }
+  .viewport canvas{ display:block; }
+ 
+  .hud-top{ position:absolute; top:16px; left:18px; right:18px; display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; }
+  .hud-card{ background: rgba(16,13,10,0.72); border:1px solid var(--line); border-radius:4px; padding:10px 14px; backdrop-filter: blur(3px); pointer-events:auto; }
+  .hud-title{ font-family:'Cinzel'; font-size:14px; font-weight:700; color:var(--parchment); letter-spacing:0.03em; }
+  .hud-sub{ font-size:10.5px; color:var(--text-dim); margin-top:2px; letter-spacing:0.03em; }
+  .hud-seed{ font-size:10.5px; color:var(--brass); text-align:right; }
+  .hud-seed .n{ font-family:'Cinzel'; font-size:13px; color:var(--ember-bright); }
+ 
+  .anim-bar{ position:absolute; bottom:18px; left:50%; transform:translateX(-50%); display:flex; flex-wrap:wrap; justify-content:center; gap:5px; background: rgba(16,13,10,0.78); border:1px solid var(--line); padding:6px; border-radius:5px; backdrop-filter: blur(3px); max-width:min(640px, 82vw); }
+  .anim-bar button{
+    background:transparent; border:1px solid transparent; color:var(--text-dim); font-size:11px; font-family:'Inter'; font-weight:500;
+    padding:7px 10px; border-radius:3px; cursor:pointer; white-space:nowrap;
+  }
+  .anim-bar button:hover{ color:var(--text); }
+  .anim-bar button.active{ background:#2c2013; border-color:var(--ember); color:var(--ember-bright); }
+ 
+  .hint{ position:absolute; top:16px; left:50%; transform:translateX(-50%); font-size:10.5px; color:var(--text-dim); background: rgba(16,13,10,0.6); padding:6px 10px; border-radius:4px; border:1px solid var(--line); pointer-events:none; }
+ 
+  /* ---------- BOTTOM BAR ---------- */
+  .bottombar{
+    grid-row:2/3; grid-column: 1/3; background: var(--panel); border-top:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; padding: 0 18px;
+  }
+  .bottombar .spacer{ flex:1; }
+  .bigbtn{
+    font-family:'Cinzel'; font-size:12px; font-weight:700; letter-spacing:0.04em; padding:11px 18px;
+    border-radius:3px; cursor:pointer; border:1px solid var(--line); background: var(--panel-2); color:var(--text);
+    transition: all .12s;
+  }
+  .bigbtn:hover{ border-color:#54452f; }
+  .bigbtn.primary{ background: linear-gradient(180deg, var(--ember-bright), var(--ember)); color:#1a0f06; border-color:transparent; }
+  .bigbtn.primary:hover{ filter:brightness(1.08); }
+  .bigbtn.ghost{ color:var(--text-dim); }
+  .presetdd{ background:var(--panel-2); border:1px solid var(--line); color:var(--text); font-family:'Inter'; font-size:12px; padding:10px 10px; border-radius:3px; max-width:150px; }
+ 
+  /* JSON drawer */
+  .jsondrawer{
+    position:absolute; top:0; right:0; height:100%; width:340px; background: rgba(14,11,8,0.96); border-left:1px solid var(--line);
+    transform: translateX(100%); transition: transform .2s ease; padding: 18px; overflow-y:auto; z-index:5;
+  }
+  .jsondrawer.open{ transform: translateX(0); }
+  .jsondrawer h3{ font-family:'Cinzel'; font-size:13px; color:var(--parchment); margin:0 0 10px; }
+  .jsondrawer pre{ font-size:11px; color:#b7d6a3; white-space:pre-wrap; word-break:break-all; line-height:1.5; font-family:'SF Mono', monospace; }
+  .jsondrawer .close{ position:absolute; top:14px; right:14px; cursor:pointer; color:var(--text-dim); font-size:18px; background:none;border:none; }
+  .copybtn{ margin-top:10px; width:100%; padding:8px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); border-radius:3px; cursor:pointer; font-size:11.5px; }
+ 
+  ::selection{ background: var(--ember); color:#160f08; }
+</style>
+</head>
+<body>
+ 
+<div class="app">
+ 
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AF</div>
+      <div class="brand-text">
+        <div class="t1">AIKA FANTASY FORGE</div>
+        <div class="t2">CHARACTER GENERATOR — PROTOTYPE</div>
+      </div>
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Generator</div>
+      <div class="seg">
+        <button class="opt active" data-group="mode" data-value="hero">Hero</button>
+        <button class="opt" data-group="mode" data-value="enemy">Enemy</button>
+      </div>
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Race</div>
+      <div class="chip-grid" id="raceGrid"></div>
+    </div>
+ 
+    <div class="section" id="genderSection">
+      <div class="section-title">Gender Presentation</div>
+      <div class="seg">
+        <button class="opt active" data-group="gender" data-value="male">Male</button>
+        <button class="opt" data-group="gender" data-value="female">Female</button>
+      </div>
+    </div>
+ 
+    <div class="section" id="tierSection" style="display:none;">
+      <div class="section-title">Enemy Tier</div>
+      <div class="chip-grid cols3" id="tierGrid"></div>
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Class</div>
+      <select class="dd" id="classSelect"></select>
+    </div>
+ 
+    <div class="divider"></div>
+ 
+    <div class="section">
+      <div class="section-title">Body <span class="reset-mini" id="bodyResetBtn">reset</span></div>
+      <div class="row"><label>Height</label><span class="val" id="v_height">1.00</span></div>
+      <input type="range" id="s_height" min="0.75" max="1.3" step="0.01" value="1">
+      <div class="row"><label>Bulk</label><span class="val" id="v_bulk">1.00</span></div>
+      <input type="range" id="s_bulk" min="0.65" max="1.5" step="0.01" value="1">
+      <div class="row"><label>Head Size</label><span class="val" id="v_head">1.00</span></div>
+      <input type="range" id="s_head" min="0.75" max="1.35" step="0.01" value="1">
+      <div class="row"><label>Shoulder Width</label><span class="val" id="v_shoulders">1.00</span></div>
+      <input type="range" id="s_shoulders" min="0.7" max="1.4" step="0.01" value="1">
+      <div class="row"><label>Arm Length</label><span class="val" id="v_arms">1.00</span></div>
+      <input type="range" id="s_arms" min="0.75" max="1.3" step="0.01" value="1">
+      <div class="row"><label>Leg Length</label><span class="val" id="v_legs">1.00</span></div>
+      <input type="range" id="s_legs" min="0.75" max="1.3" step="0.01" value="1">
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Hair</div>
+      <div class="chip-grid cols3" id="hairGrid"></div>
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Armor</div>
+      <div class="chip-grid" id="armorGrid"></div>
+    </div>
+ 
+    <div class="section">
+      <div class="section-title">Weapon</div>
+      <div class="chip-grid" id="weaponGrid"></div>
+    </div>
+ 
+    <div class="divider"></div>
+ 
+    <div class="section">
+      <div class="section-title">Colors</div>
+      <div class="color-row"><span class="lbl">Skin / Hide</span><input type="color" class="swatch-input" id="c_skin"></div>
+      <div class="color-row"><span class="lbl">Hair</span><input type="color" class="swatch-input" id="c_hair"></div>
+      <div class="color-row"><span class="lbl">Armor</span><input type="color" class="swatch-input" id="c_armor"></div>
+      <div class="color-row"><span class="lbl">Accent / Trim</span><input type="color" class="swatch-input" id="c_accent"></div>
+    </div>
+ 
+  </div>
+ 
+  <!-- VIEWPORT -->
+  <div class="viewport" id="viewport">
+    <div class="hint">drag to orbit · scroll to zoom</div>
+    <div class="hud-top">
+      <div class="hud-card">
+        <div class="hud-title" id="hudTitle">Human Warrior</div>
+        <div class="hud-sub" id="hudSub">Male · Iron Armor · Longsword</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-seed">SEED</div>
+        <div class="hud-seed n" id="hudSeed">48152</div>
+      </div>
+    </div>
+ 
+    <div class="anim-bar" id="animBar">
+      <button class="opt-anim active" data-anim="idle">Idle</button>
+      <button class="opt-anim" data-anim="walk">Walk</button>
+      <button class="opt-anim" data-anim="run">Run</button>
+      <button class="opt-anim" data-anim="attack">Attack</button>
+      <button class="opt-anim" data-anim="block">Block</button>
+      <button class="opt-anim" data-anim="cast">Cast</button>
+      <button class="opt-anim" data-anim="hit">Hit</button>
+      <button class="opt-anim" data-anim="cheer">Cheer</button>
+      <button class="opt-anim" data-anim="sit">Sit</button>
+      <button class="opt-anim" data-anim="sleep">Sleep</button>
+      <button class="opt-anim" data-anim="death">Death</button>
+    </div>
+ 
+    <div class="jsondrawer" id="jsonDrawer">
+      <button class="close" id="closeJson">×</button>
+      <h3>Character Config</h3>
+      <pre id="jsonOut"></pre>
+      <button class="copybtn" id="copyJson">Copy JSON</button>
+    </div>
+  </div>
+ 
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <button class="bigbtn" id="btnRandom">🎲 Randomize</button>
+    <button class="bigbtn" id="btnSeed">⟳ New Seed</button>
+    <div class="spacer"></div>
+    <select class="presetdd" id="presetSelect"><option value="">Load preset…</option></select>
+    <button class="bigbtn" id="btnSave">Save Preset</button>
+    <button class="bigbtn ghost" id="btnJson">View JSON</button>
+    <button class="bigbtn ghost" id="btnReset">Reset</button>
+  </div>
+ 
+</div>
+ 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   AIKA FANTASY FORGE — Procedural Character Prototype (v2)
+   ============================================================ */
+ 
+// ---------- DATA ----------
+const RACES = {
+  human:  { label:"Human",  heightM:1.0, bulkM:1.0, headM:1.0, skin:"#c58c6d", ears:false, tusks:false, horns:false, hunch:0, tail:false },
+  elf:    { label:"Elf",    heightM:1.08, bulkM:0.82, headM:0.92, skin:"#e3c9a4", ears:true,  tusks:false, horns:false, hunch:0, tail:false },
+  dwarf:  { label:"Dwarf",  heightM:0.72, bulkM:1.35, headM:1.08, skin:"#c99268", ears:false, tusks:false, horns:false, hunch:0, tail:false, beard:true },
+  orc:    { label:"Orc",    heightM:1.12, bulkM:1.35, headM:1.05, skin:"#7ba05b", ears:false, tusks:true,  horns:false, hunch:0.06, tail:false },
+  goblin: { label:"Goblin", heightM:0.68, bulkM:0.75, headM:1.35, skin:"#8faf5c", ears:true,  tusks:false, horns:false, hunch:0.16, tail:false },
+  undead: { label:"Undead", heightM:0.98, bulkM:0.85, headM:0.95, skin:"#a3ab9c", ears:false, tusks:false, horns:false, hunch:0.1, tail:false, glow:"#7fd8e0" },
+  demon:  { label:"Demon",  heightM:1.15, bulkM:1.1,  headM:0.95, skin:"#9c4a4a", ears:false, tusks:false, horns:true,  hunch:0, tail:true, glow:"#ff8a3c" },
+};
+ 
+const CLASSES = {
+  warrior:   { label:"Warrior",   group:"Combat",   weapon:"sword",     armor:"leather",  offhand:"shield", accent:"#8a3b2c" },
+  knight:    { label:"Knight",    group:"Combat",   weapon:"sword",     armor:"knight",   offhand:"shield", accent:"#3b5a8a" },
+  paladin:   { label:"Paladin",   group:"Combat",   weapon:"sword",     armor:"plate",    offhand:"shield", accent:"#c9a13a" },
+  berserker: { label:"Berserker", group:"Combat",   weapon:"greatsword",armor:"chain",    offhand:"none",   accent:"#8a2c2c" },
+  ranger:    { label:"Ranger",    group:"Combat",   weapon:"bow",       armor:"leather",  offhand:"none",   accent:"#4a7a4a" },
+  rogue:     { label:"Rogue",     group:"Combat",   weapon:"dagger",    armor:"scale",    offhand:"dagger", accent:"#3a3a3a" },
+  mage:      { label:"Mage",      group:"Magic",    weapon:"staff",     armor:"mage_robe",offhand:"none",   accent:"#4a5f9c" },
+  cleric:    { label:"Cleric",    weapon:"mace",     group:"Magic",     armor:"mage_robe",offhand:"none",   accent:"#c9a13a" },
+  monk:      { label:"Monk",      group:"Magic",    weapon:"none",      armor:"monk_robe",offhand:"none",   accent:"#a06a3a" },
+  citizen:   { label:"Citizen",   group:"Civilian", weapon:"none",      armor:"cloth",    offhand:"none",   accent:"#7a6a4a" },
+  merchant:  { label:"Merchant",  group:"Civilian", weapon:"none",      armor:"cloth",    offhand:"none",   accent:"#8a6a2a" },
+  farmer:    { label:"Farmer",    group:"Civilian", weapon:"none",      armor:"tribal",   offhand:"none",   accent:"#6a7a3a" },
+  blacksmith:{ label:"Blacksmith",group:"Civilian", weapon:"mace",      armor:"leather",  offhand:"none",   accent:"#4a3a2a" },
+  noble:     { label:"Noble",     group:"Civilian", weapon:"dagger",    armor:"royal",    offhand:"none",   accent:"#d4af6a" },
+};
+ 
+const ENEMY_CLASSES = {
+  grunt:  { label:"Grunt",  group:"Enemy", weapon:"axe",        armor:"tribal", offhand:"none", accent:"#6a5a3a" },
+  archer: { label:"Archer", group:"Enemy", weapon:"bow",        armor:"tribal", offhand:"none", accent:"#5a6a3a" },
+  shaman: { label:"Shaman", group:"Enemy", weapon:"staff",      armor:"monk_robe", offhand:"none", accent:"#5a3a6a" },
+  brute:  { label:"Brute",  group:"Enemy", weapon:"greatsword", armor:"chain", offhand:"none", accent:"#4a3a2a" },
+  knight: { label:"Dark Knight", group:"Enemy", weapon:"sword", armor:"plate", offhand:"shield", accent:"#3a2a4a" },
+};
+ 
+const TIERS = {
+  normal:   { label:"Normal",   scale:1.0,  glow:0 },
+  elite:    { label:"Elite",    scale:1.08, glow:0 },
+  champion: { label:"Champion", scale:1.18, glow:0.15 },
+  boss:     { label:"Boss",     scale:1.4,  glow:0.35 },
+};
+ 
+// armor visual definitions
+const ARMOR_DEFS = {
+  cloth:     { label:"Cloth",     metal:false, plate:false, pauldron:false, cape:false, robe:null,    tone:"#8a7a5a" },
+  leather:   { label:"Leather",   metal:false, plate:false, pauldron:false, cape:false, robe:null,    tone:"#6b4a2c" },
+  tribal:    { label:"Tribal",    metal:false, plate:false, pauldron:false, cape:false, robe:null,    tone:"#7a5a3a", trinkets:true },
+  chain:     { label:"Chainmail", metal:true,  plate:false, pauldron:false, cape:false, robe:null,    tone:"#83887d", rough:0.55 },
+  scale:     { label:"Scale",     metal:true,  plate:false, pauldron:false, cape:false, robe:null,    tone:"#4f6a52", scales:true },
+  iron:      { label:"Iron",      metal:true,  plate:true,  pauldron:false, cape:false, robe:null,    tone:"#9a968a" },
+  knight:    { label:"Knight",    metal:true,  plate:true,  pauldron:true,  cape:true,  robe:null,    tone:"#7a8296" },
+  plate:     { label:"Full Plate",metal:true,  plate:true,  pauldron:true,  cape:false, robe:null,    tone:"#c7c2b6", helm:true },
+  royal:     { label:"Royal",     metal:true,  plate:true,  pauldron:true,  cape:true,  robe:null,    tone:"#8a6a2a", trim:"#d4af6a" },
+  mage_robe: { label:"Mage Robe", metal:false, plate:false, pauldron:false, cape:false, robe:"mage",  tone:"#3a3a6a" },
+  monk_robe: { label:"Monk Robe", metal:false, plate:false, pauldron:false, cape:false, robe:"monk",  tone:"#a06a3a" },
+};
+ 
+const HAIR_STYLES = ["bald","short","messy","mohawk","ponytail","long"];
+const WEAPONS = ["none","sword","greatsword","axe","dagger","staff","bow","mace"];
+const ANIMATIONS = ["idle","walk","run","attack","block","cast","hit","cheer","sit","sleep","death"];
+ 
+// ---------- SEEDED RANDOM ----------
+function makeRNG(seed){
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return function(){ s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+function pick(rng, arr){ return arr[Math.floor(rng() * arr.length)]; }
+function hexToInt(hex){ return parseInt(hex.replace('#','0x')); }
+function shade(hex, amt){
+  const c = new THREE.Color(hex);
+  const h = {}; c.getHSL(h);
+  c.setHSL(h.h, h.s, Math.max(0, Math.min(1, h.l + amt)));
+  return '#' + c.getHexString();
+}
+function niceLabel(s){ return s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+ 
+// ---------- STATE ----------
+const DEFAULT_STATE = () => ({
+  mode: "hero", race: "human", gender: "male", cls: "warrior", tier: "normal",
+  hair: "short", armor: "leather", weapon: "sword",
+  body: { height:1, bulk:1, head:1, shoulders:1, arms:1, legs:1 },
+  colors: { skin:"#c58c6d", hair:"#3a2a1a", armor:"#5a5148", accent:"#8a3b2c" },
+  seed: 48152,
+});
+let state = DEFAULT_STATE();
+ 
+function classSet(){ return state.mode === "hero" ? CLASSES : ENEMY_CLASSES; }
+ 
+// ---------- THREE SETUP ----------
+const viewport = document.getElementById('viewport');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0c0906, 0.045);
+ 
+const camera = new THREE.PerspectiveCamera(42, viewport.clientWidth/viewport.clientHeight, 0.1, 100);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+renderer.shadowMap.enabled = true;
+viewport.appendChild(renderer.domElement);
+ 
+scene.add(new THREE.AmbientLight(0x59503f, 0.9));
+const key = new THREE.DirectionalLight(0xffe0b0, 1.15);
+key.position.set(3, 5, 4);
+key.castShadow = true;
+key.shadow.mapSize.set(1024,1024);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x6a86c9, 0.55);
+rim.position.set(-4, 3, -3);
+scene.add(rim);
+const torch = new THREE.PointLight(0xff9c4a, 0.6, 8);
+torch.position.set(0, 2.2, 2.4);
+scene.add(torch);
+ 
+const ground = new THREE.Mesh(
+  new THREE.CylinderGeometry(3.2, 3.2, 0.15, 24),
+  new THREE.MeshStandardMaterial({ color:0x1c1712, flatShading:true, roughness:0.95 })
+);
+ground.position.y = -0.075;
+ground.receiveShadow = true;
+scene.add(ground);
+const runeMat = new THREE.MeshStandardMaterial({ color:0xc9702f, emissive:0xc9702f, emissiveIntensity:0.4, flatShading:true });
+const rune = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.02, 8, 48), runeMat);
+rune.rotation.x = Math.PI/2; rune.position.y = 0.01;
+scene.add(rune);
+const runeMat2 = new THREE.MeshStandardMaterial({ color:0xc9702f, emissive:0xc9702f, emissiveIntensity:0.25, flatShading:true });
+const rune2 = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.012, 8, 48), runeMat2);
+rune2.rotation.x = Math.PI/2; rune2.position.y = 0.01;
+scene.add(rune2);
+ 
+// custom orbit control
+let camTarget = new THREE.Vector3(0, 1.05, 0);
+let camDist = 4.2, camTheta = 0.5, camPhi = 1.25;
+function updateCamera(){
+  camPhi = Math.max(0.35, Math.min(1.5, camPhi));
+  camDist = Math.max(2.0, Math.min(9, camDist));
+  const x = camTarget.x + camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  const y = camTarget.y + camDist * Math.cos(camPhi);
+  const z = camTarget.z + camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  camera.position.set(x,y,z);
+  camera.lookAt(camTarget);
+}
+updateCamera();
+let dragging = false, lastX=0, lastY=0;
+renderer.domElement.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('pointerup', ()=> dragging=false);
+window.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const dx = e.clientX-lastX, dy = e.clientY-lastY;
+  lastX=e.clientX; lastY=e.clientY;
+  camTheta -= dx*0.008;
+  camPhi -= dy*0.008;
+  updateCamera();
+});
+renderer.domElement.addEventListener('wheel', e=>{
+  camDist += e.deltaY * 0.0025 * camDist;
+  updateCamera();
+  e.preventDefault();
+}, { passive:false });
+ 
+// ---------- MATERIAL HELPER ----------
+function mat(color, opts={}){
+  return new THREE.MeshStandardMaterial({
+    color: hexToInt(color), flatShading:true,
+    roughness: opts.rough !== undefined ? opts.rough : (opts.metal ? 0.35 : 0.8),
+    metalness: opts.metal ? 0.65 : 0.04,
+    emissive: opts.glow ? hexToInt(opts.glow) : 0x000000,
+    emissiveIntensity: opts.glow ? 0.6 : 0,
+  });
+}
+function box(w,h,d,m){ const me=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); me.castShadow=true; return me; }
+function cyl(r1,r2,h,m,seg=6){ const me=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg),m); me.castShadow=true; return me; }
+function cone(r,h,m,seg=6){ const me=new THREE.Mesh(new THREE.ConeGeometry(r,h,seg),m); me.castShadow=true; return me; }
+function sph(r,m,seg=7){ const me=new THREE.Mesh(new THREE.SphereGeometry(r,seg,seg),m); me.castShadow=true; return me; }
+function ico(r,m,det=0){ const me=new THREE.Mesh(new THREE.IcosahedronGeometry(r,det),m); me.castShadow=true; return me; }
+function torus(r,tube,m,seg=16,arc){ const me=new THREE.Mesh(new THREE.TorusGeometry(r,tube,6,seg,arc), m); me.castShadow=true; return me; }
+ 
+// ---------- WEAPON BUILDER ----------
+// All weapons are built so the GRIP sits at local origin (0,0,0) and the
+// blade/head extends in -Y (down and away from the hand), matching a
+// natural relaxed hold. The hand mesh sits at the same origin as the grip.
+function buildWeapon(type, accentHex, metalM){
+  const g = new THREE.Group();
+  g.userData.type = type;
+  if(type === "none") return g;
+  const metal = metalM || mat("#c9c9c9",{metal:true});
+  const wood = mat("#5c3f24");
+ 
+  switch(type){
+    case "sword": {
+      g.add(cyl(0.017,0.02,0.15,wood).translateY(-0.07));
+      const guard = box(0.11,0.02,0.02,metal); guard.position.y=-0.145; g.add(guard);
+      const blade = box(0.032,0.46,0.011,metal); blade.position.y=-0.375; g.add(blade);
+      const tip = cone(0.016,0.055,metal,4); tip.rotation.x=Math.PI; tip.position.y=-0.635; g.add(tip);
+      break;
+    }
+    case "greatsword": {
+      g.add(cyl(0.024,0.026,0.26,wood).translateY(-0.12));
+      const guard = box(0.2,0.03,0.03,metal); guard.position.y=-0.26; g.add(guard);
+      const blade = box(0.065,0.78,0.02,metal); blade.position.y=-0.66; g.add(blade);
+      const tip = cone(0.032,0.11,metal,4); tip.rotation.x=Math.PI; tip.position.y=-1.11; g.add(tip);
+      break;
+    }
+    case "axe": {
+      g.add(cyl(0.02,0.022,0.52,wood).translateY(-0.25));
+      const head = box(0.05,0.26,0.2,metal); head.rotation.z=0.18; head.position.set(0.02,-0.44,0); g.add(head);
+      break;
+    }
+    case "dagger": {
+      g.add(cyl(0.014,0.016,0.09,wood).translateY(-0.045));
+      const blade = box(0.024,0.18,0.01,metal); blade.position.y=-0.18; g.add(blade);
+      const tip = cone(0.012,0.035,metal,4); tip.rotation.x=Math.PI; tip.position.y=-0.29; g.add(tip);
+      break;
+    }
+    case "staff": {
+      g.add(cyl(0.022,0.026,1.05,wood).translateY(-0.5));
+      const gem = ico(0.075, mat(accentHex, {glow:accentHex, metal:false}), 0);
+      gem.position.y = 0.06; gem.userData.isGem = true;
+      g.add(gem);
+      break;
+    }
+    case "mace": {
+      g.add(cyl(0.023,0.023,0.55,wood).translateY(-0.26));
+      const head = ico(0.09, metal, 0); head.position.y=-0.57; g.add(head);
+      // flanges
+      for(let i=0;i<4;i++){
+        const f = box(0.02,0.1,0.06, metal); f.position.set(0,-0.57,0);
+        f.rotation.y = i*Math.PI/2; f.position.x = Math.cos(i*Math.PI/2)*0.08; f.position.z = Math.sin(i*Math.PI/2)*0.08;
+        g.add(f);
+      }
+      break;
+    }
+    case "bow": {
+      const arcGeo = new THREE.TorusGeometry(0.34, 0.016, 6, 16, Math.PI*1.25);
+      const bow = new THREE.Mesh(arcGeo, wood);
+      bow.rotation.z = Math.PI/2 - (Math.PI*1.25)/2;
+      bow.castShadow = true;
+      g.add(bow);
+      break;
+    }
+  }
+  return g;
+}
+function buildShield(accentHex, metalM){
+  const g = new THREE.Group();
+  const face = cyl(0.15,0.15,0.028,metalM,8); face.rotation.z=Math.PI/2; g.add(face);
+  const boss = ico(0.05, mat(accentHex,{metal:true}),0); boss.position.x=0.016; g.add(boss);
+  return g;
+}
+ 
+// ---------- HAIR BUILDER ----------
+function buildHair(style, hairColor, rng){
+  const g = new THREE.Group();
+  const m = mat(hairColor);
+  if(style === "bald") return g;
+  if(style === "short"){
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.19,8,6,0,Math.PI*2,0,Math.PI/1.7), m);
+    dome.position.y=0.02; dome.castShadow=true; g.add(dome);
+  } else if(style === "messy"){
+    for(let i=0;i<7;i++){
+      const t = cone(0.05+rng()*0.02, 0.1+rng()*0.05, m, 4);
+      const a = (i/7)*Math.PI*2;
+      t.position.set(Math.cos(a)*0.13, 0.12+rng()*0.04, Math.sin(a)*0.13);
+      t.rotation.set(rng()*0.6-0.3, a, rng()*0.6-0.3);
+      g.add(t);
+    }
+  } else if(style === "mohawk"){
+    const ridge = box(0.05,0.18,0.32,m); ridge.position.y=0.16; g.add(ridge);
+  } else if(style === "ponytail"){
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.19,8,6,0,Math.PI*2,0,Math.PI/1.9), m);
+    dome.position.y=0.02; g.add(dome);
+    const tail = cyl(0.035,0.02,0.35,m); tail.position.set(0,-0.05,-0.19); tail.rotation.x=0.5; g.add(tail);
+  } else if(style === "long"){
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.19,8,6,0,Math.PI*2,0,Math.PI/1.9), m);
+    dome.position.y=0.02; g.add(dome);
+    const back = box(0.24,0.42,0.06,m); back.position.set(0,-0.18,-0.15); back.rotation.x=0.15; g.add(back);
+  }
+  return g;
+}
+ 
+// ---------- CHARACTER BUILDER ----------
+let charGroup = null;
+let refs = {};
+ 
+function buildCharacter(cfg){
+  if(charGroup){ scene.remove(charGroup); }
+  refs = {};
+  const rng = makeRNG(cfg.seed);
+  const race = RACES[cfg.race];
+  const clsData = classSet()[cfg.cls];
+  const tierData = TIERS[cfg.tier];
+  const ad = ARMOR_DEFS[cfg.armor];
+ 
+  const skinM = mat(cfg.colors.skin, race.glow ? {glow:race.glow} : {});
+  const hairM = mat(cfg.colors.hair);
+  const armorM = mat(cfg.colors.armor, { metal: ad.metal, rough: ad.rough });
+  const accentM = mat(cfg.colors.accent);
+  const trimM = mat(ad.trim || cfg.colors.accent, {metal:true});
+  const metalM = mat("#c7c2b6", {metal:true});
+  const bulk = cfg.body.bulk;
+ 
+  const root = new THREE.Group();
+ 
+  // ----- Hips (all width/bulk propagates from here) -----
+  const hips = box(0.34, 0.22, 0.24, armorM);
+  hips.position.y = 0.95;
+  hips.rotation.x = race.hunch*0.4;
+  hips.scale.set(bulk, 1, bulk);
+  root.add(hips);
+ 
+  // ----- Spine / Chest -----
+  const spine = new THREE.Group();
+  spine.position.y = 0.11;
+  spine.rotation.x = race.hunch;
+  hips.add(spine);
+  refs.spine = spine;
+ 
+  const chest = box(0.4, 0.42, 0.26, armorM);
+  chest.position.y = 0.24;
+  spine.add(chest);
+ 
+  if(ad.plate){
+    const plate = box(0.42, 0.22, 0.02, metalM);
+    plate.position.set(0, 0.32, 0.14);
+    spine.add(plate);
+  }
+  if(ad.scales){
+    for(let row=0; row<2; row++){
+      for(let i=0;i<3;i++){
+        const s = ico(0.055, armorM, 0);
+        s.scale.set(1,1,0.35);
+        s.position.set((i-1)*0.13, 0.2+row*0.13, 0.15);
+        spine.add(s);
+      }
+    }
+  }
+  if(ad.pauldron){
+    const lp = ico(0.1, metalM, 0); lp.position.set(0.25, 0.42, 0); spine.add(lp);
+    const rp = ico(0.1, metalM, 0); rp.position.set(-0.25, 0.42, 0); spine.add(rp);
+  }
+  if(ad.cape){
+    const cape = box(0.34, 0.55, 0.02, cfg.armor==='royal' ? accentM : armorM);
+    cape.position.set(0, 0.02, -0.16);
+    cape.rotation.x = -0.18;
+    spine.add(cape);
+  }
+  if(ad.helm){
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6,0,Math.PI*2,0,Math.PI/1.8), metalM);
+    helm.position.set(0,0.62,0);
+    helm.castShadow = true;
+    spine.add(helm);
+    const visor = box(0.2,0.05,0.04, mat("#1a1410"));
+    visor.position.set(0,0.6,0.13); spine.add(visor);
+  }
+  if(ad.trinkets){
+    const feather = cone(0.025,0.16, mat("#c9a13a"), 4);
+    feather.position.set(0.24,0.48,-0.02); feather.rotation.z=-0.5;
+    spine.add(feather);
+  }
+  if(ad.trim && ad.cape){
+    const hem = torus(0.19,0.012,trimM,16); hem.rotation.x=Math.PI/2; hem.position.y=0.03; spine.add(hem);
+  }
+ 
+  // ----- Robe (mage / monk classes replace lower torso + legs read) -----
+  if(ad.robe){
+    const style = ad.robe;
+    let topR, botR, h, hemColor;
+    if(style === "mage"){ topR=0.24; botR=0.52; h=1.05; }
+    else { topR=0.23; botR=0.36; h=0.8; } // monk
+    const robe = cyl(topR*bulk, botR*bulk, h, mat(cfg.colors.armor));
+    robe.position.y = -h/2 - 0.08;
+    spine.add(robe);
+ 
+    // belt / trim
+    const belt = torus(topR*bulk*0.72, 0.016, style==='mage' ? accentM : mat("#4a3a2a"), 16);
+    belt.rotation.x = Math.PI/2; belt.position.y = 0.13;
+    spine.add(belt);
+ 
+    if(style === "mage"){
+      const hem = torus(botR*bulk*0.98, 0.014, accentM, 16);
+      hem.rotation.x = Math.PI/2; hem.position.y = -h-0.06;
+      spine.add(hem);
+      // pointed wizard hat
+      if(cfg.cls === "mage" || cfg.cls === "shaman"){
+        const hatGroup = new THREE.Group();
+        hatGroup.position.y = 0.78;
+        const brim = cyl(0.22,0.22,0.02, mat(cfg.colors.armor)); brim.position.y=0; hatGroup.add(brim);
+        const cap = cone(0.16,0.42, mat(cfg.colors.armor), 6); cap.position.y=0.24; cap.rotation.z=0.12; hatGroup.add(cap);
+        const band = torus(0.155,0.013,accentM,12); band.rotation.x=Math.PI/2; band.position.y=0.04; hatGroup.add(band);
+        spine.add(hatGroup);
+        refs.hat = hatGroup;
+      }
+    } else {
+      const rope = torus(topR*bulk*0.74, 0.012, mat("#c9a877"), 16);
+      rope.rotation.x = Math.PI/2; rope.position.y = 0.1;
+      spine.add(rope);
+    }
+  }
+ 
+  // ----- Neck / Head -----
+  const neck = cyl(0.055,0.06,0.08, skinM);
+  neck.position.y = 0.46;
+  spine.add(neck);
+ 
+  const headGroup = new THREE.Group();
+  headGroup.position.y = 0.62;
+  const headScale = cfg.body.head * race.headM;
+  headGroup.scale.set(headScale/bulk, headScale, headScale/bulk); // cancel inherited torso bulk so head size stays independent
+  spine.add(headGroup);
+  refs.head = headGroup;
+ 
+  const headShape = cfg.race === "goblin" ? new THREE.IcosahedronGeometry(0.155,0) : new THREE.BoxGeometry(0.24,0.24,0.22);
+  const head = new THREE.Mesh(headShape, skinM);
+  head.castShadow = true;
+  headGroup.add(head);
+ 
+  const eyeColor = race.glow ? mat(race.glow,{glow:race.glow}) : mat("#1a1410");
+  const le = sph(0.018, eyeColor, 5); le.position.set(0.07,0.02,0.115); headGroup.add(le);
+  const re = sph(0.018, eyeColor, 5); re.position.set(-0.07,0.02,0.115); headGroup.add(re);
+ 
+  if(race.ears){
+    const le2 = cone(0.035,0.13, skinM, 4); le2.position.set(0.15,0.06,0); le2.rotation.z=-1.1; headGroup.add(le2);
+    const re2 = cone(0.035,0.13, skinM, 4); re2.position.set(-0.15,0.06,0); re2.rotation.z=1.1; headGroup.add(re2);
+  }
+  if(race.tusks){
+    const lt = cone(0.018,0.09, mat("#e8e2d0"), 4); lt.position.set(0.06,-0.11,0.08); lt.rotation.x=2.6; headGroup.add(lt);
+    const rt = cone(0.018,0.09, mat("#e8e2d0"), 4); rt.position.set(-0.06,-0.11,0.08); rt.rotation.x=2.6; headGroup.add(rt);
+  }
+  if(race.horns){
+    const lh = cone(0.03,0.18, mat("#2a1a14"), 4); lh.position.set(0.08,0.15,-0.02); lh.rotation.set(-0.4,0,-0.3); headGroup.add(lh);
+    const rh = cone(0.03,0.18, mat("#2a1a14"), 4); rh.position.set(-0.08,0.15,-0.02); rh.rotation.set(-0.4,0,0.3); headGroup.add(rh);
+  }
+  if(race.beard || cfg.cls === "cleric"){
+    const beard = cone(0.09,0.16, hairM, 5); beard.position.set(0,-0.16,0.04); headGroup.add(beard);
+  }
+  if(!ad.robe || cfg.cls !== "mage"){
+    const hair = buildHair(cfg.hair, cfg.colors.hair, rng);
+    hair.position.y = 0.02;
+    headGroup.add(hair);
+  }
+ 
+  // ----- Arms -----
+  function buildArm(side){
+    const sign = side === "L" ? 1 : -1;
+    const shoulder = new THREE.Group();
+    shoulder.position.set(sign*0.24*cfg.body.shoulders, 0.4, 0);
+    shoulder.scale.y = cfg.body.arms;
+    spine.add(shoulder);
+ 
+    const upper = cyl(0.05,0.045,0.26, skinM);
+    upper.position.y = -0.13;
+    upper.rotation.z = sign*0.06;
+    shoulder.add(upper);
+ 
+    const forearmGroup = new THREE.Group();
+    forearmGroup.position.y = -0.26;
+    upper.add(forearmGroup);
+    const forearm = cyl(0.042,0.036,0.24, skinM);
+    forearm.position.y = -0.12;
+    forearmGroup.add(forearm);
+ 
+    const handGroup = new THREE.Group();
+    handGroup.position.y = -0.24;
+    forearmGroup.add(handGroup);
+    const hand = sph(0.05, skinM, 5);
+    handGroup.add(hand);
+ 
+    return { shoulder, forearmGroup, handGroup };
+  }
+  const armL = buildArm("L");
+  const armR = buildArm("R");
+  refs.leftUpperArm = armL.shoulder;
+  refs.rightUpperArm = armR.shoulder;
+  refs.leftHand = armL.handGroup;
+  refs.rightHand = armR.handGroup;
+ 
+  // weapon: bows sit naturally in the off-hand; everything else in the main hand.
+  const weaponG = buildWeapon(cfg.weapon, cfg.colors.accent, metalM);
+  if(cfg.weapon === "bow"){
+    weaponG.rotation.z = Math.PI/2;
+    armL.handGroup.add(weaponG);
+  } else if(cfg.weapon !== "none"){
+    armR.handGroup.add(weaponG);
+  }
+  refs.gem = weaponG.getObjectByProperty ? null : null;
+  weaponG.traverse(o=>{ if(o.userData && o.userData.isGem) refs.gem = o; });
+ 
+  if(clsData.offhand === "shield"){
+    const shield = buildShield(cfg.colors.accent, metalM);
+    armL.handGroup.add(shield);
+  } else if(clsData.offhand === "dagger"){
+    const off = buildWeapon("dagger", cfg.colors.accent, metalM);
+    armL.handGroup.add(off);
+  }
+ 
+  // ----- Legs -----
+  function buildLeg(side){
+    const sign = side === "L" ? 1 : -1;
+    const thighGroup = new THREE.Group();
+    thighGroup.position.set(sign*0.1, -0.11, 0);
+    thighGroup.scale.set(bulk, cfg.body.legs, bulk);
+    hips.add(thighGroup);
+    const thigh = cyl(0.06,0.055,0.32, mat(cfg.colors.armor));
+    thigh.position.y = -0.16;
+    thighGroup.add(thigh);
+ 
+    const shinGroup = new THREE.Group();
+    shinGroup.position.y = -0.32;
+    thigh.add(shinGroup);
+    const shin = cyl(0.05,0.04,0.3, skinM);
+    shin.position.y = -0.15;
+    shinGroup.add(shin);
+ 
+    const foot = box(0.09,0.06,0.16, mat("#2a2018"));
+    foot.position.set(0,-0.33,0.03);
+    shinGroup.add(foot);
+ 
+    return { thighGroup };
+  }
+  const legL = buildLeg("L");
+  const legR = buildLeg("R");
+  refs.leftThigh = legL.thighGroup;
+  refs.rightThigh = legR.thighGroup;
+ 
+  if(race.tail){
+    const tail = new THREE.Group();
+    tail.position.set(0,-0.05,-0.14);
+    hips.add(tail);
+    let prev = tail;
+    for(let i=0;i<3;i++){
+      const seg = cyl(0.03-i*0.006,0.026-i*0.006,0.18, skinM);
+      seg.position.y = -0.09;
+      seg.rotation.x = -0.35;
+      prev.add(seg);
+      const next = new THREE.Group(); next.position.y=-0.18; seg.add(next);
+      prev = next;
+    }
+  }
+ 
+  // overall height (vertical stretch only) + tier size
+  root.scale.set(tierData.scale, tierData.scale*cfg.body.height, tierData.scale);
+ 
+  const glowAmt = tierData.glow;
+  runeMat.emissiveIntensity = 0.4 + glowAmt;
+  runeMat2.emissiveIntensity = 0.25 + glowAmt*0.7;
+ 
+  root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; } });
+  charGroup = root;
+  scene.add(root);
+}
+ 
+// ---------- ANIMATION ----------
+let animState = "idle";
+let animClock = 0;
+ 
+function animate(dt){
+  animClock += dt;
+  if(!refs.spine) return;
+  const t = animClock;
+ 
+  charGroup.position.set(0,0,0);
+  charGroup.rotation.set(0,0,0);
+  refs.spine.rotation.y = 0;
+  if(refs.gem) refs.gem.material.emissiveIntensity = 0.6;
+ 
+  if(animState === "idle"){
+    const sway = Math.sin(t*1.6);
+    refs.spine.rotation.z = sway*0.02;
+    refs.spine.rotation.x = (RACES[state.race].hunch) + sway*0.008;
+    refs.head.rotation.y = Math.sin(t*0.5)*0.12;
+    refs.leftUpperArm.rotation.x = Math.sin(t*1.6)*0.05;
+    refs.rightUpperArm.rotation.x = -Math.sin(t*1.6)*0.05 + 0.05;
+    refs.leftThigh.rotation.x = 0;
+    refs.rightThigh.rotation.x = 0;
+  } else if(animState === "walk" || animState === "run"){
+    const speed = animState === "walk" ? 5 : 9;
+    const amp = animState === "walk" ? 0.5 : 0.85;
+    refs.leftUpperArm.rotation.x = Math.sin(t*speed)*amp;
+    refs.rightUpperArm.rotation.x = -Math.sin(t*speed)*amp;
+    refs.leftThigh.rotation.x = -Math.sin(t*speed)*amp;
+    refs.rightThigh.rotation.x = Math.sin(t*speed)*amp;
+    refs.spine.rotation.z = Math.sin(t*speed)*0.06;
+    refs.head.rotation.y = Math.sin(t*speed*0.5)*0.08;
+    charGroup.position.y = Math.abs(Math.sin(t*speed))*0.04;
+  } else if(animState === "attack"){
+    const cycle = (t % 0.7)/0.7;
+    const swing = Math.sin(cycle*Math.PI);
+    refs.rightUpperArm.rotation.x = -1.5*swing;
+    refs.rightUpperArm.rotation.z = -0.3*swing;
+    refs.spine.rotation.y = 0.15*swing;
+    refs.leftThigh.rotation.x = 0.15*swing;
+    refs.rightThigh.rotation.x = -0.1*swing;
+  } else if(animState === "block"){
+    const raise = Math.min(1, t*4);
+    refs.leftUpperArm.rotation.x = -1.1*raise;
+    refs.leftUpperArm.rotation.z = 0.2*raise;
+    refs.rightUpperArm.rotation.x = -0.9*raise;
+    refs.spine.rotation.x = (RACES[state.race].hunch) - 0.08*raise;
+    refs.leftThigh.rotation.x = 0.15*raise;
+    refs.rightThigh.rotation.x = 0.15*raise;
+  } else if(animState === "cast"){
+    const pulse = (Math.sin(t*3)+1)/2;
+    refs.leftUpperArm.rotation.x = -1.3 - pulse*0.1;
+    refs.rightUpperArm.rotation.x = -1.3 - pulse*0.1;
+    refs.rightUpperArm.rotation.z = -0.35;
+    refs.leftUpperArm.rotation.z = 0.35;
+    refs.spine.rotation.x = (RACES[state.race].hunch) - 0.1;
+    refs.head.rotation.x = -0.1;
+    if(refs.gem) refs.gem.material.emissiveIntensity = 0.9 + pulse*1.2;
+  } else if(animState === "hit"){
+    const cycle = (t % 0.5)/0.5;
+    const snap = Math.sin(cycle*Math.PI);
+    refs.spine.rotation.x = (RACES[state.race].hunch) - 0.35*snap;
+    refs.head.rotation.x = -0.3*snap;
+    refs.leftUpperArm.rotation.x = 0.3*snap;
+    refs.rightUpperArm.rotation.x = 0.3*snap;
+    charGroup.position.z = 0.06*snap;
+  } else if(animState === "cheer"){
+    const bounce = Math.abs(Math.sin(t*5));
+    refs.leftUpperArm.rotation.x = -2.4 + Math.sin(t*5)*0.15;
+    refs.rightUpperArm.rotation.x = -2.4 - Math.sin(t*5)*0.15;
+    refs.leftUpperArm.rotation.z = 0.3;
+    refs.rightUpperArm.rotation.z = -0.3;
+    charGroup.position.y = bounce*0.12;
+    refs.head.rotation.y = Math.sin(t*3)*0.15;
+  } else if(animState === "sit"){
+    refs.leftThigh.rotation.x = -1.4;
+    refs.rightThigh.rotation.x = -1.4;
+    refs.spine.rotation.x = (RACES[state.race].hunch) + 0.15;
+    charGroup.position.y = -0.42*state.body.height;
+    refs.leftUpperArm.rotation.x = Math.sin(t*1.2)*0.04;
+    refs.rightUpperArm.rotation.x = Math.sin(t*1.2)*0.04 + 0.1;
+  } else if(animState === "sleep"){
+    charGroup.rotation.z = Math.PI/2;
+    charGroup.position.y = -0.05 + Math.sin(t*1.2)*0.015;
+    charGroup.position.x = -0.35;
+    refs.leftUpperArm.rotation.x = 0.1;
+    refs.rightUpperArm.rotation.x = 0.1;
+  } else if(animState === "death"){
+    const p = Math.min(1, t*1.2);
+    charGroup.rotation.x = p * Math.PI/2.1;
+    charGroup.position.y = -p*0.15;
+  }
+}
+ 
+// ---------- RENDER LOOP ----------
+let lastTime = performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt = Math.min(0.05,(now-lastTime)/1000);
+  lastTime = now;
+  animate(dt);
+  renderer.render(scene, camera);
+}
+loop();
+ 
+window.addEventListener('resize', ()=>{
+  camera.aspect = viewport.clientWidth/viewport.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+});
+ 
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+ 
+function buildOptionGrid(el, items, group, labelFn){
+  el.innerHTML = "";
+  items.forEach(key=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = labelFn ? labelFn(key) : niceLabel(key);
+    btn.dataset.group = group;
+    btn.dataset.value = key;
+    btn.addEventListener('click', ()=>{
+      el.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      onControlChange(group, key);
+    });
+    el.appendChild(btn);
+  });
+}
+function setActiveInGrid(el, value){
+  el.querySelectorAll('button').forEach(b=> b.classList.toggle('active', b.dataset.value === value));
+}
+ 
+buildOptionGrid(document.getElementById('raceGrid'), Object.keys(RACES), 'race', k=>RACES[k].label);
+buildOptionGrid(document.getElementById('tierGrid'), Object.keys(TIERS), 'tier', k=>TIERS[k].label);
+buildOptionGrid(document.getElementById('hairGrid'), HAIR_STYLES, 'hair');
+buildOptionGrid(document.getElementById('armorGrid'), Object.keys(ARMOR_DEFS), 'armor', k=>ARMOR_DEFS[k].label);
+buildOptionGrid(document.getElementById('weaponGrid'), WEAPONS, 'weapon');
+setActiveInGrid(document.getElementById('raceGrid'), state.race);
+setActiveInGrid(document.getElementById('hairGrid'), state.hair);
+setActiveInGrid(document.getElementById('armorGrid'), state.armor);
+setActiveInGrid(document.getElementById('weaponGrid'), state.weapon);
+ 
+function refreshClassSelect(){
+  const sel = document.getElementById('classSelect');
+  const src = classSet();
+  sel.innerHTML = "";
+  const groups = {};
+  Object.keys(src).forEach(k=>{
+    const g = src[k].group || "Other";
+    (groups[g] = groups[g]||[]).push(k);
+  });
+  Object.keys(groups).forEach(g=>{
+    const og = document.createElement('optgroup'); og.label = g;
+    groups[g].forEach(k=>{
+      const o = document.createElement('option'); o.value=k; o.textContent = src[k].label;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  if(!src[state.cls]) state.cls = Object.keys(src)[0];
+  sel.value = state.cls;
+}
+refreshClassSelect();
+ 
+document.querySelectorAll('[data-group="mode"]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-group="mode"]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.mode = btn.dataset.value;
+    document.getElementById('genderSection').style.display = state.mode==='hero' ? '' : 'none';
+    document.getElementById('tierSection').style.display = state.mode==='enemy' ? '' : 'none';
+    refreshClassSelect();
+    applyClassDefaults();
+    rebuild();
+  });
+});
+ 
+document.querySelectorAll('[data-group="gender"]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-group="gender"]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.gender = btn.dataset.value;
+    rebuild();
+  });
+});
+ 
+document.getElementById('classSelect').addEventListener('change', e=>{
+  state.cls = e.target.value;
+  applyClassDefaults();
+  rebuild();
+});
+ 
+function applyRaceDefaults(){
+  const r = RACES[state.race];
+  state.body.height = r.heightM;
+  state.body.bulk = r.bulkM;
+  state.body.head = 1.0;
+  state.body.shoulders = 1.0;
+  state.body.arms = 1.0;
+  state.body.legs = 1.0;
+  state.colors.skin = r.skin;
+  syncSliders();
+  document.getElementById('c_skin').value = state.colors.skin;
+}
+function applyClassDefaults(){
+  const c = classSet()[state.cls];
+  state.weapon = c.weapon;
+  state.armor = c.armor;
+  state.colors.accent = c.accent;
+  setActiveInGrid(document.getElementById('weaponGrid'), state.weapon);
+  setActiveInGrid(document.getElementById('armorGrid'), state.armor);
+  document.getElementById('c_accent').value = state.colors.accent;
+  state.colors.armor = ARMOR_DEFS[state.armor].tone;
+  document.getElementById('c_armor').value = state.colors.armor;
+}
+ 
+function onControlChange(group, value){
+  if(group === 'race'){ state.race = value; applyRaceDefaults(); }
+  else if(group === 'tier'){ state.tier = value; }
+  else if(group === 'hair'){ state.hair = value; }
+  else if(group === 'armor'){ state.armor = value; document.getElementById('c_armor').value = ARMOR_DEFS[value].tone; state.colors.armor = ARMOR_DEFS[value].tone; }
+  else if(group === 'weapon'){ state.weapon = value; }
+  rebuild();
+}
+ 
+function syncSliders(){
+  document.getElementById('s_height').value = state.body.height;
+  document.getElementById('s_bulk').value = state.body.bulk;
+  document.getElementById('s_head').value = state.body.head;
+  document.getElementById('s_shoulders').value = state.body.shoulders;
+  document.getElementById('s_arms').value = state.body.arms;
+  document.getElementById('s_legs').value = state.body.legs;
+  document.getElementById('v_height').textContent = state.body.height.toFixed(2);
+  document.getElementById('v_bulk').textContent = state.body.bulk.toFixed(2);
+  document.getElementById('v_head').textContent = state.body.head.toFixed(2);
+  document.getElementById('v_shoulders').textContent = state.body.shoulders.toFixed(2);
+  document.getElementById('v_arms').textContent = state.body.arms.toFixed(2);
+  document.getElementById('v_legs').textContent = state.body.legs.toFixed(2);
+}
+ 
+['height','bulk','head','shoulders','arms','legs'].forEach(key=>{
+  const el = document.getElementById('s_'+key);
+  el.addEventListener('input', ()=>{
+    state.body[key] = parseFloat(el.value);
+    document.getElementById('v_'+key).textContent = state.body[key].toFixed(2);
+    rebuild();
+  });
+});
+ 
+document.getElementById('bodyResetBtn').addEventListener('click', ()=>{
+  const r = RACES[state.race];
+  state.body = { height:r.heightM, bulk:r.bulkM, head:1, shoulders:1, arms:1, legs:1 };
+  syncSliders();
+  rebuild();
+});
+ 
+['skin','hair','armor','accent'].forEach(key=>{
+  const el = document.getElementById('c_'+key);
+  el.addEventListener('input', ()=>{
+    state.colors[key] = el.value;
+    rebuild();
+  });
+});
+ 
+document.querySelectorAll('.anim-bar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.anim-bar button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    animState = btn.dataset.anim;
+    animClock = 0;
+  });
+});
+ 
+document.getElementById('btnRandom').addEventListener('click', ()=>{
+  state.seed = Math.floor(Math.random()*99999);
+  const rng = makeRNG(state.seed);
+  state.race = pick(rng, Object.keys(RACES));
+  applyRaceDefaults();
+  const cs = Object.keys(classSet());
+  state.cls = pick(rng, cs);
+  document.getElementById('classSelect').value = state.cls;
+  applyClassDefaults();
+  state.hair = pick(rng, HAIR_STYLES);
+  setActiveInGrid(document.getElementById('hairGrid'), state.hair);
+  state.gender = rng() > 0.5 ? "male" : "female";
+  document.querySelectorAll('[data-group="gender"]').forEach(b=>b.classList.toggle('active', b.dataset.value===state.gender));
+  if(state.mode === 'enemy'){
+    state.tier = pick(rng, Object.keys(TIERS));
+    setActiveInGrid(document.getElementById('tierGrid'), state.tier);
+  }
+  state.body.height *= (0.92 + rng()*0.16);
+  state.body.bulk *= (0.9 + rng()*0.25);
+  state.body.head *= (0.92 + rng()*0.16);
+  state.body.shoulders = 0.85 + rng()*0.3;
+  state.body.arms = 0.9 + rng()*0.2;
+  state.body.legs = 0.9 + rng()*0.2;
+  syncSliders();
+  state.colors.skin = shade(state.colors.skin, (rng()-0.5)*0.1);
+  document.getElementById('c_skin').value = state.colors.skin;
+  state.colors.hair = pick(rng, ["#1a140f","#3a2a1a","#6b4a2c","#c9a13a","#8a8a8a","#e8e2d0"]);
+  document.getElementById('c_hair').value = state.colors.hair;
+  setActiveInGrid(document.getElementById('raceGrid'), state.race);
+  rebuild();
+});
+ 
+document.getElementById('btnSeed').addEventListener('click', ()=>{
+  state.seed = Math.floor(Math.random()*99999);
+  rebuild();
+});
+ 
+function applyStateToUI(){
+  document.querySelectorAll('[data-group="mode"]').forEach(b=>b.classList.toggle('active', b.dataset.value===state.mode));
+  document.getElementById('genderSection').style.display = state.mode==='hero' ? '' : 'none';
+  document.getElementById('tierSection').style.display = state.mode==='enemy' ? '' : 'none';
+  refreshClassSelect();
+  document.getElementById('classSelect').value = state.cls;
+  setActiveInGrid(document.getElementById('raceGrid'), state.race);
+  setActiveInGrid(document.getElementById('hairGrid'), state.hair);
+  setActiveInGrid(document.getElementById('armorGrid'), state.armor);
+  setActiveInGrid(document.getElementById('weaponGrid'), state.weapon);
+  setActiveInGrid(document.getElementById('tierGrid'), state.tier);
+  document.querySelectorAll('[data-group="gender"]').forEach(b=>b.classList.toggle('active', b.dataset.value===state.gender));
+  syncSliders();
+  document.getElementById('c_skin').value = state.colors.skin;
+  document.getElementById('c_hair').value = state.colors.hair;
+  document.getElementById('c_armor').value = state.colors.armor;
+  document.getElementById('c_accent').value = state.colors.accent;
+}
+ 
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  state = DEFAULT_STATE();
+  applyStateToUI();
+  rebuild();
+});
+ 
+// ---------- PRESETS ----------
+function loadPresets(){ try{ return JSON.parse(localStorage.getItem('aika_ff_presets')||'[]'); } catch(e){ return []; } }
+function savePresets(list){ localStorage.setItem('aika_ff_presets', JSON.stringify(list)); }
+function refreshPresetDropdown(){
+  const sel = document.getElementById('presetSelect');
+  const list = loadPresets();
+  sel.innerHTML = '<option value="">Load preset…</option>';
+  list.forEach((p,i)=>{
+    const o = document.createElement('option'); o.value = i; o.textContent = p.name;
+    sel.appendChild(o);
+  });
+}
+refreshPresetDropdown();
+ 
+document.getElementById('btnSave').addEventListener('click', ()=>{
+  const name = prompt("Preset name:", `${state.race} ${state.cls}`);
+  if(!name) return;
+  const list = loadPresets();
+  list.push({ name, config: JSON.parse(JSON.stringify(state)) });
+  savePresets(list);
+  refreshPresetDropdown();
+});
+ 
+document.getElementById('presetSelect').addEventListener('change', e=>{
+  if(e.target.value === "") return;
+  const list = loadPresets();
+  const p = list[parseInt(e.target.value)];
+  if(!p) return;
+  state = JSON.parse(JSON.stringify(p.config));
+  applyStateToUI();
+  rebuild();
+});
+ 
+// ---------- JSON DRAWER ----------
+document.getElementById('btnJson').addEventListener('click', ()=>{
+  document.getElementById('jsonOut').textContent = JSON.stringify(state, null, 2);
+  document.getElementById('jsonDrawer').classList.add('open');
+});
+document.getElementById('closeJson').addEventListener('click', ()=>{
+  document.getElementById('jsonDrawer').classList.remove('open');
+});
+document.getElementById('copyJson').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(JSON.stringify(state, null, 2));
+});
+ 
+// ---------- REBUILD ----------
+function rebuild(){
+  buildCharacter(state);
+  document.getElementById('hudTitle').textContent = `${RACES[state.race].label} ${classSet()[state.cls].label}`;
+  const bits = [state.mode==='hero' ? (state.gender==='male'?'Male':'Female') : TIERS[state.tier].label,
+    ARMOR_DEFS[state.armor].label + ' Armor',
+    state.weapon === 'none' ? 'Unarmed' : niceLabel(state.weapon)];
+  document.getElementById('hudSub').textContent = bits.join(' · ');
+  document.getElementById('hudSeed').textContent = state.seed;
+}
+ 
+document.getElementById('c_skin').value = state.colors.skin;
+document.getElementById('c_hair').value = state.colors.hair;
+document.getElementById('c_armor').value = state.colors.armor;
+document.getElementById('c_accent').value = state.colors.accent;
+syncSliders();
+rebuild();
+ 
+</script>
+</body>
+</html>
+ 
+
+
