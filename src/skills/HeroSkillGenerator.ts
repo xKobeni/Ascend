@@ -91,6 +91,51 @@ export class HeroSkillGenerator {
       discover("fear_resistance", 1, "Repeatedly managing low bravery revealed Fear Resistance potential.");
     }
 
+    // ── Survival / Exploration ──────────────────────────────────────────
+
+    if (aptitudes.includes("track") || aptitudes.includes("field") || aptitudes.includes("forag") || affinities.survival >= 0.58) {
+      discover("foraging", 1, `${context.origin.occupation} experience revealed Foraging.`);
+    }
+    if (aptitudes.includes("observ") || aptitudes.includes("scout") || aptitudes.includes("infiltr") || affinities.survival >= 0.62) {
+      discover("observation", 1, `${context.origin.occupation} experience revealed Observation.`);
+    }
+    if (context.attributes.endurance >= 3 || aptitudes.includes("shield") || aptitudes.includes("protection")) {
+      discover("shield_mastery", 1, `${context.origin.occupation} experience revealed Shield Mastery.`);
+    }
+
+    // ── Support / Crafting ──────────────────────────────────────────────
+
+    if (aptitudes.includes("craft") || aptitudes.includes("metal") || aptitudes.includes("repair") || aptitudes.includes("construct") || (context.attributes.intelligence >= 3 && affinities.support >= 0.5)) {
+      discover("crafting", 1, `${context.origin.occupation} experience revealed Crafting.`);
+    }
+    if (aptitudes.includes("negotiat") || aptitudes.includes("persuas") || aptitudes.includes("diplomat") || context.attributes.leadership >= 3) {
+      discover("negotiation", 1, `${context.origin.occupation} experience revealed Negotiation.`);
+    }
+
+    // ── Mental / Tactical ──────────────────────────────────────────────
+
+    if (context.attributes.willpower >= 4 && (context.personality.discipline >= 0.5 || context.personality.bravery >= 0.5)) {
+      discover("iron_will", 1, "Exceptional willpower and mental fortitude revealed Iron Will.");
+    }
+    if (context.attributes.intelligence >= 3 && context.attributes.leadership >= 2 && affinities.support >= 0.45) {
+      discover("tactical_knowledge", 1, "Analytical mind and command presence revealed Tactical Knowledge.");
+    }
+
+    // ── Magic ──────────────────────────────────────────────────────────
+
+    if (affinities.magic >= 0.48 || context.attributes.intelligence >= 4) {
+      discover("mana_sense", 1, "Innate magical sensitivity detected during origin evaluation.");
+    }
+
+    // ── Weapon Expansion ───────────────────────────────────────────────
+
+    if (context.traits.includes("Reckless") && context.attributes.endurance >= 4) {
+      discover("adrenaline_rush", 1, "Reckless nature and physical resilience produced Adrenaline Rush.");
+    }
+    if (context.attributes.endurance >= 5 && context.attributes.willpower >= 3) {
+      discover("second_wind", 1, "Extraordinary endurance and willpower revealed Second Wind.");
+    }
+
     const discoveryLog = Object.values(known).map(({ definitionId, discoveryReason, source }) => ({
       definitionId,
       reason: discoveryReason,

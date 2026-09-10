@@ -56,6 +56,7 @@ export interface Personality {
 }
 
 export type OriginCategory =
+  | "Arcane"
   | "Civilian"
   | "Leadership"
   | "Military"
