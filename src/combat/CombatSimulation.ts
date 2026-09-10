@@ -23,6 +23,12 @@ import type { CombatMemoryEvent } from "../memories/HeroMemory";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
+  bleedDamage: number;
+  bleedTicks: number;
+  damageMultiplier: number;
+  defense: number;
+  defenseMultiplier: number;
+  leadership: number;
   medicine: number;
   memories: Hero["memories"];
   personality: Hero["personality"];
@@ -31,6 +37,7 @@ interface Combatant extends CombatantSnapshot {
   retreatLogged: boolean;
   traits: readonly string[];
   weaponSkillId: "spear_mastery" | "sword_mastery" | null;
+  attributes: Hero["attributes"];
 }
 
 interface PlannedAction {
@@ -47,6 +54,8 @@ const MAX_COMBAT_TICKS = 600;
 export class CombatSimulation {
   private accumulatorSeconds = 0;
   private readonly combatants: Combatant[] = [];
+  private focusTargetId: string | null = null;
+  private focusTargetTicks = 0;
   private readonly lastSkillUsageTicks = new Map<string, number>();
   private readonly log: CombatLogEntry[] = [];
   private nextLogId = 1;
@@ -91,17 +100,36 @@ export class CombatSimulation {
       this.combatants.push({
         action: "Idle",
         actionScores: [],
+        assistBoost: 1,
         attackCooldown: index * 0.12,
+        attributes: { ...entry.hero.attributes },
+        berserkTicks: 0,
+        bleedDamage: 0,
+        bleedTicks: 0,
+        buffStat: null,
+        buffTicks: 0,
+        damageMultiplier: 1,
         decisionReason: "Awaiting first evaluation",
         defeatedBy: null,
         defending: false,
+        defense: stats.defense,
+        defenseMultiplier: 1,
+        flanking: 0,
+        focusTargetId: null,
+        focusTargetTicks: 0,
         formation: entry.member.formation,
+        hardenTicks: 0,
+        hasBodyBlock: false,
+        hasCover: false,
         hp: stats.maxHp,
         id: entry.hero.id,
+        isTaunting: false,
         kills: 0,
         label: entry.hero.name,
+        leadership: entry.hero.attributes.leadership,
         medicine: entry.hero.skills.medicine,
         memories: entry.hero.memories,
+        panicTicks: 0,
         personality: entry.hero.personality,
         position: getFormationStart(entry.member.formation, lane),
         preparedSkillIds: new Set([
@@ -113,6 +141,8 @@ export class CombatSimulation {
         relationships: entry.hero.relationships,
         role: entry.member.role,
         stats,
+        stunTicks: 0,
+        suppressTicks: 0,
         tacticalRole,
         team: "Hero",
         traits: entry.hero.traits,
@@ -134,17 +164,43 @@ export class CombatSimulation {
       this.combatants.push({
         action: "Idle",
         actionScores: [],
+        assistBoost: 1,
         attackCooldown: 0.2 + index * 0.12,
+        attributes: {
+          agility: 3,
+          endurance: 3,
+          intelligence: 2,
+          leadership: 0,
+          strength: 4,
+          willpower: 3,
+        },
+        berserkTicks: 0,
+        bleedDamage: 0,
+        bleedTicks: 0,
+        buffStat: null,
+        buffTicks: 0,
+        damageMultiplier: 1,
         decisionReason: "Simple enemy behavior",
         defeatedBy: null,
         defending: false,
+        defense: stats.defense,
+        defenseMultiplier: 1,
+        flanking: 0,
+        focusTargetId: null,
+        focusTargetTicks: 0,
         formation: "Front",
+        hardenTicks: 0,
+        hasBodyBlock: false,
+        hasCover: false,
         hp: stats.maxHp,
         id: `rift-stalker-${index + 1}`,
+        isTaunting: false,
         kills: 0,
         label,
+        leadership: 0,
         medicine: 0,
         memories: [],
+        panicTicks: 0,
         personality: {
           aggression: 0.7,
           ambition: 0,
@@ -159,6 +215,8 @@ export class CombatSimulation {
         relationships: {},
         role: "Skirmisher",
         stats,
+        stunTicks: 0,
+        suppressTicks: 0,
         tacticalRole: "Skirmisher",
         team: "Enemy",
         traits: [],
@@ -203,9 +261,128 @@ export class CombatSimulation {
 
   private advanceTick(): void {
     this.tick += 1;
+
+    // Process focus target decay
+    if (this.focusTargetTicks > 0) {
+      this.focusTargetTicks -= 1;
+      if (this.focusTargetTicks === 0) this.focusTargetId = null;
+    }
+
     this.combatants.forEach((combatant) => {
       combatant.attackCooldown = Math.max(0, combatant.attackCooldown - COMBAT_TICK_SECONDS);
       combatant.defending = false;
+
+      // Process status effect ticks
+      if (combatant.bleedTicks > 0 && combatant.hp > 0) {
+        const bleedDmg = Math.max(1, Math.round(combatant.bleedDamage));
+        combatant.hp = Math.max(0, combatant.hp - bleedDmg);
+        combatant.bleedTicks -= 1;
+        this.addLog(`${combatant.label} bleeds for ${bleedDmg}.`, combatant.team === "Hero" ? "danger" : "success");
+        if (combatant.hp === 0) {
+          combatant.action = "Dead";
+          combatant.defeatedBy = "Bleed";
+          combatant.defending = false;
+          this.addLog(`${combatant.label} bled out.`, combatant.team === "Enemy" ? "success" : "danger");
+        }
+      }
+
+      // Stun — skip all actions
+      if (combatant.stunTicks > 0 && combatant.hp > 0) {
+        combatant.stunTicks -= 1;
+        combatant.action = "Idle";
+        combatant.attackCooldown = 1.5;
+        return;
+      }
+
+      // Panic — random uncontrollable actions
+      if (combatant.panicTicks > 0 && combatant.hp > 0) {
+        combatant.panicTicks -= 1;
+        const roll = Math.random();
+        if (roll < 0.5) {
+          const nearest = this.findNearestOpponent(combatant);
+          if (nearest) {
+            combatant.action = "Attack";
+            this.executeAttack(combatant, nearest);
+          }
+        } else if (roll < 0.8) {
+          combatant.position.x -= combatant.stats.speed * 2.0 * COMBAT_TICK_SECONDS;
+          if (!combatant.retreatLogged) {
+            combatant.retreatLogged = true;
+            this.addLog(`${combatant.label} panicked and fled!`, combatant.team === "Hero" ? "danger" : "success");
+          }
+        }
+        return;
+      }
+
+      // Suppress — reduce damage output
+      if (combatant.suppressTicks > 0 && combatant.hp > 0) {
+        combatant.suppressTicks -= 1;
+        combatant.damageMultiplier = 0.8;
+      } else {
+        combatant.damageMultiplier = 1;
+      }
+
+      // Buff — enhance stat
+      if (combatant.buffTicks > 0 && combatant.hp > 0) {
+        combatant.buffTicks -= 1;
+      }
+
+      // Berserk — enhance attack, reduce defense
+      if (combatant.berserkTicks > 0 && combatant.hp > 0) {
+        combatant.berserkTicks -= 1;
+        combatant.damageMultiplier *= 1.3;
+        combatant.defenseMultiplier = 0.7;
+        if (combatant.berserkTicks === 0) combatant.defenseMultiplier = 1;
+      }
+
+      // Flanking bonus
+      if (combatant.flanking > 0 && combatant.hp > 0) {
+        combatant.flanking -= 1;
+      }
+
+      // Hardened (Taunt/Hesitate) — extra defense
+      if (combatant.hardenTicks > 0 && combatant.hp > 0) {
+        combatant.hardenTicks -= 1;
+      }
+
+      // Taunt expires
+      if (combatant.isTaunting && combatant.hardenTicks === 0) {
+        combatant.isTaunting = false;
+      }
+
+      // Assist boost decays
+      if (combatant.assistBoost > 1) {
+        combatant.assistBoost = 1;
+      }
+    });
+
+    // Reaction processing: BodyBlock, TakeCover, Evade
+    this.combatants.forEach((combatant) => {
+      if (combatant.hp <= 0 || combatant.team !== "Hero") return;
+
+      // Auto-activate cover if targeted by ranged
+      const targetedByRanged = this.combatants.some(
+        (c) => c.team !== combatant.team && c.hp > 0 &&
+          c.stats.range > 3 && c.action === "Attack" &&
+          this.getDistance(c.position, combatant.position) > 3,
+      );
+      combatant.hasCover = targetedByRanged && combatant.tacticalRole !== "Defender";
+    });
+
+    // Process enemies trying to taunt
+    this.combatants.forEach((combatant) => {
+      if (combatant.hp <= 0) return;
+      if (combatant.isTaunting && combatant.team === "Enemy") {
+        // Force heroes to target taunting enemies
+        this.combatants
+          .filter((c) => c.team === "Hero" && c.hp > 0 && c.action === "Attack")
+          .forEach((hero) => {
+            if (this.getDistance(hero.position, combatant.position) <= 6) {
+              hero.focusTargetId = combatant.id;
+              hero.focusTargetTicks = 1;
+            }
+          });
+      }
     });
 
     const plans = this.combatants
@@ -231,6 +408,68 @@ export class CombatSimulation {
           `Protected ${plan.target.label}.`,
         );
       }
+      if (plan.action === "Taunt" && plan.actor.action !== "Taunt") {
+        this.addLog(`${plan.actor.label} taunted enemies to attack them!`, "neutral");
+        plan.actor.isTaunting = true;
+        plan.actor.hardenTicks = 3;
+      }
+      if (plan.action === "Berserk" && plan.actor.action !== "Berserk") {
+        this.addLog(`${plan.actor.label} enters a berserk rage!`, "danger");
+        plan.actor.berserkTicks = 3;
+        this.recordCombatUsage(plan.actor, "berserk_rage", true, 3, "Entered berserk rage.");
+      }
+      if (plan.action === "Hesitate" && plan.actor.action !== "Hesitate") {
+        this.addLog(`${plan.actor.label} hesitates, steeling their defenses.`, "neutral");
+        plan.actor.hardenTicks = 2;
+      }
+      if (plan.action === "Flee" && plan.actor.action !== "Flee") {
+        if (!plan.actor.retreatLogged) {
+          plan.actor.retreatLogged = true;
+          this.addLog(`${plan.actor.label} panicked and fled!`, "danger");
+        }
+      }
+      if (plan.action === "FocusTarget" && plan.actor.action !== "FocusTarget" && plan.target) {
+        this.focusTargetId = plan.target.id;
+        this.focusTargetTicks = 4;
+        this.addLog(`${plan.actor.label} designated ${plan.target.label} as priority target.`, "success");
+      }
+      if (plan.action === "Assist" && plan.actor.action !== "Assist" && plan.target) {
+        plan.target.assistBoost = 1.2;
+        this.addLog(`${plan.actor.label} prepared to assist ${plan.target.label}.`, "success");
+        this.recordMemoryEvent(plan.actor, plan.target, "ASSISTED_ALLY");
+      }
+      if (plan.action === "Regroup" && plan.actor.action !== "Regroup") {
+        this.addLog(`${plan.actor.label} is regrouping with allies.`, "neutral");
+        this.recordCombatUsage(plan.actor, "regroup", true, 1, "Regrouping with squad.");
+      }
+      if (plan.action === "MaintainFormation" && plan.actor.action !== "MaintainFormation") {
+        this.addLog(`${plan.actor.label} returns to formation position.`, "neutral");
+      }
+      if (plan.action === "FollowLeader" && plan.actor.action !== "FollowLeader") {
+        this.addLog(`${plan.actor.label} follows the squad leader.`, "neutral");
+      }
+      if (plan.action === "Flank" && plan.actor.action !== "Flank") {
+        this.addLog(`${plan.actor.label} moves to flank the enemy.`, "success");
+        plan.actor.flanking = 3;
+        this.recordCombatUsage(plan.actor, "flanking_manoeuvre", true, 2, "Flanking manoeuvre.");
+      }
+      if (plan.action === "Kite" && plan.actor.action !== "Kite") {
+        this.addLog(`${plan.actor.label} kites to maintain range.`, "neutral");
+      }
+      if (plan.action === "FallBack" && plan.actor.action !== "FallBack") {
+        this.addLog(`${plan.actor.label} falls back tactically.`, "neutral");
+      }
+      if (plan.action === "Advance" && plan.actor.action !== "Advance") {
+        this.addLog(`${plan.actor.label} advances aggressively.`, "success");
+      }
+      if (plan.action === "Recover" && plan.actor.action !== "Recover") {
+        const healing = Math.max(8, Math.round(8 + plan.actor.stats.defense * 0.3 + plan.actor.personality.discipline * 2));
+        const restored = Math.min(healing, plan.actor.stats.maxHp - plan.actor.hp);
+        plan.actor.hp += restored;
+        plan.actor.attackCooldown = 1.5;
+        this.addLog(`${plan.actor.label} recovered ${restored} HP.`, "success");
+      }
+
       plan.actor.action = plan.action;
       plan.actor.defending = plan.action === "Defend" || plan.action === "Protect";
     });
@@ -242,7 +481,11 @@ export class CombatSimulation {
     if (actor.team === "Hero") {
       const allies = this.combatants.filter((candidate) => candidate.team === actor.team);
       const opponents = this.combatants.filter((candidate) => candidate.team !== actor.team);
-      const decision = scoreCombatActions(actor, allies, opponents);
+      const decision = scoreCombatActions(
+        actor as unknown as import("./UtilityAI").UtilityActor,
+        allies as unknown as import("./UtilityAI").UtilityTarget[],
+        opponents as unknown as import("./UtilityAI").UtilityTarget[],
+      );
       actor.actionScores = decision.scores;
       actor.decisionReason = decision.reason;
       return {
@@ -260,12 +503,38 @@ export class CombatSimulation {
       return { action: "Idle", actor, target: null };
     }
     const distance = this.getDistance(actor.position, target.position);
-    if (distance > actor.stats.range) {
-      return { action: "Move", actor, target };
+
+    // Flank — try to move around frontline to attack backline
+    if (distance <= 4 && Math.random() < 0.2 && actor.stats.speed > 1.5) {
+      const backline = this.combatants.find(c =>
+        c.team !== actor.team && c.hp > 0 && c.formation === "Back",
+      );
+      if (backline) {
+        return { action: "Flank", actor, target: backline };
+      }
     }
-    const shouldDefend =
-      actor.hp / actor.stats.maxHp <= 0.52 && (this.tick + index * 5) % 32 < 6;
-    return { action: shouldDefend ? "Defend" : "Attack", actor, target };
+
+    // Taunt — high aggression enemies challenge
+    if (actor.personality.aggression > 0.7 && distance <= 3 && actor.hp / actor.stats.maxHp > 0.5) {
+      return { action: "Taunt", actor, target };
+    }
+
+    // Regroup — pull back when isolated
+    const nearbyAllies = this.combatants.filter(c =>
+      c.team === actor.team && c.hp > 0 && this.getDistance(c.position, actor.position) < 6,
+    );
+    if (nearbyAllies.length === 0 && actor.hp / actor.stats.maxHp < 0.6) {
+      return { action: "Regroup", actor, target: null };
+    }
+
+    // Defend periodically when low
+    const health = actor.hp / actor.stats.maxHp;
+    if (distance <= actor.stats.range) {
+      const shouldDefend = health <= 0.52 && (this.tick + index * 5) % 32 < 6;
+      return { action: shouldDefend ? "Defend" : "Attack", actor, target };
+    }
+
+    return { action: "Move", actor, target };
   }
 
   private executePlan(plan: PlannedAction): void {
@@ -273,31 +542,50 @@ export class CombatSimulation {
     if (actor.hp <= 0) {
       return;
     }
+
+    // ── Retreat ──
     if (plan.action === "Retreat") {
       actor.position.x -= actor.stats.speed * COMBAT_TICK_SECONDS;
       if (!actor.retreatLogged) {
         actor.retreatLogged = true;
         this.addLog(`${actor.label} began retreating at ${Math.ceil(actor.hp)} HP.`, "danger");
       }
-      if (actor.position.x <= -15) {
-        actor.position.x = -15;
-      }
+      if (actor.position.x <= -15) actor.position.x = -15;
       return;
     }
+
+    // ── Flee (panic-driven, faster than Retreat) ──
+    if (plan.action === "Flee") {
+      actor.position.x -= actor.stats.speed * 2.0 * COMBAT_TICK_SECONDS;
+      if (!actor.retreatLogged) {
+        actor.retreatLogged = true;
+        this.addLog(`${actor.label} panicked and fled!`, "danger");
+      }
+      if (actor.position.x <= -15) actor.position.x = -15;
+      return;
+    }
+
+    // ── Move ──
     if (plan.action === "Move" && target) {
       this.moveToward(actor, target.position);
       return;
     }
+
+    // ── Reposition (move to preferred range) ──
     if (plan.action === "Reposition" && target) {
       this.moveToPreferredRange(actor, target.position);
       return;
     }
+
+    // ── Protect ──
     if (plan.action === "Protect" && target && target.hp > 0) {
       if (this.getDistance(actor.position, target.position) > 1.65) {
         this.moveToward(actor, target.position);
       }
       return;
     }
+
+    // ── Heal ──
     if (plan.action === "Heal" && target && target.hp > 0) {
       const healRange = Math.max(2.5, actor.stats.range);
       if (this.getDistance(actor.position, target.position) > healRange) {
@@ -310,43 +598,369 @@ export class CombatSimulation {
         target.hp += restored;
         actor.attackCooldown = 1.1;
         this.addLog(`${actor.label} restored ${restored} HP to ${target.label}.`, "success");
+
+        // Cleanse: remove one negative effect
+        if (target.stunTicks > 0) {
+          target.stunTicks = 0;
+          this.addLog(`${actor.label} cleansed ${target.label}'s stun.`, "success");
+        } else if (target.suppressTicks > 0) {
+          target.suppressTicks = 0;
+          this.addLog(`${actor.label} cleansed ${target.label}'s suppression.`, "success");
+        } else if (target.bleedTicks > 0) {
+          target.bleedTicks = 0;
+          this.addLog(`${actor.label} cleansed ${target.label}'s bleed.`, "success");
+        }
+
         if (restored > 0) {
           this.recordMemoryEvent(actor, target, "HEALED_ALLY");
         }
-        this.recordCombatUsage(
-          actor,
-          "field_treatment",
-          restored > 0,
-          4,
-          `Treated ${target.label} during combat.`,
-        );
+        this.recordCombatUsage(actor, "field_treatment", restored > 0, 4, `Treated ${target.label} during combat.`);
       }
       return;
     }
+
+    // ── Advance (fast approach) ──
+    if (plan.action === "Advance" && target) {
+      const speed = actor.stats.speed * 1.5;
+      const dx = target.position.x - actor.position.x;
+      const dz = target.position.z - actor.position.z;
+      const dist = Math.hypot(dx, dz);
+      const step = Math.min(speed * COMBAT_TICK_SECONDS, Math.max(0, dist - 2.0));
+      if (dist > 0) {
+        actor.position.x += (dx / dist) * step;
+        actor.position.z += (dz / dist) * step;
+      }
+      return;
+    }
+
+    // ── FallBack (tactical withdrawal) ──
+    if (plan.action === "FallBack") {
+      actor.position.x -= actor.stats.speed * 0.8 * COMBAT_TICK_SECONDS;
+      return;
+    }
+
+    // ── Flank (lateral movement) ──
+    if (plan.action === "Flank" && target) {
+      const dz = target.position.z - actor.position.z;
+      const sign = dz >= 0 ? -1 : 1;
+      const step = Math.min(actor.stats.speed * 1.2 * COMBAT_TICK_SECONDS, 4);
+      actor.position.z += sign * step;
+      return;
+    }
+
+    // ── Kite (maintain range while retreating) ──
+    if (plan.action === "Kite" && target) {
+      const preferredRange = getPreferredRange(actor.tacticalRole);
+      const dist = this.getDistance(actor.position, target.position);
+      if (dist < preferredRange) {
+        const dx = target.position.x - actor.position.x;
+        const dz = target.position.z - actor.position.z;
+        const distH = Math.hypot(dx, dz);
+        if (distH > 0) {
+          const step = Math.min(actor.stats.speed * 0.6 * COMBAT_TICK_SECONDS, Math.max(0, dist - preferredRange));
+          actor.position.x -= (dx / distH) * step;
+          actor.position.z -= (dz / distH) * step;
+        }
+      }
+      return;
+    }
+
+    // ── Taunt ──
+    if (plan.action === "Taunt") {
+      actor.isTaunting = true;
+      actor.hardenTicks = 3;
+      return;
+    }
+
+    // ── Berserk ──
+    if (plan.action === "Berserk") {
+      actor.berserkTicks = 3;
+      return;
+    }
+
+    // ── Hesitate ──
+    if (plan.action === "Hesitate") {
+      actor.hardenTicks = 2;
+      actor.attackCooldown = 1.5;
+      return;
+    }
+
+    // ── FocusTarget ──
+    if (plan.action === "FocusTarget" && target) {
+      this.focusTargetId = target.id;
+      this.focusTargetTicks = 4;
+      return;
+    }
+
+    // ── Assist ──
+    if (plan.action === "Assist" && target && target.hp > 0) {
+      target.assistBoost = 1.2;
+      return;
+    }
+
+    // ── Recover (self-heal) ──
+    if (plan.action === "Recover") {
+      const healing = Math.max(8, Math.round(8 + actor.stats.defense * 0.3 + actor.personality.discipline * 2));
+      const restored = Math.min(healing, actor.stats.maxHp - actor.hp);
+      actor.hp += restored;
+      actor.attackCooldown = 1.5;
+      if (restored > 0) {
+        this.addLog(`${actor.label} recovered ${restored} HP.`, "success");
+      }
+      return;
+    }
+
+    // ── Regroup (move toward ally center) ──
+    if (plan.action === "Regroup") {
+      const allies = this.combatants.filter(c => c.team === actor.team && c.hp > 0 && c.id !== actor.id);
+      if (allies.length > 0) {
+        const avgX = allies.reduce((s, a) => s + a.position.x, 0) / allies.length;
+        const avgZ = allies.reduce((s, a) => s + a.position.z, 0) / allies.length;
+        this.moveToward(actor, { x: avgX, z: avgZ });
+      }
+      return;
+    }
+
+    // ── MaintainFormation ──
+    if (plan.action === "MaintainFormation") {
+      const lane = this.combatants.filter(c => c.team === actor.team).indexOf(actor);
+      const targetPos = getFormationStart(actor.formation as "Front" | "Middle" | "Back", (lane - 1) * 4.2);
+      this.moveToward(actor, targetPos);
+      return;
+    }
+
+    // ── FollowLeader ──
+    if (plan.action === "FollowLeader") {
+      const leader = this.combatants
+        .filter(c => c.team === actor.team && c.hp > 0 && c.id !== actor.id && c.leadership > actor.leadership)
+        .sort((a, b) => b.leadership - a.leadership)[0];
+      if (leader) this.moveToward(actor, leader.position);
+      return;
+    }
+
+    // ── BodyBlock (react to ally being targeted) ──
+    if (plan.action === "BodyBlock" && target && target.hp > 0) {
+      if (this.getDistance(actor.position, target.position) > 1.5) {
+        this.moveToward(actor, target.position);
+      }
+      actor.hasBodyBlock = true;
+      return;
+    }
+
+    // ── RescueAlly (move to intercept) ──
+    if (plan.action === "RescueAlly" && target && target.hp > 0) {
+      this.moveToward(actor, target.position);
+      actor.hasBodyBlock = true;
+      return;
+    }
+
+    // ── UseSkill ──
+    if (plan.action === "UseSkill" && target) {
+      // Interrupt check
+      const interrupters = this.combatants.filter(c =>
+        c.team !== actor.team && c.hp > 0 &&
+        c.preparedSkillIds.has("interrupt_skill") &&
+        this.getDistance(c.position, actor.position) <= 4,
+      );
+      if (interrupters.length > 0 && Math.random() < 0.4) {
+        const interrupter = interrupters[0];
+        if (interrupter) this.addLog(`${interrupter.label} interrupted ${actor.label}!`, "danger");
+        return;
+      }
+      const skillId = this.chooseBestSkill(actor, target);
+      if (skillId) {
+        this.executeSkill(actor, target, skillId);
+        return;
+      }
+      // Fallback to Attack
+      plan.action = "Attack";
+    }
+
+    // ── UseUltimate (mastered skill at 2x power) ──
+    if (plan.action === "UseUltimate" && target) {
+      const mastered = [...actor.preparedSkillIds].find(id => {
+        const def = skillDefinitionRegistry.get(id);
+        return def && def.type === "active";
+      });
+      if (mastered) {
+        this.executeSkill(actor, target, mastered, 2.0);
+        this.addLog(`${actor.label} used ${mastered} at full power!`, "success");
+        return;
+      }
+      plan.action = "Attack";
+    }
+
+    // ── SwitchWeapon ──
+    if (plan.action === "SwitchWeapon") {
+      const alt = actor.weaponSkillId === "sword_mastery" ? "spear_mastery" : "sword_mastery";
+      actor.weaponSkillId = alt;
+      this.addLog(`${actor.label} switched to ${alt === "sword_mastery" ? "sword" : "spear"}.`, "neutral");
+      actor.attackCooldown = 0.5;
+      return;
+    }
+
+    // ── CounterAttack (free attack after parry/brace) ──
+    if (plan.action === "CounterAttack" && target && target.hp > 0) {
+      if (actor.attackCooldown <= 0) {
+        const counterDmg = Math.round(this.calculateDamage(actor, target) * 0.8);
+        target.hp = Math.max(0, target.hp - counterDmg);
+        this.addLog(`${actor.label} counter-attacked ${target.label} for ${counterDmg}!`, "success");
+        actor.attackCooldown = 0.75;
+        if (target.hp === 0) {
+          target.action = "Dead";
+          target.defeatedBy = actor.label;
+          actor.kills += 1;
+          this.addLog(`${target.label} was defeated.`, target.team === "Enemy" ? "success" : "danger");
+        }
+      }
+      return;
+    }
+
+    // ── Revive (placeholder for future skill/item system) ──
+    // if (plan.action === "Revive" && target && target.hp <= 0) {
+    //   target.hp = 1;
+    //   target.action = "Idle";
+    //   target.defeatedBy = null;
+    //   this.addLog(`${actor.label} revived ${target.label}!`, "success");
+    //   this.recordMemoryEvent(actor, target, "REVIVED_ALLY");
+    //   return;
+    // }
+
+    // ── Attack ──
     if (plan.action !== "Attack" || !target || target.hp <= 0 || actor.attackCooldown > 0) {
       return;
     }
-    const damage = this.calculateDamage(actor, target);
-    target.hp = Math.max(0, target.hp - damage);
+
+    // Evade check
+    if (target.action !== "Defend" && target.stunTicks === 0) {
+      const evadeChance = this.evadeChance(target, actor);
+      if (Math.random() < evadeChance) {
+        this.addLog(`${target.label} evaded the attack!`, "neutral");
+        actor.attackCooldown = 0.75;
+        return;
+      }
+    }
+
+    this.executeAttack(actor, target);
+  }
+
+  private executeAttack(actor: Combatant, target: Combatant): void {
+    if (actor.hp <= 0 || target.hp <= 0 || actor.attackCooldown > 0) return;
+
+    // BodyBlock: redirect 50% damage to body blocker
+    let actualTarget = target;
+    let redirectedTo: Combatant | null = null;
+    if (target.team === "Hero") {
+      const bodyBlocker = this.combatants.find(c =>
+        c.team === target.team && c.hp > 0 && c.hasBodyBlock &&
+        c.id !== target.id && this.getDistance(c.position, target.position) <= 1.5,
+      );
+      if (bodyBlocker) {
+        redirectedTo = bodyBlocker;
+      }
+    }
+
+    const damage = this.calculateDamage(actor, actualTarget);
+    const finalDamage = Math.round(damage * (actor.damageMultiplier ?? 1));
+
+    // TakeCover: -40% ranged damage
+    let reducedDamage = finalDamage;
+    if (actualTarget.hasCover && this.getDistance(actor.position, actualTarget.position) > 3 && actor.stats.range > 3) {
+      reducedDamage = Math.round(finalDamage * 0.6);
+    }
+
+    actualTarget.hp = Math.max(0, actualTarget.hp - reducedDamage);
     actor.attackCooldown = 0.75;
-    this.addLog(`${actor.label} hit ${target.label} for ${damage}.`, actor.team === "Hero" ? "success" : "danger");
+
+    // Flanking bonus log
+    if (actor.flanking > 0) {
+      this.addLog(`${actor.label} flanks for +15% damage!`, "success");
+    }
+
+    // Focus target bonus
+    if (this.focusTargetId === actualTarget.id && this.focusTargetTicks > 0 && actor.team === "Hero") {
+      this.addLog(`${actor.label} strikes the focus target!`, "success");
+    }
+
+    // Assist bonus log
+    if ((actor.assistBoost ?? 1) > 1) {
+      this.addLog(`${actor.label} attacks with assistance!`, "success");
+    }
+
+    this.addLog(`${actor.label} hit ${actualTarget.label} for ${reducedDamage}.`, actor.team === "Hero" ? "success" : "danger");
+
+    // BodyBlock damage
+    if (redirectedTo && reducedDamage > 0) {
+      const blockDmg = Math.round(reducedDamage * 0.5);
+      redirectedTo.hp = Math.max(0, redirectedTo.hp - blockDmg);
+      this.addLog(`${redirectedTo.label} blocked ${blockDmg} damage for ${actualTarget.label}!`, "success");
+      if (redirectedTo.hp === 0) {
+        redirectedTo.action = "Dead";
+        redirectedTo.defeatedBy = actor.label;
+        this.addLog(`${redirectedTo.label} was defeated.`, "danger");
+      }
+    }
+
+    // Bleed chance on hit
+    if (reducedDamage > 0 && actualTarget.hp > 0 && !actualTarget.bleedTicks) {
+      const bleedChance = Math.min(0.15, 0.05 + (actor.stats.attack * 0.002));
+      if (Math.random() < bleedChance) {
+        const bleedDamage = Math.max(1, Math.round(actor.stats.attack * 0.08));
+        actualTarget.bleedDamage = bleedDamage;
+        actualTarget.bleedTicks = 3;
+        this.addLog(`${actualTarget.label} starts bleeding!`, actor.team === "Hero" ? "success" : "danger");
+      }
+    }
+
     if (actor.weaponSkillId) {
       this.recordCombatUsage(
         actor,
         actor.weaponSkillId,
-        damage > 0,
+        reducedDamage > 0,
         3,
-        `Landed a weapon attack against ${target.label}.`,
-        target.stats.attack / Math.max(1, actor.stats.attack),
+        `Landed a weapon attack against ${actualTarget.label}.`,
+        actualTarget.stats.attack / Math.max(1, actor.stats.attack),
       );
     }
+    if (actualTarget.hp === 0) {
+      actualTarget.action = "Dead";
+      actualTarget.defeatedBy = actor.label;
+      actualTarget.defending = false;
+      actor.kills += 1;
+      this.addLog(`${actualTarget.label} was defeated.`, actualTarget.team === "Enemy" ? "success" : "danger");
+    }
+  }
+
+  private executeSkill(actor: Combatant, target: Combatant, skillId: string, multiplier = 1.0): void {
+    if (actor.attackCooldown > 0) return;
+    const def = skillDefinitionRegistry.get(skillId);
+    if (!def) return;
+    const damage = Math.round(this.calculateDamage(actor, target) * multiplier * (actor.damageMultiplier ?? 1));
+    target.hp = Math.max(0, target.hp - damage);
+    actor.attackCooldown = 1.2;
+    this.addLog(`${actor.label} used ${skillId} on ${target.label} for ${damage}!`, actor.team === "Hero" ? "success" : "danger");
+    this.recordCombatUsage(actor, skillId, damage > 0, 4, `Used ${skillId} on ${target.label}.`);
     if (target.hp === 0) {
       target.action = "Dead";
       target.defeatedBy = actor.label;
-      target.defending = false;
       actor.kills += 1;
       this.addLog(`${target.label} was defeated.`, target.team === "Enemy" ? "success" : "danger");
     }
+  }
+
+  private chooseBestSkill(actor: Combatant, _target: Combatant): string | null {
+    const actives = [...actor.preparedSkillIds].filter(id => {
+      const def = skillDefinitionRegistry.get(id);
+      return def && def.type === "active";
+    });
+    if (actives.length === 0) return null;
+    // Pick lowest cooldown or highest value skill
+    return actives[0] ?? null;
+  }
+
+  private evadeChance(dodger: Readonly<Combatant>, attacker: Readonly<Combatant>): number {
+    const agilityDiff = (dodger.attributes.agility - attacker.attributes.agility) * 0.03;
+    return Math.min(0.35, Math.max(0, 0.08 + agilityDiff + (dodger.action === "Reposition" ? 0.12 : 0)));
   }
 
   private moveToward(actor: Combatant, target: Readonly<CombatPosition>): void {
@@ -398,10 +1012,38 @@ export class CombatSimulation {
           candidate.position.x > target.position.x &&
           this.getDistance(candidate.position, target.position) <= 8,
       );
-    const defenseMultiplier =
-      (target.defending ? 1.65 : 1) + (hasProtector ? 0.45 : 0) + (hasFrontlineCover ? 0.3 : 0);
-    const effectiveDefense = target.stats.defense * defenseMultiplier;
-    return Math.max(1, Math.round(attacker.stats.attack - effectiveDefense * 0.72));
+
+    // Defense multiplier from actions
+    let defenseMultiplier = (target.defending ? 1.65 : 1);
+    if (hasProtector) defenseMultiplier += 0.45;
+    if (hasFrontlineCover) defenseMultiplier += 0.3;
+    // Taunt/Hesitate hardened bonus
+    if (target.hardenTicks > 0) defenseMultiplier += target.isTaunting ? 0.35 : 0.40;
+    // Berserk defense penalty for attacker (applied to target's effective defense)
+    const attackerBerserkPenalty = attacker.berserkTicks > 0 ? 0.7 : 1;
+
+    const effectiveDefense = target.stats.defense * defenseMultiplier * attackerBerserkPenalty;
+
+    let baseDamage = Math.max(1, Math.round(attacker.stats.attack - effectiveDefense * 0.72));
+
+    // Flanking bonus: +15%
+    if (attacker.flanking > 0) baseDamage = Math.round(baseDamage * 1.15);
+
+    // Berserk attack bonus already handled by damageMultiplier in executeAttack
+
+    // Focus target bonus: +15%
+    if (this.focusTargetId === target.id && this.focusTargetTicks > 0 && attacker.team === "Hero") {
+      baseDamage = Math.round(baseDamage * 1.15);
+    }
+
+    // Assist boost
+    if ((attacker.assistBoost ?? 1) > 1) {
+      baseDamage = Math.round(baseDamage * attacker.assistBoost);
+    }
+
+    // Taunt forces attacker to target taunter (handled in advanceTick)
+
+    return baseDamage;
   }
 
   private findNearestOpponent(actor: Readonly<Combatant>): Combatant | null {

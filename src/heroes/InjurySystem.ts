@@ -6,6 +6,9 @@ export interface InjuryDefinition {
   defenseMultiplier: number;
   description: string;
   recoveryMinutes: number;
+  stackable?: boolean;
+  maxStacks?: number;
+  permanentChance?: number;
   trainingMultiplier: number;
   treatmentCost: number;
 }
@@ -23,17 +26,85 @@ export interface TreatmentResult {
 }
 
 const HOUR = 60;
+const BASE_PERMANENT_CHANCE = 0.08;
+
 const DEFINITIONS: Readonly<Record<InjuryType, Readonly<InjuryDefinition>>> = Object.freeze({
-  "Minor Wound": Object.freeze({ attackMultiplier: 0.95, defenseMultiplier: 0.96, description: "Light trauma reduces combat readiness and training pace.", recoveryMinutes: 18 * HOUR, trainingMultiplier: 0.88, treatmentCost: 1 }),
-  "Broken Arm": Object.freeze({ attackMultiplier: 0.8, defenseMultiplier: 0.9, description: "Attack -20% · Defense -10% · Training speed -30%.", recoveryMinutes: 72 * HOUR, trainingMultiplier: 0.7, treatmentCost: 3 }),
-  Burn: Object.freeze({ attackMultiplier: 0.92, defenseMultiplier: 0.82, description: "Defense -18% · Training speed -25%.", recoveryMinutes: 48 * HOUR, trainingMultiplier: 0.75, treatmentCost: 2 }),
-  Concussion: Object.freeze({ attackMultiplier: 0.88, defenseMultiplier: 0.88, description: "Attack -12% · Defense -12% · Training speed -35%.", recoveryMinutes: 60 * HOUR, trainingMultiplier: 0.65, treatmentCost: 2 }),
+  // ── Minor ──────────────────────────────────────────────────────────────
+
+  "Minor Wound": Object.freeze({
+    attackMultiplier: 0.95, defenseMultiplier: 0.96,
+    description: "Light trauma reduces combat readiness and training pace.",
+    recoveryMinutes: 18 * HOUR, trainingMultiplier: 0.88, treatmentCost: 1,
+  }),
+  "Sprain": Object.freeze({
+    attackMultiplier: 0.97, defenseMultiplier: 0.94,
+    description: "A twisted joint restricts movement. Defense -6% · Training speed -8%.",
+    recoveryMinutes: 12 * HOUR, trainingMultiplier: 0.92, treatmentCost: 1,
+  }),
+
+  // ── Moderate ───────────────────────────────────────────────────────────
+
+  "Bleed": Object.freeze({
+    attackMultiplier: 0.94, defenseMultiplier: 0.97,
+    description: "An open wound that worsens with exertion. Stacks up to 3 times.",
+    recoveryMinutes: 24 * HOUR, stackable: true, maxStacks: 3,
+    trainingMultiplier: 0.90, treatmentCost: 1,
+  }),
+  "Burn": Object.freeze({
+    attackMultiplier: 0.92, defenseMultiplier: 0.82,
+    description: "Defense -18% · Training speed -25%.",
+    recoveryMinutes: 48 * HOUR, trainingMultiplier: 0.75, treatmentCost: 2,
+  }),
+  "Fracture": Object.freeze({
+    attackMultiplier: 0.85, defenseMultiplier: 0.88,
+    description: "A severe bone break. Attack -15% · Defense -12% · Training speed -28%.",
+    recoveryMinutes: 54 * HOUR, trainingMultiplier: 0.72, treatmentCost: 2,
+  }),
+  "Poison": Object.freeze({
+    attackMultiplier: 0.90, defenseMultiplier: 0.92,
+    description: "Toxins weaken the body. Attack -10% · Defense -8% · Training speed -20%.",
+    recoveryMinutes: 36 * HOUR, trainingMultiplier: 0.80, treatmentCost: 2,
+  }),
+  "Broken Arm": Object.freeze({
+    attackMultiplier: 0.80, defenseMultiplier: 0.90,
+    description: "Attack -20% · Defense -10% · Training speed -30%.",
+    recoveryMinutes: 72 * HOUR, trainingMultiplier: 0.70, treatmentCost: 3,
+  }),
+  "Concussion": Object.freeze({
+    attackMultiplier: 0.88, defenseMultiplier: 0.88,
+    description: "Attack -12% · Defense -12% · Training speed -35%.",
+    recoveryMinutes: 60 * HOUR, trainingMultiplier: 0.65, treatmentCost: 2,
+  }),
+
+  // ── Severe ─────────────────────────────────────────────────────────────
+
+  "Burns (Severe)": Object.freeze({
+    attackMultiplier: 0.86, defenseMultiplier: 0.80,
+    description: "Devastating burns across the body. Attack -14% · Defense -20% · Training speed -30%.",
+    recoveryMinutes: 54 * HOUR, permanentChance: 0.12,
+    trainingMultiplier: 0.70, treatmentCost: 3,
+  }),
+  "Concussion (Severe)": Object.freeze({
+    attackMultiplier: 0.82, defenseMultiplier: 0.82,
+    description: "A traumatic head injury. Attack -18% · Defense -18% · Training speed -40%.",
+    recoveryMinutes: 72 * HOUR, permanentChance: 0.12,
+    trainingMultiplier: 0.60, treatmentCost: 3,
+  }),
+  "Internal Bleeding": Object.freeze({
+    attackMultiplier: 0.82, defenseMultiplier: 0.85,
+    description: "Internal hemorrhaging threatens vital organs. Attack -18% · Defense -15% · Training speed -35%.",
+    recoveryMinutes: 66 * HOUR, permanentChance: 0.15,
+    trainingMultiplier: 0.65, treatmentCost: 3,
+  }),
 });
 
 export const getInjuryDefinition = (type: InjuryType): Readonly<InjuryDefinition> => DEFINITIONS[type];
 
 export const hasRecoveringInjury = (hero: Readonly<Hero>): boolean =>
   hero.injuries.some((injury) => !injury.permanent);
+
+export const getStackCount = (hero: Readonly<Hero>, type: InjuryType): number =>
+  hero.injuries.filter((injury) => injury.type === type && !injury.permanent).length;
 
 export const getInjuryModifiers = (hero: Readonly<Hero>): InjuryModifiers => {
   const modifiers = hero.injuries.reduce((result, injury) => {
@@ -55,17 +126,14 @@ export class InjurySystem {
   constructor(private readonly random = Random.fromEntropy()) {}
 
   inflictTrainingInjury(hero: Hero, day: number): HeroInjury {
-    return this.inflict(hero, "Minor Wound", "Training", day, false);
+    const type: InjuryType = this.random.next() < 0.4 ? "Sprain" : "Minor Wound";
+    return this.inflict(hero, type, "Training", day, false);
   }
 
   inflictExpeditionInjury(hero: Hero, outcome: "Defeat" | "Withdrawn", damageRatio: number, day: number): HeroInjury {
-    const severe = damageRatio >= 0.72 || outcome === "Defeat";
-    const type: InjuryType = !severe
-      ? "Minor Wound"
-      : damageRatio >= 0.9
-        ? this.random.next() < 0.5 ? "Broken Arm" : "Concussion"
-        : this.random.next() < 0.5 ? "Burn" : "Concussion";
-    const permanent = outcome === "Defeat" && damageRatio >= 0.92 && this.random.next() < 0.08;
+    const type = this.pickExpeditionInjury(damageRatio, outcome);
+    const permanentChance = DEFINITIONS[type].permanentChance ?? BASE_PERMANENT_CHANCE;
+    const permanent = outcome === "Defeat" && damageRatio >= 0.92 && this.random.next() < permanentChance;
     return this.inflict(hero, type, "Expedition", day, permanent);
   }
 
@@ -105,24 +173,83 @@ export class InjurySystem {
     return recovering ? `Recovery required before training · ${recovering.type}` : null;
   }
 
+  private pickExpeditionInjury(damageRatio: number, outcome: "Defeat" | "Withdrawn"): InjuryType {
+    const severe = damageRatio >= 0.72 || outcome === "Defeat";
+    if (!severe) {
+      return this.random.pick(["Minor Wound", "Sprain", "Bleed"]);
+    }
+    if (damageRatio >= 0.92) {
+      return this.random.pick([
+        "Broken Arm", "Concussion", "Internal Bleeding",
+        "Burns (Severe)", "Concussion (Severe)", "Fracture",
+      ]);
+    }
+    if (damageRatio >= 0.85) {
+      return this.random.pick([
+        "Burn", "Concussion", "Fracture", "Internal Bleeding",
+        "Burns (Severe)", "Concussion (Severe)",
+      ]);
+    }
+    if (damageRatio >= 0.72) {
+      return this.random.pick([
+        "Bleed", "Burn", "Fracture", "Concussion", "Poison",
+      ]);
+    }
+    return this.random.pick(["Minor Wound", "Bleed", "Sprain", "Fracture"]);
+  }
+
   private inflict(hero: Hero, type: InjuryType, source: HeroInjury["source"], day: number, permanent: boolean): HeroInjury {
-    const existing = hero.injuries.find((injury) => injury.type === type);
     const definition = getInjuryDefinition(type);
+
+    // Bleed and other stackable injuries: add a new instance
+    if (definition.stackable) {
+      const currentStacks = hero.injuries.filter((inj) => inj.type === type && !inj.permanent).length;
+      const maxStacks = definition.maxStacks ?? 3;
+      if (currentStacks >= maxStacks) {
+        // Aggravate the oldest stack instead
+        const oldest = hero.injuries.find((inj) => inj.type === type && !inj.permanent);
+        if (oldest) {
+          oldest.remainingMinutes = oldest.permanent ? null : Math.max(oldest.remainingMinutes ?? 0, definition.recoveryMinutes);
+          oldest.treated = false;
+          hero.recovery.lastOutcome = `${type} aggravated (${currentStacks} stacks).`;
+          return oldest;
+        }
+      }
+      const injury: HeroInjury = {
+        acquiredDay: day,
+        id: crypto.randomUUID(),
+        permanent: false,
+        remainingMinutes: definition.recoveryMinutes,
+        severity: "Minor",
+        source,
+        totalRecoveryMinutes: definition.recoveryMinutes,
+        treated: false,
+        type,
+      };
+      hero.injuries.push(injury);
+      const newStacks = hero.injuries.filter((inj) => inj.type === type && !inj.permanent).length;
+      hero.recovery.lastOutcome = `${type} sustained (${newStacks} stacks).`;
+      return injury;
+    }
+
+    // Non-stackable: merge if exists
+    const existing = hero.injuries.find((injury) => injury.type === type);
     if (existing) {
       existing.permanent ||= permanent;
-      existing.severity = existing.permanent ? "Permanent" : type === "Minor Wound" ? "Minor" : "Serious";
+      existing.severity = existing.permanent ? "Permanent" : this.getSeverity(type);
       existing.remainingMinutes = existing.permanent ? null : Math.max(existing.remainingMinutes ?? 0, definition.recoveryMinutes);
       existing.totalRecoveryMinutes = existing.permanent ? null : definition.recoveryMinutes;
       existing.treated = false;
       hero.recovery.lastOutcome = `${type} aggravated.`;
       return existing;
     }
+
     const injury: HeroInjury = {
       acquiredDay: day,
       id: crypto.randomUUID(),
       permanent,
       remainingMinutes: permanent ? null : definition.recoveryMinutes,
-      severity: permanent ? "Permanent" : type === "Minor Wound" ? "Minor" : "Serious",
+      severity: permanent ? "Permanent" : this.getSeverity(type),
       source,
       totalRecoveryMinutes: permanent ? null : definition.recoveryMinutes,
       treated: false,
@@ -131,5 +258,10 @@ export class InjurySystem {
     hero.injuries.push(injury);
     hero.recovery.lastOutcome = `${injury.severity} ${type.toLowerCase()} sustained.`;
     return injury;
+  }
+
+  private getSeverity(type: InjuryType): "Minor" | "Serious" {
+    if (type === "Minor Wound" || type === "Sprain") return "Minor";
+    return "Serious";
   }
 }

@@ -87,8 +87,11 @@ export class NeedsSystem {
     hero.needs.stress = clampNeed(hero.needs.stress + Math.max(0, intensity));
   }
 
-  applyDeathStress(heroes: readonly Hero[], intensity = 24): void {
-    heroes.forEach((hero) => this.applyCombatStress(hero, intensity));
+  applyDeathStress(heroes: readonly Hero[], deathCount: number, defeatOutcome = false): void {
+    const baseStress = deathCount >= 3 ? 30 : deathCount === 2 ? 20 : 12;
+    const defeatBonus = defeatOutcome ? 8 : 0;
+    const totalStress = baseStress + defeatBonus;
+    heroes.forEach((hero) => this.applyCombatStress(hero, totalStress));
   }
 
   applyInjury(hero: Hero, damage: number): void {

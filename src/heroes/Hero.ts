@@ -127,7 +127,18 @@ export interface HeroNeeds {
   stress: number;
 }
 
-export type InjuryType = "Broken Arm" | "Burn" | "Concussion" | "Minor Wound";
+export type InjuryType =
+  | "Bleed"
+  | "Broken Arm"
+  | "Burn"
+  | "Burns (Severe)"
+  | "Concussion"
+  | "Concussion (Severe)"
+  | "Fracture"
+  | "Internal Bleeding"
+  | "Minor Wound"
+  | "Poison"
+  | "Sprain";
 export type InjurySeverity = "Minor" | "Permanent" | "Serious";
 export type InjurySource = "Expedition" | "Training";
 

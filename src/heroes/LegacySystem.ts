@@ -5,6 +5,7 @@ import { getRelationshipLabel } from "./RelationshipSystem";
 export interface LegacyReaction {
   fallenHeroId: string;
   moraleLoss: number;
+  stressGain: number;
   survivorId: string;
   survivorName: string;
 }
@@ -57,27 +58,51 @@ export class LegacySystem {
   ): readonly LegacyReaction[] {
     return survivors.flatMap((survivor) => fallenHeroes.flatMap((fallen) => {
       const profile = survivor.relationships[fallen.heroId];
-      if (!profile) {
-        return [];
+      const relationship = profile ? getRelationshipLabel(profile) : "Neutral";
+
+      let moraleLoss = 0;
+      let stressGain = 0;
+
+      if (relationship === "Trusted Friend") {
+        moraleLoss = 18;
+        stressGain = 30;
+      } else if (relationship === "Friend") {
+        moraleLoss = 12;
+        stressGain = 22;
+      } else if (relationship === "Companion") {
+        moraleLoss = 8;
+        stressGain = 15;
+      } else if (relationship === "Neutral") {
+        moraleLoss = 4;
+        stressGain = 10;
+      } else {
+        // Enemy or Rival — minimal grief, but still stressful to witness death
+        stressGain = 6;
       }
-      const relationship = getRelationshipLabel(profile);
-      if (relationship !== "Friend" && relationship !== "Trusted Friend" && relationship !== "Companion") {
-        return [];
+
+      if (moraleLoss > 0) {
+        survivor.needs.morale = Math.max(0, survivor.needs.morale - moraleLoss);
       }
-      const moraleLoss = relationship === "Trusted Friend" ? 18 : relationship === "Friend" ? 12 : 8;
-      survivor.needs.morale = Math.max(0, survivor.needs.morale - moraleLoss);
-      const memory: HeroLossMemory = {
-        day,
-        fallenHeroId: fallen.heroId,
-        fallenHeroName: fallen.name,
-        relationship,
-        summary: `${fallen.name} died during an expedition.`,
-      };
-      survivor.lossMemories.unshift(memory);
-      survivor.lossMemories.splice(MAX_LOSS_MEMORIES);
+      if (stressGain > 0) {
+        survivor.needs.stress = Math.min(100, survivor.needs.stress + stressGain);
+      }
+
+      if (relationship !== "Neutral" && relationship !== "Enemy" && relationship !== "Rival" && relationship !== "Distrust") {
+        const memory: HeroLossMemory = {
+          day,
+          fallenHeroId: fallen.heroId,
+          fallenHeroName: fallen.name,
+          relationship: relationship as "Companion" | "Friend" | "Trusted Friend",
+          summary: `${fallen.name} died during an expedition.`,
+        };
+        survivor.lossMemories.unshift(memory);
+        survivor.lossMemories.splice(MAX_LOSS_MEMORIES);
+      }
+
       return [{
         fallenHeroId: fallen.heroId,
         moraleLoss,
+        stressGain,
         survivorId: survivor.id,
         survivorName: survivor.name,
       }];

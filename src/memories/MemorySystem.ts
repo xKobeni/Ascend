@@ -41,14 +41,27 @@ export class MemorySystem {
       return;
     }
 
-    const action = event.type === "HEALED_ALLY" ? "treated" : "protected";
+    const actionMap: Record<CombatMemoryEvent["type"], string> = {
+      ASSISTED_ALLY: "assisted",
+      HEALED_ALLY: "treated",
+      PROTECTED_ALLY: "protected",
+      //REVIVED_ALLY: "revived",
+    };
+    const weightMap: Record<CombatMemoryEvent["type"], number> = {
+      ASSISTED_ALLY: 36,
+      HEALED_ALLY: 48,
+      PROTECTED_ALLY: 44,
+      //REVIVED_ALLY: 52,
+    };
+    const action = actionMap[event.type];
+    const weight = weightMap[event.type];
     const saved = this.record(target, {
       day,
       persistent: false,
       summary: `${actor.name} ${action} ${target.name} during combat.`,
       targetHeroId: actor.id,
       type: "WAS_SAVED",
-      weight: event.type === "HEALED_ALLY" ? 48 : 44,
+      weight,
     });
     const saver = this.record(actor, {
       day,
@@ -56,7 +69,7 @@ export class MemorySystem {
       summary: `${actor.name} ${action} ${target.name} during combat.`,
       targetHeroId: target.id,
       type: "SAVED_ALLY",
-      weight: event.type === "HEALED_ALLY" ? 44 : 40,
+      weight: weight - 4,
     });
 
     if (!saved.changed && !saver.changed) {

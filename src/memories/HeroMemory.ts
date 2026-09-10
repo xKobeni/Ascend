@@ -25,5 +25,5 @@ export interface MemoryCombatInfluence {
 export interface CombatMemoryEvent {
   actorId: string;
   targetId: string;
-  type: "HEALED_ALLY" | "PROTECTED_ALLY";
+  type: "ASSISTED_ALLY" | "HEALED_ALLY" | "PROTECTED_ALLY"; // | "REVIVED_ALLY"
 }

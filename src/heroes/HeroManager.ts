@@ -171,6 +171,12 @@ export class HeroManager {
       fallenRecords,
       day,
     );
+
+    // Apply base death stress to all survivors (scales with death count and outcome)
+    if (fallenIds.size > 0) {
+      const survivorHeroes = this.getAll().filter((hero) => !fallenIds.has(hero.id));
+      this.needsSystem.applyDeathStress(survivorHeroes, fallenIds.size, outcome === "Defeat");
+    }
     fallenHeroes.forEach(({ hero: fallen }) => {
       this.getAll()
         .filter((survivor) => !fallenIds.has(survivor.id))
