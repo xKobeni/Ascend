@@ -112,6 +112,89 @@ try {
   await command("Page.enable");
   await command("Runtime.enable");
   await setViewport(1440, 900);
+  const recoveryValidation = await evaluate(`(async () => {
+    const [{ Simulation }, { InjurySystem, getInjuryModifiers }, { HeroManager }] = await Promise.all([
+      import('/src/simulation/Simulation.ts'),
+      import('/src/heroes/InjurySystem.ts'),
+      import('/src/heroes/HeroManager.ts'),
+    ]);
+    const simulation = new Simulation();
+    const hero = simulation.getHeroes()[0];
+    const recovery = new InjurySystem();
+    const injury = recovery.inflictExpeditionInjury(hero, 'Withdrawn', 0.82, 1);
+    simulation.getHeroes().slice(0, 3).forEach((member) => simulation.addHeroToSquad(member.id));
+    const medicineBefore = simulation.getExpeditionSnapshot().resources.medicine;
+    const trainingBlocked = !simulation.queueTraining(hero.id, 'Strength Training');
+    const deploymentBlocked = !simulation.getSquadEvaluation().isReady && !simulation.startExpedition();
+    const treated = simulation.treatHeroInjury(hero.id, injury.id);
+    const medicineAfter = simulation.getExpeditionSnapshot().resources.medicine;
+    const modifiers = getInjuryModifiers(hero);
+    hero.movement.activity = 'Resting';
+    recovery.step([hero], 20_000);
+    const manager = new HeroManager();
+    const consequenceHeroes = manager.generateInitialRoster(3);
+    const consequenceSquad = {
+      doctrine: 'Balanced', id: 'phase-14-validation', name: 'Recovery Test',
+      members: consequenceHeroes.map((member, index) => ({
+        formation: ['Front', 'Middle', 'Back'][index],
+        heroId: member.id,
+        role: ['Vanguard', 'Damage', 'Support'][index],
+      })),
+    };
+    const consequences = manager.applyExpeditionConsequences(
+      consequenceSquad,
+      { combatants: consequenceHeroes.map((member) => ({ id: member.id, hp: 18, stats: { maxHp: 100 } })) },
+      'Withdrawn',
+      1,
+    );
+    return {
+      consequenceInjuries: consequences.length === 3 && consequenceHeroes.every((member) => member.injuries.length === 1),
+      deploymentBlocked,
+      medicineAfter,
+      medicineBefore,
+      modifierApplied: modifiers.attack < 1 && modifiers.defense < 1,
+      recovered: hero.injuries.length === 0,
+      trainingBlocked,
+      treated,
+      treatmentCost: medicineBefore - medicineAfter,
+    };
+  })()`);
+  assert(
+    recoveryValidation.trainingBlocked && recoveryValidation.deploymentBlocked &&
+      recoveryValidation.treated && recoveryValidation.treatmentCost > 0 &&
+      recoveryValidation.modifierApplied && recoveryValidation.recovered &&
+      recoveryValidation.consequenceInjuries,
+    `Phase 14 recovery validation failed (${JSON.stringify(recoveryValidation)}).`,
+  );
+  const victoryValidation = await evaluate(`(async () => {
+    const { Simulation } = await import('/src/simulation/Simulation.ts');
+    const simulation = new Simulation();
+    const heroes = simulation.getHeroes().slice(0, 3);
+    heroes.forEach((hero) => {
+      hero.attributes.strength = 30;
+      hero.attributes.endurance = 30;
+      hero.attributes.agility = 30;
+      hero.skills.sword = 20;
+      hero.personality.aggression = 1;
+      hero.personality.bravery = 1;
+      simulation.addHeroToSquad(hero.id);
+      simulation.setSquadRole(hero.id, 'Damage');
+    });
+    simulation.startExpedition();
+    for (let step = 0; step < 10_000 && simulation.getExpeditionSnapshot().phase === 'Combat'; step += 1) {
+      simulation.step(0.25);
+    }
+    const snapshot = simulation.getExpeditionSnapshot();
+    return {
+      outcome: snapshot.report?.outcome,
+      resources: snapshot.resources,
+    };
+  })()`);
+  assert(
+    victoryValidation.outcome === 'Victory' &&
+      JSON.stringify(victoryValidation.resources) === JSON.stringify({ food: 10, medicine: 6, riftShards: 3, scrap: 18 }),
+    `Expedition victory rewards failed (${JSON.stringify(victoryValidation)}).`,
+  );
   const withdrawalResults = await evaluate(`(async () => {
     const [{ Simulation }, { CombatSimulation }] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
@@ -121,13 +204,17 @@ try {
     simulation.getHeroes().slice(0, 3).forEach((hero) => simulation.addHeroToSquad(hero.id));
     const withdrawalHeroes = simulation.getHeroes().map((hero) => ({
       ...hero,
+      attributes: { agility: 10, endurance: 8, intelligence: 1, leadership: 1, strength: 1, willpower: 1 },
       personality: { ...hero.personality, aggression: 0, bravery: 0, loyalty: 0 },
+      relationships: {},
+      skillForge: { ...hero.skillForge, known: {}, loadout: { active: [], passive: [] } },
+      skills: { defense: 0, leadership: 0, medicine: 0, spear: 0, sword: 0 },
       traits: [...hero.traits, 'Cowardly'],
     }));
-    return [0.9, 1, 1.1, 1.2, 1.35].map((strength) => {
+    return [0.8, 1, 1.2, 1.4].map((strength) => {
       const combat = new CombatSimulation();
       combat.start(simulation.getSquad(), withdrawalHeroes, 'Withdrawal validation', strength);
-      for (let step = 0; step < 2_000 && combat.getSnapshot().result === 'Running'; step += 1) combat.step(0.25);
+      for (let step = 0; step < 10_000 && combat.getSnapshot().result === 'Running'; step += 1) combat.step(0.25);
       return combat.getSnapshot().result;
     });
   })()`);
@@ -171,6 +258,32 @@ try {
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'Escape', bubbles:true}))");
   await waitFor("!document.querySelector('.roster-panel').hidden && document.querySelector('.hero-detail-panel').hidden", "Escape return to roster");
 
+  await click('[data-hud-section="Refuge"]');
+  const recoveryUi = await evaluate(`(async () => {
+    const [{ Simulation }, { InjurySystem }, { SelectionOverlay }] = await Promise.all([
+      import('/src/simulation/Simulation.ts'),
+      import('/src/heroes/InjurySystem.ts'),
+      import('/src/ui/SelectionOverlay.ts'),
+    ]);
+    const simulation = new Simulation();
+    const hero = simulation.getHeroes()[0];
+    const injury = new InjurySystem().inflictExpeditionInjury(hero, 'Withdrawn', 0.82, 1);
+    const overlay = new SelectionOverlay(
+      document.querySelector('#app'),
+      () => false,
+      () => false,
+      (heroId, injuryId) => simulation.treatHeroInjury(heroId, injuryId),
+      () => simulation.getExpeditionSnapshot().resources.medicine,
+      () => undefined,
+    );
+    overlay.showHero(hero, simulation.getHeroes(), 'Training');
+    globalThis.__phase14Capture = overlay;
+    return { injury: injury.type, medicine: simulation.getExpeditionSnapshot().resources.medicine };
+  })()`);
+  assert(await evaluate("document.querySelectorAll('.hero-injury').length === 1 && !document.querySelector('.hero-injury button').disabled"), "Recovery UI must show a treatable injury and Medicine cost.");
+  await screenshot("phase14-recovery-1440x900.png");
+  await evaluate("globalThis.__phase14Capture.dispose(); delete globalThis.__phase14Capture");
+
   await click('[data-hud-section="Party"]');
   await waitFor("!document.querySelector('.party-panel').hidden", "Party panel");
   for (let index = 0; index < 3; index += 1) {
@@ -193,7 +306,7 @@ try {
   const report = await evaluate("document.querySelector('.expedition-overlay__outcome strong')?.textContent");
   const resources = await evaluate("[...document.querySelectorAll('[data-resource]')].map((node) => Number(node.textContent))");
   assert(report, "Expedition did not produce a mission result.");
-  assert(report !== "ROUTE SECURED" || resources.join(',') === "18,10,3", "Victory rewards must reach the persistent top status bar.");
+  assert(report !== "ROUTE SECURED" || resources.join(',') === "18,10,6,3", "Victory rewards and Medicine must reach the persistent top status bar.");
   await screenshot(report === "ROUTE SECURED" ? "rift-debrief-victory-1440x900.png" : "rift-debrief-setback-1440x900.png");
   await click('[data-expedition-action="return"]');
   await waitFor("document.querySelector('[data-hud-section=\"Refuge\"]').getAttribute('aria-pressed') === 'true'", "refuge return");
@@ -218,7 +331,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, recoveryUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

@@ -114,11 +114,11 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–13 and the first complete
-Train → Squad → Expedition → Combat → Return loop. Its live client contains Heroes, Party, Refuge,
-and Rift only. Injury, death, recruitment, facilities, equipment, classes, and campaign depth in
-this document describe future phases; they must remain absent from the playable interface until
-their authoritative systems are implemented.
+The implemented build currently covers Phases 0–14 and the first persistent
+Train → Squad → Expedition → Combat → Injury → Recovery loop. Its live client contains Heroes,
+Party, Refuge, and Rift only. Permanent death, recruitment, facilities, equipment, classes, and
+campaign depth in this document describe future phases; they must remain absent from the playable
+interface until their authoritative systems are implemented.
 
 ---
 

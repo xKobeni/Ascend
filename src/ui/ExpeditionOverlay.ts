@@ -54,6 +54,7 @@ export class ExpeditionOverlay {
       expedition.phase,
       expedition.attempt,
       expedition.resources.food,
+      expedition.resources.medicine,
       expedition.resources.riftShards,
       expedition.resources.scrap,
       expedition.report?.outcome ?? "",
@@ -168,7 +169,7 @@ export class ExpeditionOverlay {
         <section class="expedition-overlay__consequences">
           <span class="expedition-overlay__heading">Immediate consequences</span>
           ${report.consequences.map((entry) => `<div><strong>${this.escape(entry.heroName)}</strong><span>${this.escape(entry.detail)}</span></div>`).join("")}
-          <small>Persistent injuries and permanent death unlock in later phases.</small>
+          <small>Injuries persist after return. Treat them from the hero Training panel or allow infirmary rest.</small>
         </section>
       ` : ""}
       ${this.renderStockpile(expedition.resources)}
@@ -180,12 +181,12 @@ export class ExpeditionOverlay {
     return `<header><div><span>${this.escape(title)}</span><strong>${this.escape(status)}</strong></div>${close ? '<button type="button" data-expedition-action="close" aria-label="Close expedition panel">×</button>' : ""}</header>`;
   }
 
-  private renderResources(resources: Readonly<ExpeditionSnapshot["resources"]>): string {
-    return `<div class="expedition-overlay__resources"><span><b>${resources.scrap}</b> Scrap</span><span><b>${resources.food}</b> Food</span><span><b>${resources.riftShards}</b> Rift Shards</span></div>`;
+  private renderResources(resources: Readonly<ExpeditionSnapshot["resources"]>, includeMedicine = false): string {
+    return `<div class="expedition-overlay__resources"><span><b>${resources.scrap}</b> Scrap</span><span><b>${resources.food}</b> Food</span>${includeMedicine ? `<span><b>${resources.medicine}</b> Medicine</span>` : ""}<span><b>${resources.riftShards}</b> Rift Shards</span></div>`;
   }
 
   private renderStockpile(resources: Readonly<ExpeditionSnapshot["resources"]>): string {
-    return `<section class="expedition-overlay__stockpile"><span class="expedition-overlay__heading">Refuge stockpile</span>${this.renderResources(resources)}</section>`;
+    return `<section class="expedition-overlay__stockpile"><span class="expedition-overlay__heading">Refuge stockpile</span>${this.renderResources(resources, true)}</section>`;
   }
 
   private renderCombatant(combatant: Readonly<CombatantSnapshot>): string {

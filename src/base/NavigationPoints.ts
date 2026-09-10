@@ -42,6 +42,9 @@ export const NAVIGATION_POINTS: Readonly<Record<ScheduledActivity, readonly Navi
   Training: createRing("training-spot", "Training Area", 16.2, -13.5, 5.1),
 };
 
+export const INFIRMARY_NAVIGATION_POINTS: readonly NavigationPoint[] =
+  createRing("infirmary-cot", "Infirmary", -10.4, -16.8, 2.15);
+
 export const IDLE_NAVIGATION_POINTS: readonly NavigationPoint[] = [
   ...createRing("storage-work", "Storage", -16.2, 13.5, 4.95, 3),
   { id: "idle-lookout-1", label: "Idle Area", x: -7.2, z: 17.4 },

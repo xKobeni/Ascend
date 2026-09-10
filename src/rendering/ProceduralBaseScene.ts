@@ -25,6 +25,7 @@ export class ProceduralBaseScene {
 
     this.flameCore = this.addCampfire();
     this.addTent();
+    this.addInfirmary();
     this.addTrainingDummy();
     this.addCrates();
     this.addStoragePile();
@@ -184,6 +185,30 @@ export class ProceduralBaseScene {
     this.fireGlow.intensity = 54;
     group.add(this.fireGlow);
     return flameCore;
+  }
+
+  private addInfirmary(): void {
+    const group = this.createSelectableGroup({
+      category: "facility",
+      detail: "Injured heroes recover here while resting. Treatment requires Medicine.",
+      id: "infirmary",
+      label: "Refuge Infirmary",
+    });
+    group.position.set(-10.4, 0.38, -16.8);
+    group.rotation.y = -0.16;
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: "#58463b", roughness: 0.96 });
+    const clothMaterial = new THREE.MeshStandardMaterial({ color: "#747b5d", roughness: 1 });
+    [-2.4, 0, 2.4].forEach((offset) => {
+      const cot = new THREE.Group();
+      cot.position.x = offset;
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.22, 3.2), frameMaterial);
+      frame.position.y = 0.28;
+      const bedding = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.18, 2.85), clothMaterial);
+      bedding.position.y = 0.47;
+      cot.add(frame, bedding);
+      group.add(cot);
+    });
+    this.root.add(group);
   }
 
   private addTent(): void {

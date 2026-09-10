@@ -22,6 +22,11 @@ export class NeedsSystem {
   ): HeroDecision {
     const { needs, movement } = hero;
 
+    const recoveryInjury = hero.injuries.find((injury) => !injury.permanent);
+    if (recoveryInjury && needs.hunger >= 25) {
+      return this.needDecision("Resting", `Injury recovery · ${recoveryInjury.type}`);
+    }
+
     if (
       movement.decisionSource === "Need" &&
       movement.targetActivity === "Eating" &&

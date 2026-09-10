@@ -23,6 +23,7 @@ export class HudShell {
         <div class="hud-resources" aria-label="Refuge resources">
           <span><i>SCRAP</i><b data-resource="scrap">0</b></span>
           <span><i>FOOD</i><b data-resource="food">0</b></span>
+          <span><i>MEDICINE</i><b data-resource="medicine">0</b></span>
           <span><i>SHARDS</i><b data-resource="riftShards">0</b></span>
           <span><i>HEROES</i><b data-hud="heroes">0</b></span>
         </div>
@@ -39,13 +40,14 @@ export class HudShell {
     const heroCount = this.element.querySelector<HTMLElement>("[data-hud='heroes']");
     const scrap = this.element.querySelector<HTMLElement>("[data-resource='scrap']");
     const food = this.element.querySelector<HTMLElement>("[data-resource='food']");
+    const medicine = this.element.querySelector<HTMLElement>("[data-resource='medicine']");
     const riftShards = this.element.querySelector<HTMLElement>("[data-resource='riftShards']");
-    if (!time || !heroCount || !scrap || !food || !riftShards) {
+    if (!time || !heroCount || !scrap || !food || !medicine || !riftShards) {
       throw new Error("HUD shell structure is incomplete.");
     }
     this.time = time;
     this.heroCount = heroCount;
-    this.resourceValues = { food, riftShards, scrap };
+    this.resourceValues = { food, medicine, riftShards, scrap };
     this.element.addEventListener("click", this.handleClick);
     container.appendChild(this.element);
   }
@@ -60,6 +62,7 @@ export class HudShell {
     this.heroCount.textContent = String(snapshot.heroCount);
     this.resourceValues.scrap.textContent = String(resources.scrap);
     this.resourceValues.food.textContent = String(resources.food);
+    this.resourceValues.medicine.textContent = String(resources.medicine);
     this.resourceValues.riftShards.textContent = String(resources.riftShards);
   }
 

@@ -45,6 +45,8 @@ export class Game {
       container,
       (heroId, type) => this.simulation.queueTraining(heroId, type),
       (heroId, definitionId) => this.simulation.toggleSkillLoadout(heroId, definitionId),
+      (heroId, injuryId) => this.simulation.treatHeroInjury(heroId, injuryId),
+      () => this.simulation.getExpeditionSnapshot().resources.medicine,
       () => this.closeHeroDetail(),
     );
     this.heroRosterOverlay = new HeroRosterOverlay(
@@ -74,7 +76,7 @@ export class Game {
       container,
       () => this.simulation.getExpeditionSnapshot(),
       () => this.simulation.getCombatSnapshot(),
-      () => this.simulation.getSquadEvaluation().isComplete,
+      () => this.simulation.getSquadEvaluation().isReady,
       {
         close: () => this.activateHudSection("Refuge", true),
         deploy: () => this.simulation.startExpedition(),
@@ -187,6 +189,7 @@ export class Game {
       this.simulation.getSocialEvents(),
       expeditionSnapshot,
     );
+    this.heroRosterOverlay.update();
     this.squadOverlay.updateEvaluation();
     this.combatOverlay.update();
     this.expeditionOverlay.update();

@@ -6,6 +6,7 @@ import type {
   SquadEvaluation,
   SquadRole,
 } from "./Squad";
+import { getInjuryModifiers, hasRecoveringInjury } from "../heroes/InjurySystem";
 
 export const SQUAD_SIZE = 3;
 
@@ -104,23 +105,27 @@ export class SquadSystem {
         defense: 0,
         healing: 0,
         isComplete: false,
+        isReady: false,
+        recoveringMembers: 0,
         trust: 0,
       };
     }
 
     const totals = members.reduce(
       (result, hero) => {
+        const injury = getInjuryModifiers(hero);
         result.level += hero.level;
-        result.combatPower +=
+        result.combatPower += (
           hero.attributes.strength * 4 +
           hero.attributes.agility * 2 +
           Math.max(hero.skills.sword, hero.skills.spear) * 5 +
-          hero.level * 10;
+          hero.level * 10) * injury.attack;
         result.healing += hero.skills.medicine * 10 + hero.attributes.intelligence * 2;
-        result.defense += hero.skills.defense * 8 + hero.attributes.endurance * 3;
+        result.defense += (hero.skills.defense * 8 + hero.attributes.endurance * 3) * injury.defense;
+        result.recoveringMembers += Number(hasRecoveringInjury(hero));
         return result;
       },
-      { combatPower: 0, defense: 0, healing: 0, level: 0 },
+      { combatPower: 0, defense: 0, healing: 0, level: 0, recoveringMembers: 0 },
     );
 
     const social = this.evaluateChemistry(members);
@@ -132,6 +137,8 @@ export class SquadSystem {
       defense: Math.round(totals.defense),
       healing: Math.round(totals.healing),
       isComplete: members.length === SQUAD_SIZE,
+      isReady: members.length === SQUAD_SIZE && totals.recoveringMembers === 0,
+      recoveringMembers: totals.recoveringMembers,
       trust: social.trust,
     };
   }

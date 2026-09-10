@@ -5,6 +5,7 @@ import { SkillDiscoverySystem } from "../skills/SkillDiscoverySystem";
 import { SkillLoadoutSystem } from "../skills/SkillLoadoutSystem";
 import { SkillProgressionSystem } from "../skills/SkillProgressionSystem";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
+import { getInjuryModifiers, InjurySystem } from "./InjurySystem";
 
 const MAX_TRAINING_SLOTS = 3;
 const INJURY_CHECK_INTERVAL_MINUTES = 60;
@@ -14,10 +15,16 @@ export class TrainingSystem {
     private readonly skillProgression: SkillProgressionSystem,
     private readonly skillDiscovery: SkillDiscoverySystem,
     private readonly skillLoadout: SkillLoadoutSystem,
+    private readonly injurySystem: InjurySystem,
     private readonly random = Random.fromEntropy(),
   ) {}
 
   queueTraining(hero: Hero, type: TrainingType): boolean {
+    const restriction = this.injurySystem.getTrainingRestriction(hero, type);
+    if (restriction) {
+      hero.training.lastOutcome = restriction;
+      return false;
+    }
     const occupiedSlots = hero.training.queue.length + Number(hero.training.active !== null);
     if (occupiedSlots >= MAX_TRAINING_SLOTS) {
       hero.training.lastOutcome = "Training queue is full.";
@@ -37,17 +44,21 @@ export class TrainingSystem {
     return hero.training.active !== null;
   }
 
-  step(heroes: readonly Hero[], gameMinutes: number, needsSystem: NeedsSystem): void {
+  step(heroes: readonly Hero[], gameMinutes: number, needsSystem: NeedsSystem, day: number): void {
     heroes.forEach((hero) => {
       const assignment = hero.training.active;
       if (!assignment || hero.movement.activity !== "Training") {
         return;
       }
 
-      const trainingRate = 0.42 + hero.personality.discipline * 0.16 + hero.attributes.endurance * 0.01;
+      if (this.injurySystem.getTrainingRestriction(hero, assignment.type)) {
+        return;
+      }
+      const trainingRate = (0.42 + hero.personality.discipline * 0.16 + hero.attributes.endurance * 0.01) *
+        getInjuryModifiers(hero).training;
       assignment.progress = Math.min(100, assignment.progress + gameMinutes * trainingRate);
       hero.training.injuryCheckMinutes += gameMinutes;
-      this.checkForInjury(hero, needsSystem);
+      this.checkForInjury(hero, needsSystem, day);
 
       if (assignment.progress >= 100) {
         this.completeAssignment(hero, assignment);
@@ -112,7 +123,7 @@ export class TrainingSystem {
       : `${name} gained ${result.gainedXp} XP.`;
   }
 
-  private checkForInjury(hero: Hero, needsSystem: NeedsSystem): void {
+  private checkForInjury(hero: Hero, needsSystem: NeedsSystem, day: number): void {
     if (hero.training.injuryCheckMinutes < INJURY_CHECK_INTERVAL_MINUTES) {
       return;
     }
@@ -129,7 +140,8 @@ export class TrainingSystem {
 
     const damage = this.random.integer(3, 7);
     needsSystem.applyInjury(hero, damage);
-    hero.training.lastOutcome = `Minor training injury · -${damage} health.`;
+    this.injurySystem.inflictTrainingInjury(hero, day);
+    hero.training.lastOutcome = `Minor Wound sustained during training · -${damage} health.`;
   }
 
   private describeImprovement(label: string, previous: number, current: number): string {

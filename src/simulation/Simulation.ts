@@ -30,6 +30,7 @@ export class Simulation {
       squad,
       combat,
       outcome,
+      this.state.day,
     ),
     (squad, successful) => this.heroManager.recordExpeditionExperience(squad, successful),
   );
@@ -92,6 +93,15 @@ export class Simulation {
 
   toggleSkillLoadout(heroId: string, definitionId: string): boolean {
     return this.heroManager.toggleSkillLoadout(heroId, definitionId);
+  }
+
+  treatHeroInjury(heroId: string, injuryId: string): boolean {
+    const result = this.heroManager.treatInjury(
+      heroId,
+      injuryId,
+      this.expeditionSystem.getSnapshot().resources.medicine,
+    );
+    return result.success && this.expeditionSystem.consumeMedicine(result.cost);
   }
 
   getSquad() {

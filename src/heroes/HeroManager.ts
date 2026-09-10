@@ -13,9 +13,11 @@ import type { SkillProgressionResult, SkillUsageEvent } from "../skills/Skill";
 import type { CombatSnapshot } from "../combat/Combat";
 import type { ExpeditionConsequence, ExpeditionReport } from "../expeditions/Expedition";
 import type { Squad } from "../squads/Squad";
+import { InjurySystem, type TreatmentResult } from "./InjurySystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
+  private readonly injurySystem = new InjurySystem();
   private readonly needsSystem = new NeedsSystem();
   private readonly relationshipSystem = new RelationshipSystem();
   private readonly routineSystem = new HeroRoutineSystem();
@@ -26,6 +28,7 @@ export class HeroManager {
     this.skillProgression,
     this.skillDiscovery,
     this.skillLoadout,
+    this.injurySystem,
   );
   private readonly usedNames = new Set<string>();
 
@@ -111,6 +114,7 @@ export class HeroManager {
     squad: Readonly<Squad>,
     combat: Readonly<CombatSnapshot>,
     outcome: ExpeditionReport["outcome"],
+    day: number,
   ): readonly ExpeditionConsequence[] {
     return squad.members.flatMap((member) => {
       const hero = this.heroes.get(member.heroId);
@@ -126,12 +130,25 @@ export class HeroManager {
       hero.needs.health = Math.max(0, hero.needs.health - healthLoss);
       hero.needs.morale = Math.max(0, hero.needs.morale - moraleLoss);
       hero.needs.fatigue = Math.min(100, hero.needs.fatigue + 18);
+      const injury = this.injurySystem.inflictExpeditionInjury(
+        hero,
+        outcome === "Defeat" ? "Defeat" : "Withdrawn",
+        damageRatio,
+        day,
+      );
       return [{
-        detail: `Wounded · Health -${healthLoss} · Morale -${moraleLoss}`,
+        detail: `${injury.severity} ${injury.type} · Health -${healthLoss} · Morale -${moraleLoss}`,
         heroId: hero.id,
         heroName: hero.name,
       }];
     });
+  }
+
+  treatInjury(heroId: string, injuryId: string, availableMedicine: number): TreatmentResult {
+    const hero = this.heroes.get(heroId);
+    return hero
+      ? this.injurySystem.treat(hero, injuryId, availableMedicine)
+      : { cost: 0, message: "Hero record is unavailable.", success: false };
   }
 
   step(
@@ -150,7 +167,8 @@ export class HeroManager {
       this.needsSystem,
       this.trainingSystem,
     );
-    this.trainingSystem.step(heroes, gameMinutes, this.needsSystem);
+    this.trainingSystem.step(heroes, gameMinutes, this.needsSystem, day);
+    this.injurySystem.step(heroes, gameMinutes);
     this.relationshipSystem.step(heroes, gameMinutes, day, minuteOfDay);
   }
 

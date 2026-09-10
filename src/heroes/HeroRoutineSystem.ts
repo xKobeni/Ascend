@@ -1,5 +1,6 @@
 import {
   IDLE_NAVIGATION_POINTS,
+  INFIRMARY_NAVIGATION_POINTS,
   NAVIGATION_POINTS,
   type NavigationPoint,
   type ScheduledActivity,
@@ -83,7 +84,10 @@ export class HeroRoutineSystem {
       return;
     }
 
-    const destination = NAVIGATION_POINTS[activity][heroIndex];
+    const recovering = decisionReason?.startsWith("Injury recovery") ?? false;
+    const destination = recovering
+      ? INFIRMARY_NAVIGATION_POINTS[heroIndex]
+      : NAVIGATION_POINTS[activity][heroIndex];
     if (!destination) {
       throw new Error(`No ${activity} navigation point exists for hero index ${heroIndex}.`);
     }
@@ -125,6 +129,7 @@ export class HeroRoutineSystem {
   private findDestination(destinationId: string): NavigationPoint {
     const points = [
       ...IDLE_NAVIGATION_POINTS,
+      ...INFIRMARY_NAVIGATION_POINTS,
       ...NAVIGATION_POINTS.Eating,
       ...NAVIGATION_POINTS.Resting,
       ...NAVIGATION_POINTS.Socializing,

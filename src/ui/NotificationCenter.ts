@@ -22,6 +22,8 @@ export class NotificationCenter {
   private readonly notifications: NotificationEntry[] = [];
   private readonly skillLevels = new Map<string, number>();
   private readonly trainingOutcomes = new Map<string, string | null>();
+  private readonly injurySignatures = new Map<string, string>();
+  private readonly recoveryOutcomes = new Map<string, string | null>();
 
   constructor(
     container: HTMLElement,
@@ -79,6 +81,8 @@ export class NotificationCenter {
   ): void {
     heroes.forEach((hero) => {
       this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
+      this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
+      this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
       Object.values(hero.skillForge.known).forEach((skill) => {
         this.skillLevels.set(`${hero.id}:${skill.definitionId}`, skill.level);
       });
@@ -101,6 +105,22 @@ export class NotificationCenter {
         this.push(`${hero.name} · ${hero.training.lastOutcome}`, "success");
       }
       this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
+      const previousInjuries = this.injurySignatures.get(hero.id) ?? "";
+      const injuries = this.getInjurySignature(hero);
+      if (injuries !== previousInjuries) {
+        this.push(
+          hero.injuries.length > 0
+            ? `${hero.name} · ${hero.injuries.map((injury) => injury.type).join(" · ")}`
+            : `${hero.name} is fit for duty again.`,
+          hero.injuries.length > 0 ? "danger" : "success",
+        );
+      }
+      this.injurySignatures.set(hero.id, injuries);
+      const previousRecovery = this.recoveryOutcomes.get(hero.id) ?? null;
+      if (hero.recovery.lastOutcome && hero.recovery.lastOutcome !== previousRecovery) {
+        this.push(`${hero.name} · ${hero.recovery.lastOutcome}`, "neutral");
+      }
+      this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
       Object.values(hero.skillForge.known).forEach((skill) => {
         const key = `${hero.id}:${skill.definitionId}`;
         const previousLevel = this.skillLevels.get(key);
@@ -185,5 +205,9 @@ export class NotificationCenter {
 
   private escape(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  private getInjurySignature(hero: Readonly<Hero>): string {
+    return hero.injuries.map((injury) => `${injury.id}:${injury.treated}`).join("|");
   }
 }

@@ -18,6 +18,7 @@ import {
 } from "./FormationSystem";
 import type { SkillUsageEvent } from "../skills/Skill";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
+import { getInjuryModifiers } from "../heroes/InjurySystem";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
@@ -39,6 +40,7 @@ interface PlannedAction {
 const COMBAT_TICK_SECONDS = 0.1;
 const MAX_STEPS_PER_FRAME = 10;
 const MAX_LOG_ENTRIES = 10;
+const MAX_COMBAT_TICKS = 600;
 
 export class CombatSimulation {
   private accumulatorSeconds = 0;
@@ -440,18 +442,32 @@ export class CombatSimulation {
           : `${this.encounterLabel} defeat · no heroes remain.`,
         "danger",
       );
+      return;
+    }
+    if (this.tick >= MAX_COMBAT_TICKS) {
+      this.result = "Withdrawn";
+      this.combatants
+        .filter((combatant) => combatant.hp > 0)
+        .forEach((combatant) => {
+          combatant.action = "Idle";
+        });
+      this.addLog(
+        `The ${this.encounterLabel.toLowerCase()} reached a stalemate. The squad withdrew before it was surrounded.`,
+        "danger",
+      );
     }
   }
 
   private getHeroStats(hero: Readonly<Hero>, role: string): CombatStats {
+    const injury = getInjuryModifiers(hero);
     const weaponSkill = Math.max(hero.skills.sword, hero.skills.spear);
     const roleHp = role === "Vanguard" ? 16 : 0;
     const roleAttack = role === "Damage" ? 4 : 0;
     const roleDefense = role === "Vanguard" ? 3 : 0;
     const roleRange = role === "Support" ? 2.2 : 1.8;
     return {
-      attack: 10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack,
-      defense: 4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense,
+      attack: (10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack) * injury.attack,
+      defense: (4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense) * injury.defense,
       maxHp: 58 + hero.attributes.endurance * 7 + hero.level * 5 + roleHp,
       range: roleRange,
       speed: 1.45 + hero.attributes.agility * 0.08,

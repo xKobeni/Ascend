@@ -115,6 +115,26 @@ export interface HeroNeeds {
   stress: number;
 }
 
+export type InjuryType = "Broken Arm" | "Burn" | "Concussion" | "Minor Wound";
+export type InjurySeverity = "Minor" | "Permanent" | "Serious";
+export type InjurySource = "Expedition" | "Training";
+
+export interface HeroInjury {
+  acquiredDay: number;
+  id: string;
+  permanent: boolean;
+  remainingMinutes: number | null;
+  severity: InjurySeverity;
+  source: InjurySource;
+  totalRecoveryMinutes: number | null;
+  treated: boolean;
+  type: InjuryType;
+}
+
+export interface HeroRecovery {
+  lastOutcome: string | null;
+}
+
 export type TrainingType = "Defense Training" | "Strength Training" | "Weapon Training";
 
 export interface TrainingAssignment {
@@ -158,6 +178,7 @@ export interface Hero {
   hiddenPotential: HiddenPotential;
   heroClass: HeroClass;
   id: string;
+  injuries: HeroInjury[];
   level: number;
   movement: HeroMovement;
   name: string;
@@ -167,6 +188,7 @@ export interface Hero {
   rank: number;
   relationships: Record<string, RelationshipProfile>;
   reputation: HeroReputation;
+  recovery: HeroRecovery;
   skillForge: HeroSkillForge;
   skills: HeroSkills;
   socialRole: SocialRole;

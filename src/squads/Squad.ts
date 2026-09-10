@@ -24,5 +24,7 @@ export interface SquadEvaluation {
   defense: number;
   healing: number;
   isComplete: boolean;
+  isReady: boolean;
+  recoveringMembers: number;
   trust: number;
 }

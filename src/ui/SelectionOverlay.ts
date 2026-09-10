@@ -11,6 +11,7 @@ import { getRelationshipLabel } from "../heroes/RelationshipSystem";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import { ACTIVE_SKILL_SLOTS, PASSIVE_SKILL_SLOTS } from "../skills/SkillLoadoutSystem";
 import { getSkillXpToNextLevel } from "../skills/SkillProgressionSystem";
+import { getInjuryDefinition, hasRecoveringInjury } from "../heroes/InjurySystem";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
   ["strength", "Strength"],
@@ -71,6 +72,8 @@ export class SelectionOverlay {
     container: HTMLElement,
     private readonly onQueueTraining: (heroId: string, type: TrainingType) => void,
     private readonly onToggleSkillLoadout: (heroId: string, definitionId: string) => void,
+    private readonly onTreatInjury: (heroId: string, injuryId: string) => void,
+    private readonly getMedicine: () => number,
     private readonly onClose: () => void,
   ) {
     this.element = document.createElement("aside");
@@ -106,6 +109,11 @@ export class SelectionOverlay {
           <section class="hero-panel__skill-forge"><span class="hero-panel__heading">Known skills</span><div class="hero-panel__skill-summary" data-hero="skill-summary"></div><div class="hero-panel__skill-list" data-hero="skill-forge"></div><div class="hero-panel__skill-potential" data-hero="skill-potential"></div></section>
         </div>
         <div data-hero-view="Training" hidden>
+          <section class="hero-panel__recovery">
+            <div class="hero-panel__recovery-heading"><span class="hero-panel__heading">Recovery & treatment</span><small><b data-hero="medicine">0</b> Medicine</small></div>
+            <div class="hero-panel__injuries" data-hero="injuries"></div>
+            <div class="hero-panel__recovery-outcome" data-hero="recovery-outcome"></div>
+          </section>
           <section class="hero-panel__training"><span class="hero-panel__heading">Training queue</span><div data-hero="training-active"></div><div class="hero-panel__training-progress"><i data-hero="training-progress"></i></div><div class="hero-panel__training-queue" data-hero="training-queue"></div><div class="hero-panel__training-actions"><button type="button" data-training-type="Strength Training">Strength</button><button type="button" data-training-type="Weapon Training">Weapon</button><button type="button" data-training-type="Defense Training">Defense</button></div><div class="hero-panel__training-outcome" data-hero="training-outcome"></div></section>
         </div>
         <div data-hero-view="Relations" hidden>
@@ -173,11 +181,14 @@ export class SelectionOverlay {
 
   updateHeroRuntime(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {
     const status = this.requireHeroElement("status");
-    status.textContent =
+    const activity =
       hero.movement.activity === "Walking" && hero.movement.destinationLabel
         ? `Walking → ${hero.movement.destinationLabel}`
         : hero.movement.activity;
+    const injury = hero.injuries.find((candidate) => !candidate.permanent) ?? hero.injuries[0];
+    status.textContent = injury ? `${activity} · ${injury.type}` : activity;
     status.dataset.activity = hero.movement.activity.toLowerCase();
+    status.dataset.injured = String(Boolean(injury));
     const decision = this.requireHeroElement("decision");
     decision.textContent =
       hero.movement.decisionSource === "Need" && hero.movement.decisionReason
@@ -188,6 +199,7 @@ export class SelectionOverlay {
     decision.hidden = false;
     decision.dataset.source = hero.movement.decisionSource.toLowerCase();
     this.renderNeeds(hero);
+    this.renderRecovery(hero);
     this.renderTraining(hero);
     this.renderRelationships(hero, heroes);
     this.renderValueGrid(this.requireHeroElement("attributes"), ATTRIBUTE_LABELS, hero.attributes);
@@ -211,7 +223,12 @@ export class SelectionOverlay {
 
     const occupiedSlots = hero.training.queue.length + Number(assignment !== null);
     this.heroContent.querySelectorAll<HTMLButtonElement>("[data-training-type]").forEach((button) => {
-      button.disabled = occupiedSlots >= 3;
+      button.disabled = occupiedSlots >= 3 || hasRecoveringInjury(hero);
+      button.title = hasRecoveringInjury(hero)
+        ? "Recovery must finish before deliberate training can resume."
+        : occupiedSlots >= 3
+          ? "Training queue is full."
+          : "Add this assignment to the training queue.";
     });
   }
 
@@ -230,6 +247,11 @@ export class SelectionOverlay {
     const skillButton = target?.closest<HTMLButtonElement>("[data-skill-id]");
     if (skillButton && this.selectedHeroId && skillButton.dataset.skillId) {
       this.onToggleSkillLoadout(this.selectedHeroId, skillButton.dataset.skillId);
+      return;
+    }
+    const treatmentButton = target?.closest<HTMLButtonElement>("[data-injury-id]");
+    if (treatmentButton && this.selectedHeroId && treatmentButton.dataset.injuryId) {
+      this.onTreatInjury(this.selectedHeroId, treatmentButton.dataset.injuryId);
       return;
     }
     const button = target?.closest<HTMLButtonElement>("[data-training-type]");
@@ -437,6 +459,57 @@ export class SelectionOverlay {
         return row;
       }),
     );
+  }
+
+  private renderRecovery(hero: Readonly<Hero>): void {
+    const medicine = this.getMedicine();
+    this.requireHeroElement("medicine").textContent = String(medicine);
+    this.requireHeroElement("recovery-outcome").textContent =
+      hero.recovery.lastOutcome ?? "Untreated injuries recover slowly while resting in the infirmary.";
+    const container = this.requireHeroElement("injuries");
+    if (hero.injuries.length === 0) {
+      container.innerHTML = '<p class="hero-panel__recovery-clear">No active injuries.</p>';
+      return;
+    }
+    container.replaceChildren(...hero.injuries.map((injury) => {
+      const definition = getInjuryDefinition(injury.type);
+      const card = document.createElement("article");
+      card.className = "hero-injury";
+      card.dataset.severity = injury.severity.toLowerCase();
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      const state = document.createElement("span");
+      title.textContent = injury.type;
+      state.textContent = injury.permanent ? "Permanent" : injury.treated ? "Treated" : "Untreated";
+      heading.append(title, state);
+      const detail = document.createElement("p");
+      detail.textContent = definition.description;
+      const recovery = document.createElement("div");
+      recovery.className = "hero-injury__recovery";
+      const time = document.createElement("small");
+      const remaining = injury.remainingMinutes === null ? null : Math.ceil(injury.remainingMinutes / 60);
+      time.textContent = injury.permanent
+        ? `Lasting effect · ${injury.source} · Day ${injury.acquiredDay}`
+        : `${remaining}h resting recovery · ${injury.source} · Day ${injury.acquiredDay}`;
+      const meter = document.createElement("i");
+      const progress = injury.remainingMinutes === null || injury.totalRecoveryMinutes === null
+        ? 100
+        : Math.round((1 - injury.remainingMinutes / injury.totalRecoveryMinutes) * 100);
+      meter.style.setProperty("--recovery-progress", `${progress}%`);
+      recovery.append(time, meter);
+      const action = document.createElement("button");
+      action.type = "button";
+      action.dataset.injuryId = injury.id;
+      action.disabled = injury.treated || medicine < definition.treatmentCost;
+      action.textContent = injury.treated ? "Treated" : `Treat · ${definition.treatmentCost} Medicine`;
+      action.title = injury.treated
+        ? "Treatment has already been applied."
+        : medicine < definition.treatmentCost
+          ? "The refuge does not have enough Medicine."
+          : "Consume Medicine and accelerate resting recovery.";
+      card.append(heading, detail, recovery, action);
+      return card;
+    }));
   }
 
   private renderValueGrid<Values extends object>(

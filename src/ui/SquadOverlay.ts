@@ -220,7 +220,8 @@ export class SquadOverlay {
     container.innerHTML = `
       <span class="section-heading">Party record</span>
       <dl>
-        <div><dt>Status</dt><dd data-ready="${evaluation.isComplete}">${evaluation.isComplete ? "READY" : "FORMING"}</dd></div>
+        <div><dt>Status</dt><dd data-ready="${evaluation.isReady}">${evaluation.isReady ? "READY" : evaluation.isComplete ? "RECOVERY BLOCKED" : "FORMING"}</dd></div>
+        ${evaluation.recoveringMembers ? `<div><dt>Recovering</dt><dd>${evaluation.recoveringMembers}</dd></div>` : ""}
         <div><dt>Power</dt><dd>${evaluation.combatPower}</dd></div>
         <div><dt>Defense</dt><dd>${evaluation.defense}</dd></div>
         <div><dt>Healing</dt><dd>${evaluation.healing}</dd></div>

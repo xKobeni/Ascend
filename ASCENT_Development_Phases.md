@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 10, 2026
 
 ```text
-Gameplay phases implemented: 0–13
-Current playable milestone: First complete expedition loop
+Gameplay phases implemented: 0–14
+Current playable milestone: Persistent expedition consequences and recovery
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 14 — Injury and Recovery
+Next gameplay phase: Phase 15 — Permanent Death
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,8 +47,8 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-The next implementation boundary is Phase 14 only. Phase 15 and later remain design context, not
-approved implementation scope.
+Phase 14 is complete. Phase 15 and later remain design context and require a new implementation
+approval boundary.
 
 ---
 
@@ -1102,7 +1102,7 @@ resource updates, and developer Arena access have browser validation coverage.
 
 ---
 
-# Phase 14 — Injury and Recovery
+# Phase 14 — Injury and Recovery — Complete
 
 ## Goal
 
@@ -1121,6 +1121,9 @@ Burn
 Concussion
 ```
 
+Expedition setbacks create persistent injury records based on outcome and combat damage. Exhausted
+training can create a Minor Wound through the same injury system.
+
 ### 14.2 Injury Effects
 
 Example:
@@ -1133,15 +1136,20 @@ Training Speed -30%
 
 ### 14.3 Infirmary
 
-Hero must rest.
+Recovering heroes route to the Refuge infirmary cots and must rest before recovery time advances.
+Untreated injuries recover slowly; treatment accelerates recovery.
 
 ### 14.4 Medicine
 
-Healing consumes medicine.
+Treatment atomically consumes Medicine from the real Refuge stockpile. The Phase 14 build starts
+with six Medicine so the loop is operable; replenishment remains part of the later economy phase.
 
 ### 14.5 Permanent Injuries
 
 Rare severe injuries create long-term effects.
+
+Permanent injuries retain derived combat and training modifiers after stabilization. They do not
+cause death or remove a hero; those behaviors belong to Phase 15.
 
 ### 14.6 Client Integration
 
@@ -1154,9 +1162,11 @@ Extend the established client rather than adding a new top-level destination:
 - Expose an Infirmary through the 3D Refuge only when the facility and its interactions exist.
 - Use burgundy shape, label, and icon changes for danger; never rely on glow or color alone.
 
-## Exit Criteria
+## Exit Criteria — Met
 
-Expeditions affect heroes after combat ends.
+Expeditions and exhausted training can leave persistent injuries. Injury modifiers affect real
+combat and squad evaluation, recovering heroes cannot deploy or train, Medicine treatment is
+available from hero details, and resting in the infirmary completes recovery.
 
 ---
 

@@ -11,6 +11,7 @@ export class HeroRosterOverlay {
   private filter: RosterFilter = "All";
   private readonly grid: HTMLElement;
   private readonly element: HTMLElement;
+  private lastSignature = "";
 
   constructor(
     container: HTMLElement,
@@ -58,8 +59,15 @@ export class HeroRosterOverlay {
 
   refresh(): void {
     if (this.expanded) {
+      this.lastSignature = "";
       this.render();
     }
+  }
+
+  update(): void {
+    if (!this.expanded) return;
+    const signature = this.getSignature();
+    if (signature !== this.lastSignature) this.render();
   }
 
   dispose(): void {
@@ -68,6 +76,7 @@ export class HeroRosterOverlay {
   }
 
   private render(): void {
+    this.lastSignature = this.getSignature();
     const squad = this.getSquad();
     const visibleHeroes = this.heroes.filter((hero) => this.matchesFilter(hero));
     this.grid.replaceChildren(...visibleHeroes.map((hero) => {
@@ -109,7 +118,8 @@ export class HeroRosterOverlay {
       const level = document.createElement("span");
       level.textContent = `LEVEL ${hero.level}`;
       const status = document.createElement("span");
-      status.textContent = this.getStatus(hero);
+      const injury = hero.injuries.find((candidate) => !candidate.permanent) ?? hero.injuries[0];
+      status.textContent = injury ? injury.type : this.getStatus(hero);
       footer.append(level, status);
       card.append(portrait, rank, identity, footer);
       return card;
@@ -150,7 +160,7 @@ export class HeroRosterOverlay {
   }
 
   private getStatus(hero: Readonly<Hero>): Exclude<RosterFilter, "All"> {
-    if (hero.needs.health < 70 || hero.needs.fatigue > 75) {
+    if (hero.injuries.length > 0 || hero.needs.health < 70 || hero.needs.fatigue > 75) {
       return "Recovering";
     }
     if (hero.training.active || hero.training.queue.length > 0) {
@@ -165,5 +175,21 @@ export class HeroRosterOverlay {
 
   private isFilter(value: string | undefined): value is RosterFilter {
     return value !== undefined && FILTERS.includes(value as RosterFilter);
+  }
+
+  private getSignature(): string {
+    const squad = this.getSquad();
+    return JSON.stringify({
+      filter: this.filter,
+      heroes: this.heroes.map((hero) => [
+        hero.id,
+        Math.round(hero.needs.health),
+        Math.round(hero.needs.fatigue),
+        hero.training.active?.type,
+        hero.training.queue.length,
+        hero.injuries.map((injury) => [injury.id, injury.treated]),
+      ]),
+      squad: squad.members,
+    });
   }
 }

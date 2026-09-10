@@ -2,6 +2,7 @@ import type { CombatResult } from "../combat/Combat";
 
 export interface ExpeditionResources {
   food: number;
+  medicine: number;
   riftShards: number;
   scrap: number;
 }
