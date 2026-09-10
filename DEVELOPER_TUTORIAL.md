@@ -2,6 +2,19 @@
 
 > A complete guide to understanding, maintaining, and modifying the ASCENT codebase.
 
+Current implementation boundary (verified September 10, 2026):
+
+```text
+Gameplay phases implemented: 0–17
+Current player destinations: Heroes, Party, Refuge, Rift
+Developer-only combat sandbox: F3 → Arena
+Next gameplay phase: Phase 18 — Recruitment System
+Procedural Character Forge: approved for Phase 18, not yet player-facing
+```
+
+This tutorial documents implemented code only. The roadmap and concept contain later ideas, but a
+future feature must not appear in the HUD or use mocked state before its implementation phase.
+
 ---
 
 ## Table of Contents
@@ -39,7 +52,43 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 4. You deploy squads on expeditions (Rift tab)
 5. Combat runs automatically with Utility AI
 6. Heroes can get injured or permanently die
-7. Fallen heroes get memorial graves in the refuge
+7. Survivors remember rescues, trauma, and fallen allies
+8. Experience can award traits and gently change personality
+9. Fallen heroes get memorial graves in the refuge
+
+Before and after a meaningful change, run:
+
+```bash
+npm run check
+npm run build
+npm run playtest:ui
+git diff --check
+```
+
+The browser playtest exercises the current UI, procedural portraits, camera gating, squad swaps,
+victory and withdrawal routes, recovery, permanent death, memories, and trait evolution. A successful
+static build alone does not prove those runtime paths.
+
+### 1.1 Implemented Phase Map
+
+| Phase | Implemented result | Main ownership |
+|------:|--------------------|----------------|
+| 0–1 | Vite/TypeScript foundation, fixed-step loop, 3D Refuge, camera and selection | `core/`, `rendering/`, `base/` |
+| 2–3 | Procedural hero models, identity, origins, stats, starting personality and traits | `HeroGenerator`, `HeroMeshGenerator` |
+| 4–7 | Routines, needs, relationships, training, injuries from training | hero systems |
+| 8 | Three-member squad data and evaluation | `SquadSystem` |
+| 9–11 | Developer Arena, Utility AI, roles and Front/Middle/Back formations | `combat/` |
+| 12 | Skill generation, discovery, loadout, XP and progression | `skills/` |
+| 13 | First Rift expedition with briefing, combat, rewards and debrief | `expeditions/` |
+| U1 | Unified dark-fantasy HUD, procedural portraits, responsive panels and F3 drawer | `ui/`, `styles.css` |
+| 14 | Expedition injury, treatment, recovery and readiness blocking | `InjurySystem` |
+| 15 | Permanent death, survivor grief, memorial ledger and Refuge graves | `LegacySystem` |
+| 16 | Typed memories, reinforcement/decay, relationships and Utility AI influence | `memories/` |
+| 17 | Earned traits, provenance, notifications and bounded personality drift | `TraitEvolutionSystem` |
+
+Phase 18 is the next boundary. It will introduce real recruitment and the first player-facing use of
+the approved Procedural Character Forge. Until that phase is implemented, the existing prototype is
+a reference—not a live destination, summon flow, or source of mocked recruits.
 
 ---
 
@@ -73,7 +122,7 @@ Game.frame()        <-- takes snapshots, renders 3D, updates UI panels
 |--------|--------|
 | No React/Vue/Svelte | UI is panels over a 3D canvas. Vanilla DOM is simpler and has zero bundle overhead. |
 | No external 3D assets | Everything is procedural geometry. No loading screens, no asset pipeline, no licensing. |
-| Seeded PRNG (`Random.ts`) | All hero generation is deterministic. Same seed = same heroes. Useful for debugging and future save system. |
+| Seedable PRNG (`Random.ts`) | Gameplay generation can be reproduced when a seeded `Random` is injected. Runtime UUID creation and the default entropy source are separate, so do not claim a whole session is deterministic without testing it. |
 | Fixed timestep (`GameClock`) | Simulation runs at exactly 20Hz regardless of display refresh rate. A 144Hz monitor and a 30Hz laptop run the same simulation. |
 | TypeScript strict mode | Catches bugs at compile time. The `readonly` modifier on interfaces prevents accidental mutation. |
 
@@ -108,8 +157,12 @@ The `Game` class is the central coordinator. It owns:
 **Panel management:** Only one panel can be open at a time (Heroes, Party, Refuge, Rift, or hero detail). When a panel is open, camera controls and click selection are disabled via `Renderer.setUiInteractionActive()`.
 
 **Key entry points for modification:**
-- To add a new panel: create a new class in `src/ui/`, add it to `Game` constructor, add navigation button in `HudShell`
+- To add an approved panel: create a class in `src/ui/`, add it to `Game`, and add navigation only when the corresponding gameplay phase exists
 - To add a new game mode: add state to `Simulation`, add rendering logic to `Renderer`, add UI panel
+
+The player HUD is intentionally limited to the `HudSection` union: `Heroes | Party | Refuge | Rift`.
+The Arena belongs in the F3 developer drawer. Do not add Recruitment/Forge, Facilities, Inventory,
+Summon, or Spire navigation while those systems remain future scope.
 
 ### 3.2 Game Clock (`src/core/GameClock.ts`)
 
@@ -194,7 +247,7 @@ interface Hero {
   id: string;                    // unique UUID
   name: string;                  // "Aldric Vane"
   age: number;                   // 18-58
-  gender: HeroGender;            // "male" | "female"
+  appearance: HeroAppearance;    // gender, skin, hair, body proportions, clothing
 
   // Origin
   origin: HeroOrigin;            // occupation, category, rarity, aptitudes
@@ -208,6 +261,7 @@ interface Hero {
   personality: Personality;      // aggression, ambition, bravery, discipline, empathy, loyalty (0.12-0.9)
   hiddenPotential: HiddenPotential; // per-attribute growth ceiling (0.25-0.98)
   traits: string[];              // 1-3 traits: "Hard Worker", "Cowardly", "Protective", etc.
+  traitHistory: HeroTraitRecord[]; // source, acquired day, and reason for every trait
 
   // Needs (0-100, decay over time)
   needs: HeroNeeds;              // fatigue, health, hunger, morale, social, stress
@@ -218,6 +272,9 @@ interface Hero {
   // Injuries
   injuries: HeroInjury[];        // active injuries with recovery timers
 
+  // General memories
+  memories: HeroMemory[];        // typed, weighted memories that may affect behavior
+
   // Relationships
   relationships: Record<string, RelationshipProfile>; // per-other-hero metrics
 
@@ -226,9 +283,6 @@ interface Hero {
 
   // Movement
   movement: HeroMovement;        // position, activity, destination
-
-  // Visual
-  appearance: HeroAppearance;    // skin, hair, body proportions, clothing
 
   // State
   heroClass: HeroClass;          // always "Unclassified" (future)
@@ -239,6 +293,11 @@ interface Hero {
 }
 ```
 
+`traits` is the compatibility list used by gameplay checks. `traitHistory` is the provenance layer
+used to explain whether a trait was generated or earned. Likewise, `lossMemories` is the older Phase
+15 bereavement record, while `memories` is the general Phase 16 behavior-memory system. Do not merge
+or silently remove either compatibility field.
+
 ### 4.2 Hero Generation (`src/heroes/HeroGenerator.ts`)
 
 When `HeroManager.generateInitialRoster(5)` is called, the generator creates 5 heroes:
@@ -248,7 +307,7 @@ When `HeroManager.generateInitialRoster(5)` is called, the generator creates 5 h
 3. **Generate skills** — random 0-3 per legacy skill, then apply occupation modifiers
 4. **Generate personality** — 6 floats between 0.12 and 0.9
 5. **Generate hidden potential** — 6 floats between 0.25 and 0.98
-6. **Score and pick traits** — 8 candidates scored by personality/attributes, top 1-3 selected
+6. **Score and pick starting traits** — 8 candidates scored by personality/attributes, top 1-3 selected; matching `Generated` provenance records are created
 7. **Generate appearance** — gender, hair style/color/length, skin tone, body proportions (influenced by STR/AGI)
 8. **Create skill forge** — `HeroSkillGenerator` creates affinities, discovers initial skills, prepares loadout
 
@@ -366,6 +425,55 @@ When a hero dies:
    - Companion: -8 morale
 3. A `HeroLossMemory` is added to each affected hero
 4. A 3D grave marker is rendered in the refuge
+
+The expedition consequence flow records career totals first, memorializes fallen heroes, applies
+survivor reactions, removes the fallen from the active roster, applies survivor injuries, and only
+then evaluates earned traits. This order prevents a dead hero from receiving a survivor trait.
+
+### 4.10 Memory System (`src/memories/MemorySystem.ts`)
+
+Phase 16 adds typed memories:
+
+| Type | Created by | Persistence / effect |
+|------|------------|----------------------|
+| `ALLY_DIED` | A squadmate dies on expedition | Lasting; increases later fear and retreat pressure |
+| `CRITICAL_INJURY` | A serious injury or extreme damage | Lasting; increases caution and retreat pressure |
+| `SAVED_ALLY` | Hero protects or heals another hero | Fades; reinforces protection toward that hero |
+| `WAS_SAVED` | Hero receives protection or healing | Fades; improves trust and reduces fear toward the saver |
+| `WON_BOSS` | Reserved typed vocabulary | No producer until a real boss phase exists |
+
+The pair `type + targetHeroId` identifies a repeatable memory. The same event on the same game day
+does not reapply relationship or morale effects. A repeat on a later day reinforces the existing
+record by increasing its weight and updating `lastReinforcedDay`.
+
+Minor memories decay by 6 weight per in-game day and disappear below weight 5. Lasting memories do
+not decay. Each hero retains at most 24 general memories. `getMemoryCombatInfluence()` converts the
+current collection into bounded `fear`, `retreat`, and `protect` values in the `0..1` range before
+Utility AI reads it.
+
+Event ownership matters: combat reports typed rescue events to `HeroManager`, expedition resolution
+reports deaths and critical injuries, and `MemorySystem` alone creates, reinforces, and decays the
+general memory records. UI code must never push directly into `hero.memories`.
+
+### 4.11 Trait Evolution (`src/heroes/TraitEvolutionSystem.ts`)
+
+Phase 17 turns authoritative career and memory facts into visible earned traits:
+
+| Trait | Implemented condition | One-time personality drift |
+|-------|-----------------------|----------------------------|
+| Battle-Hardened | At least 5 expeditions, plus 5 kills or a critical-injury memory | bravery +0.04, discipline +0.02 |
+| Veteran | At least 10 survived expeditions | bravery +0.03, discipline +0.03 |
+| Survivor's Guilt | Has an `ALLY_DIED` memory | bravery -0.03, empathy +0.04, loyalty +0.02 |
+| Protective | A `SAVED_ALLY` memory was reinforced on a later day | aggression -0.02, empathy +0.03, loyalty +0.04 |
+| Ruthless | At least 10 expedition kills and empathy at or below 0.35 | aggression +0.04, empathy -0.05, loyalty -0.01 |
+
+`TraitEvolutionSystem.evaluate(hero, day)` is idempotent: it skips a name already present in
+`hero.traits`, creates one `Earned` history record, applies drift once, and returns the new records.
+Personality is clamped to `0.04..0.98`. Evaluation is event-driven after expedition consequences or
+a combat-memory update; it is not polled every render frame.
+
+An initially generated Protective hero keeps a `Generated` source and is not awarded the same trait
+again. This is intentional compatibility behavior, not a missing evolution.
 
 ---
 
@@ -508,13 +616,13 @@ valid = enemy exists AND within 1.35x range
 
 **Retreat** (escape):
 ```
-score = 2 + missingHealth*72 + (1-bravery)*34 + threat*16 + (cowardly ? 16 : 0) - loyalty*8
-valid = health <= threshold (68% normal, 82% cowardly) OR (threat >= 92% AND health < 90%)
+score includes missing health, low bravery, threat, Cowardly, low loyalty, and remembered fear
+valid threshold is raised by Cowardly and bounded fear influence
 ```
 
 **Protect** (ally defense):
 ```
-score = 4 + allyRisk*44 + bond*24 + empathy*18 + loyalty*16 + (protective ? 22 : 0) + (defender ? 28 : 0)
+score includes ally risk, relationship bond, empathy, loyalty, Protective, defender role, and remembered bond
 valid = ally in danger AND has interpose/protective_instinct skill AND ally is not front-line (unless defender)
 ```
 
@@ -530,7 +638,9 @@ score = 30 + rangeError*6 + discipline*14 + speed*5
 valid = rangeError > 0.65
 ```
 
-**Decision:** Highest valid score wins. Default fallback is Defend.
+**Decision:** Highest valid score wins. Default fallback is Defend. Memory influence is computed by
+`getMemoryCombatInfluence()` and remains bounded before it reaches these scores. Arena diagnostics
+can show explanations such as `past trauma` or `remembered bond` when memory is the dominant factor.
 
 ### 6.3 Formation System (`src/combat/FormationSystem.ts`)
 
@@ -555,6 +665,10 @@ Maps squad formation positions to combat:
 ### 7.1 Squad System (`src/squads/SquadSystem.ts`)
 
 Fixed 3-member squad ("Squad Alpha"). Members are assigned to Front/Middle/Back positions with roles (Vanguard/Damage/Support).
+
+`moveHeroToFormation(heroId, formation)` performs an atomic move. If the destination is occupied,
+the two heroes exchange formation positions while retaining their roles. Both pointer drag-and-drop
+and accessible move controls use this same operation. Do not reproduce swap logic in the UI.
 
 **Squad evaluation:**
 ```
@@ -736,12 +850,17 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 ### 9.4 SelectionOverlay (Hero Detail)
 
 The most complex panel. 4 tabs:
-- **Overview:** Identity, status, needs meters, traits, attributes, personality
+- **Overview:** Identity, status, needs meters, starting/earned trait provenance, attributes, personality
 - **Skills:** Skill forge list with loadout toggles
 - **Training:** Injury cards with treat buttons, training queue
-- **Relations:** All relationships sorted by affinity
+- **Relations:** All relationships sorted by affinity plus typed general memories
 
 Also shows memorial records for fallen heroes.
+
+`NotificationCenter` snapshots existing state at startup so it does not announce old data. It then
+detects social events, training results, injury/recovery changes, skill discoveries and levels,
+expedition state, memorials, and newly earned traits. Earned-trait notices include the reason and
+remain ordinary compact notifications; skill discoveries keep the ceremonial notice.
 
 ---
 
@@ -908,31 +1027,58 @@ this.myPanel.mount(container);
 
 ### 10.6 Add a New Hero Trait
 
+There are now two distinct trait paths.
+
+#### Add a generated starting trait
+
 **File:** `src/heroes/HeroGenerator.ts`
 
-**Step 1:** Add the trait name to the `traitCandidates` array in `generateTraits()`:
+Add a scored entry inside `generateTraits()` using the existing `{ label, score }` shape:
 
 ```typescript
-{ name: "Stoic", score: willpower * 0.6 + (1 - empathy) * 0.4 },
+{ label: "Stoic", score: (personality.discipline + personality.bravery) / 2 },
 ```
 
-The trait is scored against the hero's personality/attributes. Top 1-3 traits are selected.
+The top one to three results become starting traits. `HeroGenerator` automatically creates a
+matching `Generated` record in `traitHistory`; do not manually add a second history entry.
 
-**Step 2:** If the trait has gameplay effects, add checks where other traits are checked:
+#### Add an earned trait
 
-- Combat effects: `src/combat/UtilityAI.ts` (search for `actor.traits.includes`)
-- Movement/behavior: `src/heroes/NeedsSystem.ts` or `src/heroes/HeroRoutineSystem.ts`
-- Training effects: `src/heroes/TrainingSystem.ts`
+**File:** `src/heroes/TraitEvolutionSystem.ts`
 
-**Current traits and their effects:**
-- Hard Worker: bonus to training rate (via discipline score)
-- Cowardly: higher retreat threshold in combat
-- Protective: enables Interpose and Protective Instinct skills, bonus to Protect action
-- Reckless: bonus to Attack action score
-- Patient: reduces training injury chance
-- Loyal: reduces retreat score, increases Protect score
-- Ambitious: (currently flavor only)
-- Natural Leader: (currently flavor only)
+Add one rule to `TRAIT_RULES`:
+
+```typescript
+{
+  applies: (hero) => hero.career.victories >= 8,
+  drift: { bravery: 0.02, discipline: 0.02 },
+  id: "steadfast",
+  name: "Steadfast",
+  reason: (hero) => `Earned after ${hero.career.victories} expedition victories.`,
+},
+```
+
+Use a stable lowercase ID, typed authoritative state in `applies`, a small drift, and a reason meant
+only for presentation. Never parse the reason back into gameplay state. The system handles duplicate
+suppression, provenance creation, and personality clamping.
+
+If a new event can satisfy the rule, call trait evaluation from the authoritative event boundary in
+`HeroManager`; do not call it from a UI component. If existing expedition or memory evaluation already
+covers the condition, no new hook is needed.
+
+If the trait has gameplay effects, add explicit name checks where required:
+
+- Combat scoring: `src/combat/UtilityAI.ts`
+- Skill prerequisites: `src/skills/SkillDefinitionRegistry.ts`
+- Training: `src/heroes/TrainingSystem.ts`
+- Needs or routine behavior: the relevant hero system
+
+Finally extend the Phase 17 block in `scripts/ui-playtest.mjs`. Prove the threshold, `Earned`
+metadata, one-time drift, duplicate suppression, and any player-facing presentation.
+
+Current trait-aware behavior includes Cowardly retreat pressure, Protective skill/protect behavior,
+and Reckless attack pressure. Several other generated or earned traits are currently character
+history only; do not describe an effect that the code does not implement.
 
 ### 10.7 Change Balance Numbers
 
@@ -1025,6 +1171,27 @@ this.scene.add(well);
 - Facility zones: search for `facilityZone` 
 - Hero spawn points: edit `NavigationPoints.ts`
 
+### 10.10 Validate a Change
+
+Run the complete local gate from the repository root:
+
+```bash
+npm run check
+npm run build
+npm run playtest:ui
+git diff --check
+```
+
+- `check` proves TypeScript type correctness.
+- `build` proves the production bundle can be generated.
+- `playtest:ui` launches the browser harness and exercises implemented runtime routes.
+- `git diff --check` catches whitespace errors in the patch.
+
+The current production build may report a non-blocking warning for a JavaScript chunk larger than
+500 kB. Record it honestly, but do not confuse that warning with a failed build. When changing UI,
+also inspect the generated playtest screenshots at desktop, tablet, and mobile sizes rather than
+assuming a passing typecheck proves layout quality.
+
 ---
 
 ## 11. Key Constants Reference
@@ -1042,6 +1209,10 @@ this.scene.add(well);
 | Max relationship events | 12 | `src/heroes/RelationshipSystem.ts` |
 | Max relationship history | 8 entries | `src/heroes/RelationshipSystem.ts` |
 | Max loss memories | 12 | `src/heroes/LegacySystem.ts` |
+| Max general memories per hero | 24 | `src/memories/MemorySystem.ts` |
+| Minor-memory decay | 6 weight / game day | `src/memories/MemorySystem.ts` |
+| Minor-memory removal threshold | Below weight 5 | `src/memories/MemorySystem.ts` |
+| Earned personality clamp | 0.04-0.98 | `src/heroes/TraitEvolutionSystem.ts` |
 | Game minutes/real second | 12 | `src/simulation/Simulation.ts` |
 | Starting time | 07:00 (420 min) | `src/simulation/Simulation.ts` |
 | Initial hero count | 5 | `src/simulation/Simulation.ts` |
@@ -1093,6 +1264,13 @@ this.scene.add(well);
 | `src/heroes/InjurySystem.ts` | 4 injury types, treatment, recovery. |
 | `src/heroes/RelationshipSystem.ts` | 6-metric relationship simulation. |
 | `src/heroes/LegacySystem.ts` | Death memorialization, survivor reactions. |
+| `src/heroes/TraitEvolutionSystem.ts` | Earned-trait conditions and bounded personality drift. |
+
+### Memories
+| File | Purpose |
+|------|---------|
+| `src/memories/HeroMemory.ts` | Typed memory records, combat-memory events, and influence shape. |
+| `src/memories/MemorySystem.ts` | Creates, reinforces, decays, and converts memories into bounded influence. |
 
 ### Skills
 | File | Purpose |
@@ -1164,11 +1342,17 @@ this.scene.add(well);
 | `package.json` | Project manifest. |
 | `tsconfig.json` | TypeScript configuration. |
 
+### Validation
+| File | Purpose |
+|------|---------|
+| `scripts/ui-playtest.mjs` | Browser regression harness and responsive screenshots for implemented phases. |
+
 ### Docs
 | File | Purpose |
 |------|---------|
 | `ASCENT_Full_Game_Concept.md` | Complete game design document. |
 | `ASCENT_Development_Phases.md` | 45-phase implementation roadmap. |
+| `ASCENT_Maintainer_Tutorial.md` | Deeper maintenance guide and phase-specific references. |
 | `DEVELOPER_TUTORIAL.md` | This file. |
 | `refference.txt` | Standalone character generator prototype. |
 
@@ -1186,7 +1370,10 @@ A: Zero asset pipeline overhead. No loading screens. No licensing. Every hero lo
 A: The UI is panels over a 3D canvas. Framework overhead (React reconciliation, virtual DOM) would add complexity for no benefit. Vanilla DOM is fast enough for this use case and has zero bundle cost.
 
 **Q: Why fixed timestep?**
-A: Determinism. If the simulation ran at variable speed, hero generation, combat outcomes, and relationship calculations would vary between machines. Fixed timestep ensures the same seed produces the same game on any hardware.
+A: Consistent simulation cadence. If game rules ran directly from variable render time, movement,
+needs, memory decay, and relationship calculations could advance differently between machines. A
+fixed step reduces that drift. It does not by itself make a full session deterministic because the
+default generator uses entropy and object IDs use UUIDs.
 
 **Q: How do I add sound/audio?**
 A: Not yet implemented (planned for Phase 39). When you do, the `EventBus` is the right place to emit audio triggers. Create an `AudioManager` class that subscribes to game events and plays sounds.

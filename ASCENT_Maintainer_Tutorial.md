@@ -1,6 +1,6 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 16. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 17. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
@@ -9,9 +9,9 @@ Last verified against the repository: September 10, 2026.
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–16
+Implemented gameplay phases: 0–17
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 17 — Trait Evolution
+Next gameplay phase: 18 — Recruitment System
 Procedural Character Forge activation: planned for Phase 18
 ```
 
@@ -1076,6 +1076,7 @@ whether a panel has intentionally gated input before editing camera math.
 | 14 | Injury, treatment, and recovery | `InjurySystem` |
 | 15 | Permanent death, memorials, survivor loss | `LegacySystem`, consequence flow |
 | 16 | Typed memories, decay, relationship and Utility AI influence | `memories/`, `UtilityAI` |
+| 17 | Earned traits, provenance, and bounded personality drift | `TraitEvolutionSystem`, hero Overview |
 
 Anything beyond this table is future scope unless code and validation are added under an approved
 phase.
@@ -1222,17 +1223,95 @@ diagnostics.
 
 Do not pull in:
 
-- Trait evolution remains Phase 17
+- Trait evolution belongs to Phase 17 and is documented in the next section
 - Recruitment or the Procedural Character Forge from Phase 18
 - Disk persistence from Phase 37
 - Boss encounters from Phase 30
 
-Phase 16 is complete without implementing those later systems. The next implementation boundary is
-Phase 17 — Trait Evolution.
+Phase 16 remained complete without absorbing those systems. Phase 17 is now implemented as a
+separate layer; recruitment and the Procedural Character Forge remain the next boundary in Phase 18.
 
 ---
 
-## 27. Debugging Method
+## 27. Phase 17 Reference: Trait Evolution
+
+Phase 17 makes lasting experience visible on the hero record. It does not replace starting traits.
+
+### Data model
+
+`Hero.traits: string[]` remains the compatibility surface used by Utility AI and skill rules.
+`Hero.traitHistory: HeroTraitRecord[]` adds the information needed for presentation and auditing:
+
+```ts
+interface HeroTraitRecord {
+  id: string;
+  name: string;
+  source: "Generated" | "Earned";
+  acquiredDay: number;
+  reason: string;
+}
+```
+
+When adding a trait-aware system, use `traits` for a simple rule check and `traitHistory` when you
+need to explain when or why the hero changed. Never parse the English `reason` string for gameplay.
+
+### Rule ownership
+
+All earned conditions live in `src/heroes/TraitEvolutionSystem.ts`. Each rule contains a stable ID,
+display name, condition, reason builder, and small personality-drift map. `evaluate(hero, day)`:
+
+1. Skips a trait whose name already exists.
+2. Checks the condition against authoritative hero career and memory data.
+3. Adds both the compatible name and provenance record.
+4. Applies the rule's personality drift once.
+5. Returns the new records for callers or tests.
+
+This idempotency is important. Simulation and UI refreshes may happen many times, but they must not
+reapply personality changes.
+
+### Implemented conditions
+
+| Trait | Condition | Drift direction |
+| --- | --- | --- |
+| Battle-Hardened | 5 expeditions and either 5 kills or a critical-injury memory | bravery and discipline up |
+| Veteran | 10 survived expeditions | bravery and discipline up |
+| Survivor's Guilt | an `ALLY_DIED` memory | empathy and loyalty up, bravery down |
+| Protective | a `SAVED_ALLY` memory reinforced on a later day | empathy and loyalty up, aggression down |
+| Ruthless | 10 kills and empathy at or below 0.35 | aggression up, empathy and loyalty down |
+
+Personality values are clamped to `0.04..0.98`. These are small changes, not a replacement for the
+hero's generated identity.
+
+### Event connections
+
+`HeroManager.applyExpeditionConsequences` evaluates surviving heroes only after career totals,
+deaths, grief memories, and injuries are resolved. A fallen hero is removed first and cannot earn a
+posthumous survivor trait.
+
+`HeroManager.recordCombatMemory` evaluates the actor and target after the rescue memory is recorded.
+This is what lets a later-day repeated rescue earn Protective without polling every simulation frame.
+
+### UI and notifications
+
+The Overview tab renders each trait as a compact record. Starting traits say `Starting trait`;
+earned traits show `Earned · Day N` plus their source reason. `NotificationCenter` snapshots existing
+trait names during initialization and only announces later earned traits, preventing startup spam.
+
+### Safe recipe: add an earned trait
+
+1. Add one rule to `TRAIT_RULES` with a unique ID and display name.
+2. Base its condition on authoritative typed data, not UI text or rendered objects.
+3. Keep drift small and use only existing `Personality` keys.
+4. Confirm the trait name does not accidentally collide with a generated trait unless that is intended.
+5. Add a focused browser regression proving the threshold, provenance, drift, and duplicate suppression.
+6. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
+
+Do not add recruitment, Forge UI, classes, equipment, facilities, or save migration as part of a
+trait change. Those retain their own phase boundaries.
+
+---
+
+## 28. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1311,7 +1390,7 @@ git diff --check
 
 ---
 
-## 28. Safe Git Workflow
+## 29. Safe Git Workflow
 
 Before editing:
 
@@ -1339,7 +1418,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 29. Definition of Done for a Change
+## 30. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1363,7 +1442,7 @@ Use this checklist:
 
 ---
 
-## 30. Final Rule of Thumb
+## 31. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 

@@ -114,11 +114,11 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–16 and the first persistent
+The implemented build currently covers Phases 0–17 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
-records, Refuge memorials, rescue memories, lasting trauma, memory decay, and memory-shaped combat
-decisions are active. Recruitment, trait evolution, facilities, equipment,
+records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
+decisions, earned traits, and bounded personality drift are active. Recruitment, facilities, equipment,
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
@@ -782,6 +782,24 @@ Earned traits:
 - Unbreakable
 - Ruthless
 - Squad Leader
+
+## 15.1 Current Implemented Trait Evolution
+
+Phase 17 activates five experience-driven traits without adding a separate trait screen:
+
+```text
+Battle-Hardened → 5 expeditions plus sustained combat pressure
+Veteran → 10 survived expeditions
+Survivor's Guilt → survive an ally's expedition death
+Protective → repeatedly protect or treat the same ally
+Ruthless → 10 expedition kills while empathy is low
+```
+
+Each hero keeps both a compatibility list of trait names and a provenance record containing whether
+the trait was generated or earned, its acquisition day, and its reason. Earned traits apply one
+small personality drift when awarded, clamped inside the valid personality range. They can influence
+existing systems that already read trait names, but do not invent classes, equipment, leadership,
+recruitment, or other future mechanics.
 
 ---
 

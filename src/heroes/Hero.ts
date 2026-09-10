@@ -56,6 +56,16 @@ export interface Personality {
   loyalty: number;
 }
 
+export type HeroTraitSource = "Earned" | "Generated";
+
+export interface HeroTraitRecord {
+  acquiredDay: number;
+  id: string;
+  name: string;
+  reason: string;
+  source: HeroTraitSource;
+}
+
 export type OriginCategory =
   | "Arcane"
   | "Civilian"
@@ -229,6 +239,7 @@ export interface Hero {
   skillForge: HeroSkillForge;
   skills: HeroSkills;
   socialRole: SocialRole;
+  traitHistory: HeroTraitRecord[];
   traits: string[];
   training: HeroTraining;
 }

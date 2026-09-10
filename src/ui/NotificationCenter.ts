@@ -25,6 +25,7 @@ export class NotificationCenter {
   private readonly injurySignatures = new Map<string, string>();
   private readonly knownMemorialIds = new Set<string>();
   private readonly recoveryOutcomes = new Map<string, string | null>();
+  private readonly traitNames = new Map<string, Set<string>>();
 
   constructor(
     container: HTMLElement,
@@ -87,6 +88,7 @@ export class NotificationCenter {
       this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
       this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
       this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
+      this.traitNames.set(hero.id, new Set(hero.traits));
       Object.values(hero.skillForge.known).forEach((skill) => {
         this.skillLevels.set(`${hero.id}:${skill.definitionId}`, skill.level);
       });
@@ -136,6 +138,13 @@ export class NotificationCenter {
         this.push(`${hero.name} · ${hero.recovery.lastOutcome}`, "neutral");
       }
       this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
+      const previousTraits = this.traitNames.get(hero.id) ?? new Set<string>();
+      hero.traitHistory
+        .filter((trait) => trait.source === "Earned" && !previousTraits.has(trait.name))
+        .forEach((trait) => {
+          this.push(`${hero.name} earned ${trait.name} · ${trait.reason}`, "success", 30_000);
+        });
+      this.traitNames.set(hero.id, new Set(hero.traits));
       Object.values(hero.skillForge.known).forEach((skill) => {
         const key = `${hero.id}:${skill.definitionId}`;
         const previousLevel = this.skillLevels.get(key);

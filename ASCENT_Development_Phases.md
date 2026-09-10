@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 10, 2026
 
 ```text
-Gameplay phases implemented: 0–16
-Current playable milestone: Memory-shaped heroes and persistent expedition consequences
+Gameplay phases implemented: 0–17
+Current playable milestone: Experience-shaped heroes with earned traits and personality drift
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 17 — Trait Evolution
+Next gameplay phase: Phase 18 — Recruitment System
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,7 +47,7 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 16 is complete. Phase 17 and later remain design context and require a new implementation
+Phase 17 is complete. Phase 18 and later remain design context and require a new implementation
 approval boundary.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
@@ -1357,7 +1357,7 @@ major memories, Phase 15 ally-loss compatibility, and hero-detail presentation.
 
 ---
 
-# Phase 17 — Trait Evolution
+# Phase 17 — Trait Evolution — Complete
 
 ## Goal
 
@@ -1367,7 +1367,7 @@ Turn experiences into visible character development.
 
 ### 17.1 Earned Traits
 
-Examples:
+Implemented earned traits:
 
 ```text
 Battle-Hardened
@@ -1379,16 +1379,25 @@ Ruthless
 
 ### 17.2 Trait Conditions
 
-Example:
+Current conditions:
 
 ```text
-Survive 10 battles
-→ Veteran
+5 expeditions plus 5 kills or a critical-injury memory → Battle-Hardened
+10 survived expeditions → Veteran
+Survive an ally's expedition death → Survivor's Guilt
+Protect or treat the same ally on different days → Protective
+10 expedition kills with empathy at or below 0.35 → Ruthless
 ```
+
+Rules are centralized in `TraitEvolutionSystem`. Trait names remain in the compatible `traits`
+array, while `traitHistory` stores source, acquisition day, and the human-readable reason. Repeated
+evaluation is idempotent and cannot award the same trait twice.
 
 ### 17.3 Personality Drift
 
-Major events can slightly change personality.
+Each earned trait applies a small, rule-specific personality change once. Values are clamped to
+`0.04..0.98`, so repeated events cannot push personality outside its valid domain. Starting traits
+do not apply drift retroactively.
 
 ### 17.4 Trait UI
 
@@ -1399,9 +1408,17 @@ Battle-Hardened
 Earned after surviving 12 expeditions.
 ```
 
+The shared hero Overview renders starting and earned traits differently and shows the acquisition
+day and source reason. Newly earned traits also generate a compact notification. No new player
+destination was added.
+
 ## Exit Criteria
 
 Heroes visibly change because of what they experience.
+
+Automated browser validation confirms all five earned conditions, bounded and one-time personality
+drift, duplicate suppression, trait provenance rendering, notifications, and the complete earlier
+recovery, memory, legacy, expedition, party, roster, and camera regression paths.
 
 ---
 

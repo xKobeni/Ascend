@@ -17,6 +17,7 @@ import { InjurySystem, type TreatmentResult } from "./InjurySystem";
 import { LegacySystem } from "./LegacySystem";
 import type { CombatMemoryEvent } from "../memories/HeroMemory";
 import { MemorySystem } from "../memories/MemorySystem";
+import { TraitEvolutionSystem } from "./TraitEvolutionSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -35,6 +36,7 @@ export class HeroManager {
     this.skillLoadout,
     this.injurySystem,
   );
+  private readonly traitEvolutionSystem = new TraitEvolutionSystem();
   private readonly usedNames = new Set<string>();
 
   constructor(private readonly generator = new HeroGenerator()) {}
@@ -97,6 +99,14 @@ export class HeroManager {
 
   recordCombatMemory(event: Readonly<CombatMemoryEvent>, day: number, minuteOfDay = 0): void {
     this.memorySystem.recordCombatEvent(this.getAll(), event, day, minuteOfDay);
+    const actor = this.heroes.get(event.actorId);
+    const target = this.heroes.get(event.targetId);
+    if (actor) {
+      this.traitEvolutionSystem.evaluate(actor, day);
+    }
+    if (target) {
+      this.traitEvolutionSystem.evaluate(target, day);
+    }
   }
 
   recordExpeditionExperience(squad: Readonly<Squad>, successful: boolean): void {
@@ -172,7 +182,7 @@ export class HeroManager {
     });
     fallenIds.forEach((heroId) => this.heroes.delete(heroId));
 
-    return squad.members.flatMap<ExpeditionConsequence>((member) => {
+    const consequences = squad.members.flatMap<ExpeditionConsequence>((member) => {
       const fallen = fallenRecords.find((record) => record.heroId === member.heroId);
       if (fallen) {
         const affected = reactions.filter((reaction) => reaction.fallenHeroId === fallen.heroId).length;
@@ -215,6 +225,8 @@ export class HeroManager {
         permanent: false,
       }];
     });
+    this.getAll().forEach((hero) => this.traitEvolutionSystem.evaluate(hero, day));
+    return consequences;
   }
 
   treatInjury(heroId: string, injuryId: string, availableMedicine: number): TreatmentResult {

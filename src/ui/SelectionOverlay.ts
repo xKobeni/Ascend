@@ -414,9 +414,20 @@ export class SelectionOverlay {
     const traits = this.requireHeroElement("traits");
     traits.replaceChildren(
       ...hero.traits.map((trait) => {
-        const chip = document.createElement("span");
-        chip.textContent = trait;
-        return chip;
+        const record = hero.traitHistory.find((entry) => entry.name === trait);
+        const item = document.createElement("article");
+        item.className = "hero-trait";
+        item.dataset.source = record?.source ?? "Generated";
+        const name = document.createElement("strong");
+        name.textContent = trait;
+        const source = document.createElement("span");
+        source.textContent = record?.source === "Earned"
+          ? `Earned · Day ${record.acquiredDay}`
+          : "Starting trait";
+        const reason = document.createElement("small");
+        reason.textContent = record?.reason ?? "Part of this hero's starting temperament.";
+        item.append(name, source, reason);
+        return item;
       }),
     );
 

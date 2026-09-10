@@ -84,6 +84,13 @@ export class HeroGenerator {
       skillForge,
       skills,
       socialRole: "Resident",
+      traitHistory: traits.map((trait) => ({
+        acquiredDay: 1,
+        id: trait.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        name: trait,
+        reason: "Part of this hero's starting temperament.",
+        source: "Generated",
+      })),
       traits,
       training: {
         active: null,

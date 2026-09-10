@@ -233,6 +233,90 @@ try {
       memoryValidation.rescueRecorded && memoryValidation.utilityChanged,
     `Phase 16 memory validation failed (${JSON.stringify(memoryValidation)}).`,
   );
+  const traitValidation = await evaluate(`(async () => {
+    const [{ HeroManager }, { MemorySystem }, { TraitEvolutionSystem }, { SelectionOverlay }, { NotificationCenter }] = await Promise.all([
+      import('/src/heroes/HeroManager.ts'),
+      import('/src/memories/MemorySystem.ts'),
+      import('/src/heroes/TraitEvolutionSystem.ts'),
+      import('/src/ui/SelectionOverlay.ts'),
+      import('/src/ui/NotificationCenter.ts'),
+    ]);
+    const earnedNames = new Set(['Battle-Hardened', 'Veteran', "Survivor's Guilt", 'Protective', 'Ruthless']);
+    const clearEarned = (hero) => {
+      hero.traits = hero.traits.filter((name) => !earnedNames.has(name));
+      hero.traitHistory = hero.traitHistory.filter((trait) => !earnedNames.has(trait.name));
+    };
+    const manager = new HeroManager();
+    const heroes = manager.generateInitialRoster(3);
+    const veteran = heroes[0];
+    clearEarned(veteran);
+    veteran.career.expeditions = 10;
+    veteran.career.kills = 6;
+    veteran.personality.bravery = 0.5;
+    veteran.personality.discipline = 0.5;
+    const memories = new MemorySystem();
+    memories.recordCriticalInjury(veteran, 'Concussion', 8);
+    const evolution = new TraitEvolutionSystem();
+    const before = { ...veteran.personality };
+    const awards = evolution.evaluate(veteran, 12);
+    const afterFirst = JSON.stringify(veteran.personality);
+    const duplicateAwards = evolution.evaluate(veteran, 13);
+
+    const survivor = heroes[1];
+    clearEarned(survivor);
+    memories.recordAllyDeath(survivor, veteran, 'Trusted Friend', 12);
+    evolution.evaluate(survivor, 12);
+
+    const protector = heroes[2];
+    clearEarned(protector);
+    manager.recordCombatMemory({ actorId: protector.id, targetId: survivor.id, type: 'PROTECTED_ALLY' }, 14);
+    manager.recordCombatMemory({ actorId: protector.id, targetId: survivor.id, type: 'PROTECTED_ALLY' }, 15);
+
+    const ruthlessManager = new HeroManager();
+    const ruthless = ruthlessManager.generateInitialRoster(1)[0];
+    clearEarned(ruthless);
+    ruthless.career.kills = 10;
+    ruthless.personality.empathy = 0.3;
+    const notification = new NotificationCenter(document.querySelector('#app'), () => undefined);
+    const expedition = {
+      attempt: 0, deployedSquadName: null,
+      mission: { description: '', difficulty: 'Moderate', id: 'trait-test', name: 'Trait Test', objective: 'Test', rewards: {food:0,medicine:0,riftShards:0,scrap:0}, threats: [] },
+      phase: 'Briefing', report: null, resources: {food:0,medicine:0,riftShards:0,scrap:0},
+    };
+    notification.update([ruthless], [], expedition, []);
+    evolution.evaluate(ruthless, 16);
+    notification.update([ruthless], [], expedition, []);
+    const traitNotice = [...document.querySelectorAll('.notification-feed li')].some((entry) => entry.textContent.includes('earned Ruthless'));
+    notification.dispose();
+
+    const overlay = new SelectionOverlay(document.querySelector('#app'), () => undefined, () => undefined, () => undefined, () => 0, () => undefined);
+    overlay.showHero(veteran, heroes, 'Overview');
+    const renderedEarned = document.querySelectorAll('.hero-trait[data-source="Earned"]').length;
+    const renderedSource = [...document.querySelectorAll('.hero-trait')].some((entry) => entry.textContent.includes('Earned · Day 12') && entry.textContent.includes('surviving 10 expeditions'));
+    overlay.dispose();
+
+    return {
+      battleHardened: veteran.traits.includes('Battle-Hardened'),
+      bounded: Object.values(veteran.personality).every((value) => value >= 0.04 && value <= 0.98),
+      driftApplied: veteran.personality.bravery > before.bravery && veteran.personality.discipline > before.discipline,
+      idempotent: duplicateAwards.length === 0 && JSON.stringify(veteran.personality) === afterFirst,
+      metadata: awards.every((trait) => trait.source === 'Earned' && trait.reason.length > 20 && trait.acquiredDay === 12),
+      protective: protector.traits.includes('Protective'),
+      renderedEarned,
+      renderedSource,
+      ruthless: ruthless.traits.includes('Ruthless'),
+      survivorGuilt: survivor.traits.includes("Survivor's Guilt"),
+      traitNotice,
+      veteran: veteran.traits.includes('Veteran'),
+    };
+  })()`);
+  assert(
+    traitValidation.battleHardened && traitValidation.bounded && traitValidation.driftApplied &&
+      traitValidation.idempotent && traitValidation.metadata && traitValidation.protective &&
+      traitValidation.renderedEarned === 2 && traitValidation.renderedSource && traitValidation.ruthless &&
+      traitValidation.survivorGuilt && traitValidation.traitNotice && traitValidation.veteran,
+    `Phase 17 trait validation failed (${JSON.stringify(traitValidation)}).`,
+  );
   const legacyValidation = await evaluate(`(async () => {
     const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
       import('/src/heroes/HeroManager.ts'),
@@ -541,7 +625,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();
