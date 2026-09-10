@@ -3,7 +3,7 @@ import type { HeroAttributes } from "../heroes/Hero";
 export type SkillType = "active" | "passive" | "reaction" | "utility";
 export type SkillCategory = "weapon" | "combat" | "survival" | "support" | "mental" | "unique";
 export type SkillRarity = "common" | "uncommon" | "rare" | "elite" | "unique" | "legendary";
-export type SkillSource = "innate" | "training" | "combat" | "mentor" | "awakening";
+export type SkillSource = "innate" | "training" | "combat" | "expedition" | "mentor" | "awakening";
 export type SkillAffinity = "defense" | "magic" | "spear" | "support" | "survival" | "sword";
 
 export type SkillRequirement =
@@ -61,7 +61,7 @@ export interface SkillUsageEvent {
   difficulty: number;
   heroId: string;
   reason: string;
-  source: "combat" | "training";
+  source: "combat" | "expedition" | "training";
   successful: boolean;
 }
 

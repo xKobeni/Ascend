@@ -1,0 +1,122 @@
+import type { CombatResult, CombatSnapshot } from "../combat/Combat";
+import { CombatSimulation } from "../combat/CombatSimulation";
+import type { Hero } from "../heroes/Hero";
+import type { Squad } from "../squads/Squad";
+import type {
+  ExpeditionConsequence,
+  ExpeditionMission,
+  ExpeditionReport,
+  ExpeditionResources,
+  ExpeditionSnapshot,
+} from "./Expedition";
+
+const NO_REWARDS: Readonly<ExpeditionResources> = Object.freeze({ food: 0, riftShards: 0, scrap: 0 });
+
+const FIRST_MISSION: Readonly<ExpeditionMission> = Object.freeze({
+  description: "Clear the collapsed transit yard before the Rift pack reaches the refuge routes.",
+  difficulty: "Moderate",
+  id: "transit-yard-suppression",
+  name: "Transit Yard Suppression",
+  objective: "Eliminate Enemies",
+  rewards: Object.freeze({ food: 10, riftShards: 3, scrap: 18 }),
+  threats: Object.freeze(["3 Rift Stalkers", "Close-range pressure", "Retreat risk"]),
+});
+
+export class ExpeditionSystem {
+  private attempt = 0;
+  private deployedSquad: Readonly<Squad> | null = null;
+  private phase: ExpeditionSnapshot["phase"] = "Briefing";
+  private report: ExpeditionReport | null = null;
+  private readonly resources: ExpeditionResources = { food: 0, riftShards: 0, scrap: 0 };
+
+  constructor(
+    private readonly combat: CombatSimulation,
+    private readonly resolveConsequences: (
+      squad: Readonly<Squad>,
+      combat: Readonly<CombatSnapshot>,
+      outcome: ExpeditionReport["outcome"],
+    ) => readonly ExpeditionConsequence[],
+    private readonly recordExperience: (
+      squad: Readonly<Squad>,
+      successful: boolean,
+    ) => void,
+  ) {}
+
+  start(squad: Readonly<Squad>, heroes: readonly Readonly<Hero>[]): boolean {
+    if (this.phase !== "Briefing" || squad.members.length !== 3) {
+      return false;
+    }
+    if (!this.combat.start(squad, heroes, "Expedition engagement", 0.82)) {
+      return false;
+    }
+    this.attempt += 1;
+    this.deployedSquad = {
+      ...squad,
+      members: squad.members.map((member) => ({ ...member })),
+    };
+    this.phase = "Combat";
+    this.report = null;
+    return true;
+  }
+
+  step(deltaSeconds: number): void {
+    if (this.phase !== "Combat") {
+      return;
+    }
+    this.combat.step(deltaSeconds);
+    const combat = this.combat.getSnapshot();
+    if (combat.result !== "Running" && combat.result !== "Idle") {
+      this.resolve(combat, combat.result);
+    }
+  }
+
+  returnToRefuge(): boolean {
+    if (this.phase !== "Debrief") {
+      return false;
+    }
+    this.combat.stop();
+    this.deployedSquad = null;
+    this.phase = "Briefing";
+    return true;
+  }
+
+  getSnapshot(): Readonly<ExpeditionSnapshot> {
+    return {
+      attempt: this.attempt,
+      deployedSquadName: this.deployedSquad?.name ?? null,
+      mission: FIRST_MISSION,
+      phase: this.phase,
+      report: this.report,
+      resources: this.resources,
+    };
+  }
+
+  private resolve(
+    combat: Readonly<CombatSnapshot>,
+    outcome: Exclude<CombatResult, "Idle" | "Running">,
+  ): void {
+    if (!this.deployedSquad || this.phase !== "Combat") {
+      return;
+    }
+    const successful = outcome === "Victory";
+    const rewards = successful ? FIRST_MISSION.rewards : NO_REWARDS;
+    this.resources.food += rewards.food;
+    this.resources.riftShards += rewards.riftShards;
+    this.resources.scrap += rewards.scrap;
+    this.recordExperience(this.deployedSquad, successful);
+    const consequences = successful
+      ? []
+      : this.resolveConsequences(this.deployedSquad, combat, outcome);
+    this.report = {
+      consequences,
+      outcome,
+      rewards: { ...rewards },
+      summary: successful
+        ? "The route is secure. The squad recovered supplies and returned with field experience."
+        : outcome === "Withdrawn"
+          ? "The squad escaped the engagement, but the failed deployment took a toll."
+          : "The squad was recovered after the route was lost. No mission resources were secured.",
+    };
+    this.phase = "Debrief";
+  }
+}

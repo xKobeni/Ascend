@@ -6,7 +6,7 @@ export class SkillDiscoverySystem {
   evaluateProgression(
     hero: Hero,
     changedDefinitionId: string,
-    source: "combat" | "training",
+    source: "combat" | "expedition" | "training",
   ): readonly HeroSkill[] {
     const candidates = changedDefinitionId === "spear_mastery"
       ? ["basic_thrust", "lunge"]

@@ -5,6 +5,7 @@ import type { TrainingType } from "../heroes/Hero";
 import type { FormationPosition, SquadRole } from "../squads/Squad";
 import { SquadSystem } from "../squads/SquadSystem";
 import { CombatSimulation } from "../combat/CombatSimulation";
+import { ExpeditionSystem } from "../expeditions/ExpeditionSystem";
 
 const STARTING_MINUTE = 7 * 60;
 const GAME_MINUTES_PER_REAL_SECOND = 12;
@@ -23,6 +24,15 @@ export class Simulation {
   private readonly combatSimulation = new CombatSimulation((event) => {
     this.heroManager.recordSkillUsage(event);
   });
+  private readonly expeditionSystem = new ExpeditionSystem(
+    this.combatSimulation,
+    (squad, combat, outcome) => this.heroManager.applyExpeditionConsequences(
+      squad,
+      combat,
+      outcome,
+    ),
+    (squad, successful) => this.heroManager.recordExpeditionExperience(squad, successful),
+  );
   private readonly squadSystem = new SquadSystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
@@ -39,6 +49,14 @@ export class Simulation {
 
   step(deltaSeconds: number): void {
     this.state.tick += 1;
+    const expeditionPhase = this.getExpeditionSnapshot().phase;
+    if (expeditionPhase === "Combat") {
+      this.expeditionSystem.step(deltaSeconds);
+      return;
+    }
+    if (expeditionPhase === "Debrief") {
+      return;
+    }
     if (this.getCombatSnapshot().result !== "Idle") {
       this.combatSimulation.step(deltaSeconds);
       return;
@@ -110,6 +128,18 @@ export class Simulation {
 
   getCombatSnapshot() {
     return this.combatSimulation.getSnapshot();
+  }
+
+  getExpeditionSnapshot() {
+    return this.expeditionSystem.getSnapshot();
+  }
+
+  startExpedition(): boolean {
+    return this.expeditionSystem.start(this.getSquad(), this.getHeroes());
+  }
+
+  returnFromExpedition(): boolean {
+    return this.expeditionSystem.returnToRefuge();
   }
 
   startCombatSandbox(): boolean {

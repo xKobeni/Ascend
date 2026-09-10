@@ -10,6 +10,9 @@ import { SkillDiscoverySystem } from "../skills/SkillDiscoverySystem";
 import { SkillLoadoutSystem } from "../skills/SkillLoadoutSystem";
 import { SkillProgressionSystem } from "../skills/SkillProgressionSystem";
 import type { SkillProgressionResult, SkillUsageEvent } from "../skills/Skill";
+import type { CombatSnapshot } from "../combat/Combat";
+import type { ExpeditionConsequence, ExpeditionReport } from "../expeditions/Expedition";
+import type { Squad } from "../squads/Squad";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -76,6 +79,61 @@ export class HeroManager {
     return result;
   }
 
+  recordExpeditionExperience(squad: Readonly<Squad>, successful: boolean): void {
+    squad.members.forEach((member) => {
+      const survivalSkill = member.formation === "Back" ? "scouting" : "tracking";
+      this.recordExpeditionSkill(
+        member.heroId,
+        survivalSkill,
+        successful,
+        member.formation === "Back"
+          ? "Read the expedition route and identified threats from the rear line."
+          : "Tracked Rift movement through the expedition zone.",
+      );
+      if (member.role === "Support") {
+        this.recordExpeditionSkill(
+          member.heroId,
+          "medicine",
+          successful,
+          "Managed the squad's condition during deployment.",
+        );
+        this.recordExpeditionSkill(
+          member.heroId,
+          "field_treatment",
+          successful,
+          "Applied field treatment under expedition pressure.",
+        );
+      }
+    });
+  }
+
+  applyExpeditionConsequences(
+    squad: Readonly<Squad>,
+    combat: Readonly<CombatSnapshot>,
+    outcome: ExpeditionReport["outcome"],
+  ): readonly ExpeditionConsequence[] {
+    return squad.members.flatMap((member) => {
+      const hero = this.heroes.get(member.heroId);
+      if (!hero) {
+        return [];
+      }
+      const combatant = combat.combatants.find((entry) => entry.id === member.heroId);
+      const damageRatio = combatant
+        ? 1 - Math.max(0, combatant.hp) / combatant.stats.maxHp
+        : 1;
+      const healthLoss = (outcome === "Defeat" ? 24 : 10) + Math.round(damageRatio * 12);
+      const moraleLoss = (outcome === "Defeat" ? 14 : 7) + Math.round(damageRatio * 5);
+      hero.needs.health = Math.max(0, hero.needs.health - healthLoss);
+      hero.needs.morale = Math.max(0, hero.needs.morale - moraleLoss);
+      hero.needs.fatigue = Math.min(100, hero.needs.fatigue + 18);
+      return [{
+        detail: `Wounded · Health -${healthLoss} · Morale -${moraleLoss}`,
+        heroId: hero.id,
+        heroName: hero.name,
+      }];
+    });
+  }
+
   step(
     deltaSeconds: number,
     gameMinutes: number,
@@ -102,5 +160,30 @@ export class HeroManager {
 
   getDayPeriod(minuteOfDay: number) {
     return this.routineSystem.getDayPeriod(minuteOfDay);
+  }
+
+  private recordExpeditionSkill(
+    heroId: string,
+    definitionId: string,
+    successful: boolean,
+    reason: string,
+  ): void {
+    const hero = this.heroes.get(heroId);
+    if (!hero) {
+      return;
+    }
+    const discovered = this.skillDiscovery.tryDiscover(hero, definitionId, "expedition");
+    if (discovered) {
+      this.skillLoadout.autoPrepare(hero, definitionId);
+    }
+    this.recordSkillUsage({
+      baseXp: 18,
+      definitionId,
+      difficulty: 1.2,
+      heroId,
+      reason,
+      source: "expedition",
+      successful,
+    });
   }
 }

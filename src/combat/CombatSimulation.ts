@@ -48,12 +48,18 @@ export class CombatSimulation {
   private nextLogId = 1;
   private result: CombatResult = "Idle";
   private tick = 0;
+  private encounterLabel = "Sandbox";
 
   constructor(
     private readonly onSkillUsage: (event: Readonly<SkillUsageEvent>) => void = () => undefined,
   ) {}
 
-  start(squad: Readonly<Squad>, heroes: readonly Readonly<Hero>[]): boolean {
+  start(
+    squad: Readonly<Squad>,
+    heroes: readonly Readonly<Hero>[],
+    encounterLabel = "Sandbox",
+    enemyStrength = 1,
+  ): boolean {
     if (squad.members.length !== 3) {
       return false;
     }
@@ -66,6 +72,7 @@ export class CombatSimulation {
     }
 
     this.reset();
+    this.encounterLabel = encounterLabel;
     selectedHeroes.forEach((entry, index) => {
       if (!entry) {
         return;
@@ -110,11 +117,11 @@ export class CombatSimulation {
     const enemyNames = ["Rift Stalker", "Rift Stalker II", "Rift Stalker III"];
     enemyNames.forEach((label, index) => {
       const stats: CombatStats = {
-        attack: 28,
-        defense: 8,
-        maxHp: 74,
+        attack: 28 * enemyStrength,
+        defense: 8 * enemyStrength,
+        maxHp: 74 * enemyStrength,
         range: 1.75,
-        speed: 1.8,
+        speed: 1.8 * Math.max(0.85, enemyStrength),
       };
       this.combatants.push({
         action: "Idle",
@@ -153,7 +160,7 @@ export class CombatSimulation {
       .map((combatant) => `${combatant.formation} ${combatant.tacticalRole}`)
       .join(" · ");
     this.addLog(`Formation locked · ${formationSummary}.`, "neutral");
-    this.addLog("Sandbox engagement started · 3 heroes versus 3 Rift Stalkers.", "neutral");
+    this.addLog(`${this.encounterLabel} started · 3 heroes versus 3 Rift Stalkers.`, "neutral");
     return true;
   }
 
@@ -414,7 +421,7 @@ export class CombatSimulation {
         .forEach((combatant) => {
           combatant.action = "Idle";
         });
-      this.addLog("Sandbox victory · all hostiles defeated.", "success");
+      this.addLog(`${this.encounterLabel} victory · all hostiles defeated.`, "success");
       return;
     }
     if (!activeHeroes) {
@@ -428,7 +435,9 @@ export class CombatSimulation {
           combatant.action = "Idle";
         });
       this.addLog(
-        anyRetreated ? "The surviving heroes withdrew from the sandbox." : "Sandbox defeat · no heroes remain.",
+        anyRetreated
+          ? `The surviving heroes withdrew from the ${this.encounterLabel.toLowerCase()}.`
+          : `${this.encounterLabel} defeat · no heroes remain.`,
         "danger",
       );
     }
@@ -498,5 +507,6 @@ export class CombatSimulation {
     this.nextLogId = 1;
     this.result = "Idle";
     this.tick = 0;
+    this.encounterLabel = "Sandbox";
   }
 }

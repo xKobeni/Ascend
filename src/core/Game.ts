@@ -4,6 +4,7 @@ import { ControlsHint } from "../ui/ControlsHint";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
 import { SocialLogOverlay } from "../ui/SocialLogOverlay";
 import { SquadOverlay } from "../ui/SquadOverlay";
+import { ExpeditionOverlay } from "../ui/ExpeditionOverlay";
 import { CombatOverlay } from "../ui/CombatOverlay";
 import { EventBus } from "./EventBus";
 import { GameClock } from "./GameClock";
@@ -18,6 +19,7 @@ export class Game {
   private readonly controlsHint: ControlsHint;
   private readonly debugOverlay: DebugOverlay;
   private readonly events = new EventBus<GameEvents>();
+  private readonly expeditionOverlay: ExpeditionOverlay;
   private readonly renderer: Renderer;
   private selectedHeroId: string | null = null;
   private readonly selectionOverlay: SelectionOverlay;
@@ -55,6 +57,16 @@ export class Game {
         setRole: (heroId, role) => {
           this.simulation.setSquadRole(heroId, role);
         },
+      },
+    );
+    this.expeditionOverlay = new ExpeditionOverlay(
+      container,
+      () => this.simulation.getExpeditionSnapshot(),
+      () => this.simulation.getCombatSnapshot(),
+      () => this.simulation.getSquadEvaluation().isComplete,
+      {
+        deploy: () => this.simulation.startExpedition(),
+        returnToRefuge: () => this.simulation.returnFromExpedition(),
       },
     );
     this.combatOverlay = new CombatOverlay(
@@ -98,6 +110,7 @@ export class Game {
     this.events.clear();
     this.controlsHint.dispose();
     this.combatOverlay.dispose();
+    this.expeditionOverlay.dispose();
     this.debugOverlay.dispose();
     this.selectionOverlay.dispose();
     this.socialLogOverlay.dispose();
@@ -109,8 +122,12 @@ export class Game {
   private readonly frame = (timestampMs: number): void => {
     const clockFrame = this.clock.advance(timestampMs, (deltaSeconds) => this.simulation.step(deltaSeconds));
     const combatSnapshot = this.simulation.getCombatSnapshot();
-    const combatMode = combatSnapshot.result !== "Idle";
-    this.container.dataset.mode = combatMode ? "combat" : "refuge";
+    const expeditionPhase = this.simulation.getExpeditionSnapshot().phase;
+    this.container.dataset.mode = expeditionPhase !== "Briefing"
+      ? "expedition"
+      : combatSnapshot.result !== "Idle"
+        ? "combat"
+        : "refuge";
     this.renderer.render(timestampMs / 1_000, clockFrame.frameDeltaSeconds, combatSnapshot);
     this.debugOverlay.update(
       timestampMs,
@@ -120,6 +137,7 @@ export class Game {
     this.socialLogOverlay.update(this.simulation.getSocialEvents());
     this.squadOverlay.updateEvaluation();
     this.combatOverlay.update();
+    this.expeditionOverlay.update();
     if (this.selectedHeroId) {
       const selectedHero = this.simulation.getHero(this.selectedHeroId);
       if (selectedHero) {

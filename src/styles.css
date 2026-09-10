@@ -472,7 +472,7 @@ kbd {
 
 .combat-overlay {
   position: fixed;
-  inset: auto 16px 16px auto;
+  inset: auto 16px 58px auto;
   z-index: 6;
   color: #dce8e9;
   font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
@@ -740,8 +740,332 @@ kbd {
 
 #app[data-mode="combat"] .selection-overlay,
 #app[data-mode="combat"] .social-log,
-#app[data-mode="combat"] .squad-overlay {
+#app[data-mode="combat"] .squad-overlay,
+#app[data-mode="combat"] .expedition-overlay {
   display: none;
+}
+
+#app[data-mode="expedition"] .selection-overlay,
+#app[data-mode="expedition"] .social-log,
+#app[data-mode="expedition"] .squad-overlay,
+#app[data-mode="expedition"] .controls-hint,
+#app[data-mode="expedition"] .combat-overlay {
+  display: none;
+}
+
+.expedition-overlay {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  z-index: 7;
+  color: #dce8e9;
+  font: 9px/1.4 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.expedition-overlay button {
+  border: 1px solid rgb(119 186 196 / 30%);
+  border-radius: 4px;
+  background: rgb(42 72 78 / 78%);
+  color: #cce0e3;
+  font: inherit;
+  cursor: pointer;
+}
+
+.expedition-overlay button:hover:not(:disabled),
+.expedition-overlay button:focus-visible {
+  border-color: rgb(128 208 219 / 60%);
+  outline: none;
+}
+
+.expedition-overlay button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.expedition-overlay__toggle {
+  display: block;
+  margin-left: auto;
+  padding: 8px 11px;
+  letter-spacing: 0.1em;
+  backdrop-filter: blur(8px);
+}
+
+.expedition-overlay__toggle[data-active="true"] {
+  border-color: rgb(211 151 91 / 58%);
+  color: #e1bf86;
+}
+
+.expedition-overlay__panel {
+  width: min(430px, calc(100vw - 32px));
+  max-height: calc(100vh - 78px);
+  margin-bottom: 7px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgb(159 224 234 / 28%);
+  border-radius: 7px;
+  background: rgb(7 12 17 / 95%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 42%);
+  backdrop-filter: blur(10px);
+}
+
+.expedition-overlay__panel[hidden] {
+  display: none;
+}
+
+.expedition-overlay__panel header,
+.expedition-overlay__panel header > div,
+.expedition-overlay__field-meta,
+.expedition-overlay__combatant > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.expedition-overlay__panel header {
+  color: #78c8d4;
+  letter-spacing: 0.1em;
+}
+
+.expedition-overlay__panel header strong {
+  color: #d1b77f;
+}
+
+.expedition-overlay__panel header > button {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+}
+
+.expedition-overlay__mission {
+  margin-top: 13px;
+  padding: 10px;
+  border-left: 2px solid rgb(102 180 192 / 55%);
+  background: rgb(62 91 97 / 13%);
+}
+
+.expedition-overlay__mission > span,
+.expedition-overlay__heading {
+  display: block;
+  color: #789098;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.expedition-overlay__mission > strong {
+  display: block;
+  margin-top: 3px;
+  color: #e0ebed;
+  font-size: 14px;
+}
+
+.expedition-overlay__mission p,
+.expedition-overlay__outcome p {
+  margin: 6px 0 0;
+  color: #94a6ab;
+}
+
+.expedition-overlay__columns,
+.expedition-overlay__teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.expedition-overlay__columns ul {
+  display: grid;
+  gap: 3px;
+  margin: 6px 0 0;
+  padding-left: 15px;
+  color: #9aaeb2;
+}
+
+.expedition-overlay__resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.expedition-overlay__resources span {
+  padding: 4px 6px;
+  border: 1px solid rgb(126 164 170 / 17%);
+  border-radius: 4px;
+  background: rgb(62 83 88 / 12%);
+  color: #8fa1a6;
+}
+
+.expedition-overlay__resources b {
+  color: #d7e4e6;
+}
+
+.expedition-overlay__stockpile,
+.expedition-overlay__consequences,
+.expedition-overlay__outcome,
+.expedition-overlay__panel > section:not(.expedition-overlay__mission) {
+  margin-top: 12px;
+}
+
+.expedition-overlay__stockpile {
+  padding-top: 9px;
+  border-top: 1px solid rgb(126 164 170 / 14%);
+}
+
+.expedition-overlay__readiness {
+  margin: 12px 0 7px;
+  color: #c79370;
+}
+
+.expedition-overlay__readiness[data-ready="true"] {
+  color: #82c7b2;
+}
+
+.expedition-overlay__primary {
+  width: 100%;
+  padding: 8px;
+  letter-spacing: 0.08em;
+}
+
+.expedition-overlay__field-meta {
+  margin-top: 10px;
+  color: #87999e;
+}
+
+.expedition-overlay__field-meta strong {
+  color: #d1b77f;
+}
+
+.expedition-overlay__combatant {
+  margin-top: 5px;
+  padding: 6px;
+  border: 1px solid rgb(126 164 170 / 15%);
+  border-radius: 4px;
+  background: rgb(62 83 88 / 10%);
+}
+
+.expedition-overlay__combatant[data-action="dead"],
+.expedition-overlay__combatant[data-action="retreat"] {
+  opacity: 0.5;
+}
+
+.expedition-overlay__combatant span,
+.expedition-overlay__combatant small {
+  color: #819398;
+}
+
+.expedition-overlay__combatant > i {
+  display: block;
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(118 139 143 / 20%);
+}
+
+.expedition-overlay__combatant > i > b {
+  display: block;
+  width: var(--health);
+  height: 100%;
+  background: #72b99f;
+}
+
+.expedition-overlay__combatant[data-team="enemy"] > i > b {
+  background: #cb6f60;
+}
+
+.expedition-overlay__combatant small {
+  display: block;
+  margin-top: 4px;
+  font-size: 8px;
+}
+
+.expedition-overlay__log {
+  display: grid;
+  gap: 4px;
+  margin: 11px 0 0;
+  padding: 9px 0 0;
+  border-top: 1px solid rgb(126 164 170 / 14%);
+  list-style: none;
+}
+
+.expedition-overlay__log li {
+  display: grid;
+  grid-template-columns: 35px 1fr;
+  gap: 5px;
+  color: #8ea0a5;
+}
+
+.expedition-overlay__log b {
+  color: #657e84;
+}
+
+.expedition-overlay__log li[data-tone="danger"] {
+  color: #d98a78;
+}
+
+.expedition-overlay__log li[data-tone="success"] {
+  color: #82c7b2;
+}
+
+.expedition-overlay__outcome {
+  padding: 10px;
+  border: 1px solid rgb(201 105 87 / 28%);
+  background: rgb(104 42 35 / 12%);
+}
+
+.expedition-overlay__outcome[data-success="true"] {
+  border-color: rgb(112 199 167 / 30%);
+  background: rgb(42 95 76 / 12%);
+}
+
+.expedition-overlay__outcome > strong {
+  color: #d98a78;
+}
+
+.expedition-overlay__outcome[data-success="true"] > strong {
+  color: #82c7b2;
+}
+
+.expedition-overlay__consequences > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgb(126 164 170 / 10%);
+  color: #8fa1a6;
+}
+
+.expedition-overlay__consequences > div strong {
+  color: #cddbdd;
+}
+
+.expedition-overlay__consequences > small,
+.expedition-overlay__empty {
+  display: block;
+  margin: 6px 0 0;
+  color: #6f858b;
+}
+
+@media (max-width: 720px) {
+  .expedition-overlay {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .expedition-overlay__panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 68px);
+  }
+
+  .expedition-overlay__columns,
+  .expedition-overlay__teams {
+    grid-template-columns: 1fr;
+  }
+
+  .expedition-overlay__mission {
+    padding: 8px;
+  }
 }
 
 .hero-panel__status {
@@ -1085,7 +1409,7 @@ kbd {
 
   .combat-overlay {
     right: 10px;
-    bottom: 10px;
+    bottom: 52px;
   }
 
   .combat-overlay__panel {
