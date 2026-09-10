@@ -1,4 +1,4 @@
-import type { Hero } from "../heroes/Hero";
+import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { Squad } from "../squads/Squad";
 import type { HeroPortraitCache } from "../rendering/heroes/HeroPortraitCache";
 
@@ -15,10 +15,12 @@ export class HeroRosterOverlay {
 
   constructor(
     container: HTMLElement,
-    private readonly heroes: readonly Readonly<Hero>[],
+    private readonly getHeroes: () => readonly Readonly<Hero>[],
+    private readonly getFallenHeroes: () => readonly Readonly<FallenHeroRecord>[],
     private readonly getSquad: () => Readonly<Squad>,
     private readonly portraits: HeroPortraitCache,
     private readonly onInspect: (heroId: string) => void,
+    private readonly onInspectMemorial: (heroId: string) => void,
     private readonly onClose: () => void,
   ) {
     this.element = document.createElement("section");
@@ -28,13 +30,14 @@ export class HeroRosterOverlay {
     this.element.innerHTML = `
       <header class="system-panel__header">
         <div><span>REFUGE PERSONNEL</span><h1>Heroes</h1></div>
-        <strong>${heroes.length}</strong>
+        <strong data-roster-count>${this.getHeroes().length}</strong>
         <button type="button" data-roster-action="close" aria-label="Close hero roster">×</button>
       </header>
       <div class="roster-filters" role="toolbar" aria-label="Filter heroes">
         ${FILTERS.map((filter) => `<button type="button" data-roster-filter="${filter}" aria-pressed="${filter === "All"}">${filter}</button>`).join("")}
       </div>
       <div class="roster-grid"></div>
+      <section class="memorial-ledger" data-roster-memorial hidden></section>
     `;
     const grid = this.element.querySelector<HTMLElement>(".roster-grid");
     if (!grid) {
@@ -78,7 +81,12 @@ export class HeroRosterOverlay {
   private render(): void {
     this.lastSignature = this.getSignature();
     const squad = this.getSquad();
-    const visibleHeroes = this.heroes.filter((hero) => this.matchesFilter(hero));
+    const heroes = this.getHeroes();
+    const visibleHeroes = heroes.filter((hero) => this.matchesFilter(hero));
+    const count = this.element.querySelector<HTMLElement>("[data-roster-count]");
+    if (count) {
+      count.textContent = String(heroes.length);
+    }
     this.grid.replaceChildren(...visibleHeroes.map((hero) => {
       const card = document.createElement("button");
       card.type = "button";
@@ -133,6 +141,7 @@ export class HeroRosterOverlay {
     this.element.querySelectorAll<HTMLButtonElement>("[data-roster-filter]").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.rosterFilter === this.filter));
     });
+    this.renderMemorials();
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
@@ -151,8 +160,41 @@ export class HeroRosterOverlay {
     }
     if (button.dataset.heroId) {
       this.onInspect(button.dataset.heroId);
+    } else if (button.dataset.memorialHeroId) {
+      this.onInspectMemorial(button.dataset.memorialHeroId);
     }
   };
+
+  private renderMemorials(): void {
+    const container = this.element.querySelector<HTMLElement>("[data-roster-memorial]");
+    if (!container) {
+      return;
+    }
+    const fallen = this.getFallenHeroes();
+    container.hidden = fallen.length === 0;
+    if (fallen.length === 0) {
+      container.replaceChildren();
+      return;
+    }
+    const heading = document.createElement("div");
+    heading.className = "section-heading";
+    heading.textContent = "Memorial record";
+    const list = document.createElement("div");
+    list.className = "memorial-ledger__list";
+    fallen.forEach((record) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.memorialHeroId = record.heroId;
+      button.setAttribute("aria-label", `View memorial record for ${record.name}`);
+      const name = document.createElement("strong");
+      name.textContent = record.name;
+      const details = document.createElement("span");
+      details.textContent = `Day ${record.joinedDay} — ${record.diedDay} · ${record.causeOfDeath}`;
+      button.append(name, details);
+      list.appendChild(button);
+    });
+    container.replaceChildren(heading, list);
+  }
 
   private matchesFilter(hero: Readonly<Hero>): boolean {
     const status = this.getStatus(hero);
@@ -181,7 +223,7 @@ export class HeroRosterOverlay {
     const squad = this.getSquad();
     return JSON.stringify({
       filter: this.filter,
-      heroes: this.heroes.map((hero) => [
+      heroes: this.getHeroes().map((hero) => [
         hero.id,
         Math.round(hero.needs.health),
         Math.round(hero.needs.fatigue),
@@ -189,6 +231,7 @@ export class HeroRosterOverlay {
         hero.training.queue.length,
         hero.injuries.map((injury) => [injury.id, injury.treated]),
       ]),
+      memorials: this.getFallenHeroes().map((record) => [record.heroId, record.diedDay]),
       squad: squad.members,
     });
   }

@@ -90,10 +90,12 @@ export class CombatSimulation {
         actionScores: [],
         attackCooldown: index * 0.12,
         decisionReason: "Awaiting first evaluation",
+        defeatedBy: null,
         defending: false,
         formation: entry.member.formation,
         hp: stats.maxHp,
         id: entry.hero.id,
+        kills: 0,
         label: entry.hero.name,
         medicine: entry.hero.skills.medicine,
         personality: entry.hero.personality,
@@ -130,10 +132,12 @@ export class CombatSimulation {
         actionScores: [],
         attackCooldown: 0.2 + index * 0.12,
         decisionReason: "Simple enemy behavior",
+        defeatedBy: null,
         defending: false,
         formation: "Front",
         hp: stats.maxHp,
         id: `rift-stalker-${index + 1}`,
+        kills: 0,
         label,
         medicine: 0,
         personality: {
@@ -329,7 +333,9 @@ export class CombatSimulation {
     }
     if (target.hp === 0) {
       target.action = "Dead";
+      target.defeatedBy = actor.label;
       target.defending = false;
+      actor.kills += 1;
       this.addLog(`${target.label} was defeated.`, target.team === "Enemy" ? "success" : "danger");
     }
   }

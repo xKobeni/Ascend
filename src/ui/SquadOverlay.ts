@@ -21,7 +21,7 @@ export class SquadOverlay {
 
   constructor(
     container: HTMLElement,
-    private readonly heroes: readonly Readonly<Hero>[],
+    private readonly getHeroes: () => readonly Readonly<Hero>[],
     private readonly getSquad: () => Readonly<Squad>,
     private readonly getEvaluation: () => Readonly<SquadEvaluation>,
     private readonly portraits: HeroPortraitCache,
@@ -108,7 +108,7 @@ export class SquadOverlay {
     label.textContent = position.toUpperCase();
     slot.appendChild(label);
     const member = squad.members.find((candidate) => candidate.formation === position);
-    const hero = member ? this.heroes.find((candidate) => candidate.id === member.heroId) : undefined;
+    const hero = member ? this.getHeroes().find((candidate) => candidate.id === member.heroId) : undefined;
     if (!member || !hero) {
       const empty = document.createElement("div");
       empty.className = "formation-slot__empty";
@@ -174,7 +174,7 @@ export class SquadOverlay {
 
   private renderReserves(container: HTMLElement, squad: Readonly<Squad>): void {
     const full = squad.members.length >= SQUAD_SIZE;
-    const available = this.heroes.filter((hero) => !squad.members.some((member) => member.heroId === hero.id));
+    const available = this.getHeroes().filter((hero) => !squad.members.some((member) => member.heroId === hero.id));
     container.replaceChildren(...available.map((hero) => {
       const row = document.createElement("div");
       row.className = "reserve-hero";
@@ -206,7 +206,7 @@ export class SquadOverlay {
     const squad = this.getSquad();
     const evaluation = this.getEvaluation();
     const members = squad.members
-      .map((member) => this.heroes.find((hero) => hero.id === member.heroId))
+      .map((member) => this.getHeroes().find((hero) => hero.id === member.heroId))
       .filter((hero): hero is Readonly<Hero> => hero !== undefined);
     const pairings: string[] = [];
     members.forEach((hero, index) => {

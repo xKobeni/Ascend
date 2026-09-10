@@ -60,6 +60,21 @@ export class SquadSystem {
     return true;
   }
 
+  removeMissingHeroes(heroes: readonly Readonly<Hero>[]): readonly string[] {
+    const activeIds = new Set(heroes.map((hero) => hero.id));
+    const removed = this.squad.members
+      .filter((member) => !activeIds.has(member.heroId))
+      .map((member) => member.heroId);
+    if (removed.length > 0) {
+      this.squad.members.splice(
+        0,
+        this.squad.members.length,
+        ...this.squad.members.filter((member) => activeIds.has(member.heroId)),
+      );
+    }
+    return removed;
+  }
+
   setFormation(heroId: string, formation: FormationPosition): boolean {
     const member = this.squad.members.find((candidate) => candidate.heroId === heroId);
     if (!member) {

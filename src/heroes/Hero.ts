@@ -135,6 +135,38 @@ export interface HeroRecovery {
   lastOutcome: string | null;
 }
 
+export interface HeroCareer {
+  expeditions: number;
+  joinedDay: number;
+  kills: number;
+  victories: number;
+}
+
+export interface HeroLossMemory {
+  day: number;
+  fallenHeroId: string;
+  fallenHeroName: string;
+  relationship: "Companion" | "Friend" | "Trusted Friend";
+  summary: string;
+}
+
+export interface FallenHeroRecord {
+  age: number;
+  causeOfDeath: string;
+  daysAlive: number;
+  diedDay: number;
+  expeditions: number;
+  finalSquadName: string;
+  heroId: string;
+  joinedDay: number;
+  kills: number;
+  level: number;
+  name: string;
+  occupation: string;
+  rank: number;
+  victories: number;
+}
+
 export type TrainingType = "Defense Training" | "Strength Training" | "Weapon Training";
 
 export interface TrainingAssignment {
@@ -175,11 +207,13 @@ export interface Hero {
   age: number;
   appearance: HeroAppearance;
   attributes: HeroAttributes;
+  career: HeroCareer;
   hiddenPotential: HiddenPotential;
   heroClass: HeroClass;
   id: string;
   injuries: HeroInjury[];
   level: number;
+  lossMemories: HeroLossMemory[];
   movement: HeroMovement;
   name: string;
   needs: HeroNeeds;

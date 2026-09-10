@@ -21,6 +21,7 @@ export interface ExpeditionConsequence {
   detail: string;
   heroId: string;
   heroName: string;
+  permanent: boolean;
 }
 
 export interface ExpeditionReport {

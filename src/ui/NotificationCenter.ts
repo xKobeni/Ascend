@@ -1,5 +1,5 @@
 import type { ExpeditionSnapshot } from "../expeditions/Expedition";
-import type { Hero } from "../heroes/Hero";
+import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { SocialEvent } from "../heroes/RelationshipSystem";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 
@@ -23,6 +23,7 @@ export class NotificationCenter {
   private readonly skillLevels = new Map<string, number>();
   private readonly trainingOutcomes = new Map<string, string | null>();
   private readonly injurySignatures = new Map<string, string>();
+  private readonly knownMemorialIds = new Set<string>();
   private readonly recoveryOutcomes = new Map<string, string | null>();
 
   constructor(
@@ -51,14 +52,16 @@ export class NotificationCenter {
     heroes: readonly Readonly<Hero>[],
     socialEvents: readonly Readonly<SocialEvent>[],
     expedition: Readonly<ExpeditionSnapshot>,
+    fallenHeroes: readonly Readonly<FallenHeroRecord>[],
   ): void {
     if (!this.initialized) {
-      this.initialize(heroes, socialEvents, expedition);
+      this.initialize(heroes, socialEvents, expedition, fallenHeroes);
       return;
     }
     this.captureSocialEvents(socialEvents);
     this.captureHeroChanges(heroes);
     this.captureExpeditionChange(expedition);
+    this.captureMemorialChanges(fallenHeroes);
     const now = performance.now();
     const before = this.notifications.length;
     this.notifications.splice(0, this.notifications.length, ...this.notifications.filter((entry) => entry.expiresAt > now));
@@ -78,6 +81,7 @@ export class NotificationCenter {
     heroes: readonly Readonly<Hero>[],
     socialEvents: readonly Readonly<SocialEvent>[],
     expedition: Readonly<ExpeditionSnapshot>,
+    fallenHeroes: readonly Readonly<FallenHeroRecord>[],
   ): void {
     heroes.forEach((hero) => {
       this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
@@ -89,7 +93,18 @@ export class NotificationCenter {
     });
     this.latestSocialEventId = socialEvents[0]?.id ?? 0;
     this.lastExpeditionPhase = expedition.phase;
+    fallenHeroes.forEach((record) => this.knownMemorialIds.add(record.heroId));
     this.initialized = true;
+  }
+
+  private captureMemorialChanges(fallenHeroes: readonly Readonly<FallenHeroRecord>[]): void {
+    [...fallenHeroes].reverse().forEach((record) => {
+      if (this.knownMemorialIds.has(record.heroId)) {
+        return;
+      }
+      this.knownMemorialIds.add(record.heroId);
+      this.push(`${record.name} has fallen · Memorial record created.`, "danger", 30_000);
+    });
   }
 
   private captureSocialEvents(events: readonly Readonly<SocialEvent>[]): void {
@@ -164,9 +179,9 @@ export class NotificationCenter {
     `;
   }
 
-  private push(message: string, tone: NotificationEntry["tone"]): void {
+  private push(message: string, tone: NotificationEntry["tone"], duration = 9_000): void {
     this.notifications.unshift({
-      expiresAt: performance.now() + 9_000,
+      expiresAt: performance.now() + duration,
       id: this.nextId,
       message,
       tone,

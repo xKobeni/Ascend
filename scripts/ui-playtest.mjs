@@ -166,6 +166,133 @@ try {
       recoveryValidation.consequenceInjuries,
     `Phase 14 recovery validation failed (${JSON.stringify(recoveryValidation)}).`,
   );
+  const legacyValidation = await evaluate(`(async () => {
+    const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
+      import('/src/heroes/HeroManager.ts'),
+      import('/src/squads/SquadSystem.ts'),
+      import('/src/rendering/heroes/HeroRenderer.ts'),
+      import('/src/rendering/ProceduralBaseScene.ts'),
+      import('/src/ui/NotificationCenter.ts'),
+      import('/src/ui/HeroRosterOverlay.ts'),
+      import('/node_modules/three/build/three.module.js'),
+    ]);
+    const manager = new HeroManager();
+    const heroes = manager.generateInitialRoster(3);
+    const fallen = heroes[0];
+    const friend = heroes[1];
+    Object.assign(friend.relationships[fallen.id].metrics, {
+      affinity: 62, fear: 0, jealousy: 0, respect: 72, rivalry: 0, trust: 84,
+    });
+    const moraleBefore = friend.needs.morale;
+    const squad = new SquadSystem();
+    heroes.forEach((hero) => squad.addHero(hero.id, heroes));
+    const squadRecord = squad.getSquad();
+    const combatants = heroes.map((hero, index) => ({
+      action: index === 0 ? 'Dead' : 'Idle', actionScores: [], decisionReason: '', defeatedBy: index === 0 ? 'Rift Stalker II' : null,
+      defending: false, formation: ['Front', 'Middle', 'Back'][index], hp: index === 0 ? 0 : 45, id: hero.id,
+      kills: index === 0 ? 2 : index, label: hero.name, position: {x:0,z:0}, role: ['Vanguard','Damage','Support'][index],
+      stats: {attack:10,defense:5,maxHp:100,range:2,speed:2}, tacticalRole: 'Skirmisher', team: 'Hero',
+    }));
+    const consequences = manager.applyExpeditionConsequences(
+      squadRecord,
+      { combatants, log: [], result: 'Defeat', tick: 20 },
+      'Defeat',
+      5,
+    );
+    const record = manager.getFallen()[0];
+    const removedFromSquad = squad.removeMissingHeroes(manager.getAll());
+    const selectable = [];
+    const heroScene = new THREE.Scene();
+    const heroRenderer = new HeroRenderer(heroScene, heroes, selectable);
+    heroRenderer.update(manager.getAll(), 1, 0.016);
+    const activeSelectableCount = selectable.length;
+    heroRenderer.dispose();
+    const memorialSelectable = [];
+    const memorialScene = new THREE.Scene();
+    const baseScene = new ProceduralBaseScene(memorialScene, memorialSelectable);
+    const beforeMemorial = memorialSelectable.length;
+    baseScene.syncMemorials(manager.getFallen());
+    const graveCreated = memorialSelectable.length === beforeMemorial + 1 && memorialSelectable.some((root) => root.name === record.name);
+    baseScene.dispose();
+    const notification = new NotificationCenter(document.querySelector('#app'), () => undefined);
+    const expedition = {
+      attempt: 0, deployedSquadName: null,
+      mission: { description: '', difficulty: 'Moderate', id: 'test', name: 'Test', objective: 'Eliminate Enemies', rewards: {food:0,medicine:0,riftShards:0,scrap:0}, threats: [] },
+      phase: 'Briefing', report: null, resources: {food:0,medicine:6,riftShards:0,scrap:0},
+    };
+    notification.update(manager.getAll(), [], expedition, []);
+    notification.update(manager.getAll(), [], expedition, manager.getFallen());
+    const deathNotice = [...document.querySelectorAll('.notification-feed li')].some((entry) => entry.textContent.includes(record.name + ' has fallen'));
+    notification.dispose();
+    const rosterHost = document.createElement('div');
+    document.querySelector('#app').appendChild(rosterHost);
+    let inspectedMemorial = null;
+    const roster = new HeroRosterOverlay(
+      rosterHost,
+      () => manager.getAll(),
+      () => manager.getFallen(),
+      () => squad.getSquad(),
+      { get: () => null },
+      () => undefined,
+      (heroId) => { inspectedMemorial = heroId; },
+      () => undefined,
+    );
+    roster.open();
+    const ledgerEntries = rosterHost.querySelectorAll('[data-memorial-hero-id]').length;
+    const rosterCards = rosterHost.querySelectorAll('.hero-roster-card').length;
+    rosterHost.querySelector('[data-memorial-hero-id]')?.click();
+    roster.dispose();
+    rosterHost.remove();
+    const victoryManager = new HeroManager();
+    const victoryHeroes = victoryManager.generateInitialRoster(3);
+    const victorySquad = new SquadSystem();
+    victoryHeroes.forEach((hero) => victorySquad.addHero(hero.id, victoryHeroes));
+    const victoryCasualty = victoryHeroes[0];
+    const victoryConsequences = victoryManager.applyExpeditionConsequences(
+      victorySquad.getSquad(),
+      {
+        combatants: victoryHeroes.map((hero, index) => ({
+          defeatedBy: index === 0 ? 'Rift Stalker' : null,
+          hp: index === 0 ? 0 : 80,
+          id: hero.id,
+          kills: index === 1 ? 3 : 0,
+          stats: { maxHp: 100 },
+        })),
+      },
+      'Victory',
+      3,
+    );
+    const victoryDeathResolved = !victoryManager.getById(victoryCasualty.id) &&
+      victoryConsequences.some((entry) => entry.heroId === victoryCasualty.id && entry.permanent) &&
+      victoryManager.getAll().every((hero) => hero.injuries.length === 0);
+    globalThis.__phase15Record = record;
+    return {
+      activeHeroes: manager.getAll().length,
+      activeSelectableCount,
+      careerRecorded: record.expeditions === 1 && record.kills === 2 && record.daysAlive === 5,
+      cause: record.causeOfDeath,
+      consequencePermanent: consequences.some((entry) => entry.heroId === fallen.id && entry.permanent),
+      deathNotice,
+      graveCreated,
+      lossMemory: friend.lossMemories[0]?.fallenHeroId === fallen.id,
+      lossRelationship: friend.lossMemories[0]?.relationship,
+      memorialLedger: ledgerEntries === 1 && inspectedMemorial === fallen.id,
+      moraleLoss: Math.round(moraleBefore - friend.needs.morale),
+      removedFromRoster: !manager.getById(fallen.id),
+      removedFromSquad: removedFromSquad.includes(fallen.id) && squad.getSquad().members.length === 2,
+      rosterCards,
+      victoryDeathResolved,
+    };
+  })()`);
+  assert(
+    legacyValidation.activeHeroes === 2 && legacyValidation.activeSelectableCount === 2 &&
+      legacyValidation.careerRecorded && legacyValidation.cause === 'Rift Stalker II' &&
+      legacyValidation.consequencePermanent && legacyValidation.deathNotice && legacyValidation.graveCreated &&
+      legacyValidation.lossMemory && legacyValidation.lossRelationship === 'Trusted Friend' && legacyValidation.memorialLedger &&
+      legacyValidation.moraleLoss >= 18 && legacyValidation.removedFromRoster && legacyValidation.removedFromSquad &&
+      legacyValidation.rosterCards === 2 && legacyValidation.victoryDeathResolved,
+    `Phase 15 legacy validation failed (${JSON.stringify(legacyValidation)}).`,
+  );
   const victoryValidation = await evaluate(`(async () => {
     const { Simulation } = await import('/src/simulation/Simulation.ts');
     const simulation = new Simulation();
@@ -283,6 +410,19 @@ try {
   assert(await evaluate("document.querySelectorAll('.hero-injury').length === 1 && !document.querySelector('.hero-injury button').disabled"), "Recovery UI must show a treatable injury and Medicine cost.");
   await screenshot("phase14-recovery-1440x900.png");
   await evaluate("globalThis.__phase14Capture.dispose(); delete globalThis.__phase14Capture");
+  const memorialUi = await evaluate(`(async () => {
+    const { SelectionOverlay } = await import('/src/ui/SelectionOverlay.ts');
+    const overlay = new SelectionOverlay(document.querySelector('#app'), () => false, () => false, () => false, () => 0, () => undefined);
+    overlay.showMemorial(globalThis.__phase15Record);
+    globalThis.__phase15Capture = overlay;
+    return {
+      cause: document.querySelector('.memorial-record section strong')?.textContent,
+      rows: document.querySelectorAll('.memorial-record dl div').length,
+    };
+  })()`);
+  assert(memorialUi.cause === 'Rift Stalker II' && memorialUi.rows === 6, "Memorial record must expose the fallen hero's real history.");
+  await screenshot("phase15-memorial-1440x900.png");
+  await evaluate("globalThis.__phase15Capture.dispose(); delete globalThis.__phase15Capture; delete globalThis.__phase15Record");
 
   await click('[data-hud-section="Party"]');
   await waitFor("!document.querySelector('.party-panel').hidden", "Party panel");
@@ -296,6 +436,15 @@ try {
   const after = await evaluate("[...document.querySelectorAll('.formation-slot')].map((slot) => slot.querySelector('.party-hero-card')?.dataset.heroId)");
   assert(after[0] === before[1] && new Set(after).size === 3, "Formation movement must swap occupants atomically.");
   await screenshot("party-1440x900.png");
+
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer");
+  assert(await evaluate("!document.querySelector('[data-debug-action=\"arena\"]').disabled"), "Arena must remain available from the developer drawer.");
+  await click('[data-debug-action="arena"]');
+  await waitFor("document.querySelector('.combat-overlay__panel') && !document.querySelector('.combat-overlay__panel').hidden", "Arena combat");
+  assert(await evaluate("document.querySelectorAll('.combat-overlay__combatant').length") === 6, "Arena must render the existing 3v3 combatants.");
+  await click('[data-combat-action="exit"]');
+  await waitFor("document.querySelector('#app').dataset.mode === 'refuge' && document.querySelector('.combat-overlay__panel').hidden", "Arena refuge return");
 
   await click('[data-hud-section="Rift"]');
   await waitFor("!document.querySelector('.expedition-overlay__panel').hidden", "Rift briefing");
@@ -311,13 +460,6 @@ try {
   await click('[data-expedition-action="return"]');
   await waitFor("document.querySelector('[data-hud-section=\"Refuge\"]').getAttribute('aria-pressed') === 'true'", "refuge return");
 
-  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
-  await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer");
-  assert(await evaluate("!document.querySelector('[data-debug-action=\"arena\"]').disabled"), "Arena must remain available from the developer drawer.");
-  await click('[data-debug-action="arena"]');
-  await waitFor("document.querySelector('.combat-overlay__panel') && !document.querySelector('.combat-overlay__panel').hidden", "Arena combat");
-  assert(await evaluate("document.querySelectorAll('.combat-overlay__combatant').length") === 6, "Arena must render the existing 3v3 combatants.");
-
   await setViewport(1024, 768);
   await screenshot("tablet-1024x768.png");
   await setViewport(390, 844);
@@ -331,7 +473,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, recoveryUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

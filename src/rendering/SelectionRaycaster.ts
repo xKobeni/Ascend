@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 export interface SelectionDetails {
-  category: "base" | "facility" | "hero" | "prop";
+  category: "base" | "facility" | "hero" | "memorial" | "prop";
   detail?: string;
   id: string;
   label: string;
@@ -55,6 +55,12 @@ export class SelectionRaycaster {
 
   update(): void {
     if (!this.selectedRoot) {
+      return;
+    }
+    if (!this.selectableRoots.includes(this.selectedRoot)) {
+      this.selectedRoot = null;
+      this.highlight.visible = false;
+      this.onSelection(null);
       return;
     }
     this.bounds.setFromObject(this.selectedRoot).expandByScalar(0.08);

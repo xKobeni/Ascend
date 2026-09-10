@@ -1,5 +1,5 @@
 import { createInitialMovement } from "../base/NavigationPoints";
-import type { Hero } from "./Hero";
+import type { FallenHeroRecord, Hero } from "./Hero";
 import { HeroGenerator } from "./HeroGenerator";
 import { NeedsSystem } from "./NeedsSystem";
 import { RelationshipSystem } from "./RelationshipSystem";
@@ -14,10 +14,12 @@ import type { CombatSnapshot } from "../combat/Combat";
 import type { ExpeditionConsequence, ExpeditionReport } from "../expeditions/Expedition";
 import type { Squad } from "../squads/Squad";
 import { InjurySystem, type TreatmentResult } from "./InjurySystem";
+import { LegacySystem } from "./LegacySystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
   private readonly injurySystem = new InjurySystem();
+  private readonly legacySystem = new LegacySystem();
   private readonly needsSystem = new NeedsSystem();
   private readonly relationshipSystem = new RelationshipSystem();
   private readonly routineSystem = new HeroRoutineSystem();
@@ -55,6 +57,14 @@ export class HeroManager {
 
   getById(id: string): Readonly<Hero> | undefined {
     return this.heroes.get(id);
+  }
+
+  getFallen(): readonly Readonly<FallenHeroRecord>[] {
+    return this.legacySystem.getFallen();
+  }
+
+  getFallenByHeroId(heroId: string): Readonly<FallenHeroRecord> | undefined {
+    return this.legacySystem.getByHeroId(heroId);
   }
 
   queueTraining(heroId: string, type: TrainingType): boolean {
@@ -116,9 +126,52 @@ export class HeroManager {
     outcome: ExpeditionReport["outcome"],
     day: number,
   ): readonly ExpeditionConsequence[] {
-    return squad.members.flatMap((member) => {
+    const successful = outcome === "Victory";
+    squad.members.forEach((member) => {
+      const hero = this.heroes.get(member.heroId);
+      if (hero) {
+        this.legacySystem.recordExpedition(
+          hero,
+          combat.combatants.find((entry) => entry.id === hero.id),
+          successful,
+        );
+      }
+    });
+    const fallenHeroes = squad.members.flatMap((member) => {
+      const hero = this.heroes.get(member.heroId);
+      const combatant = combat.combatants.find((entry) => entry.id === member.heroId);
+      return hero && combatant && combatant.hp <= 0 ? [{ combatant, hero }] : [];
+    });
+    const fallenRecords = fallenHeroes.map(({ combatant, hero }) => this.legacySystem.memorialize(
+      hero,
+      day,
+      combatant.defeatedBy ?? "Rift exposure",
+      squad.name,
+    ));
+    const fallenIds = new Set(fallenRecords.map((record) => record.heroId));
+    const reactions = this.legacySystem.applyRelationshipReactions(
+      this.getAll().filter((hero) => !fallenIds.has(hero.id)),
+      fallenRecords,
+      day,
+    );
+    fallenIds.forEach((heroId) => this.heroes.delete(heroId));
+
+    return squad.members.flatMap<ExpeditionConsequence>((member) => {
+      const fallen = fallenRecords.find((record) => record.heroId === member.heroId);
+      if (fallen) {
+        const affected = reactions.filter((reaction) => reaction.fallenHeroId === fallen.heroId).length;
+        return [{
+          detail: `Fallen · ${fallen.causeOfDeath}${affected ? ` · ${affected} friend${affected === 1 ? "" : "s"} grieving` : ""}`,
+          heroId: fallen.heroId,
+          heroName: fallen.name,
+          permanent: true,
+        }];
+      }
       const hero = this.heroes.get(member.heroId);
       if (!hero) {
+        return [];
+      }
+      if (successful) {
         return [];
       }
       const combatant = combat.combatants.find((entry) => entry.id === member.heroId);
@@ -140,6 +193,7 @@ export class HeroManager {
         detail: `${injury.severity} ${injury.type} · Health -${healthLoss} · Morale -${moraleLoss}`,
         heroId: hero.id,
         heroName: hero.name,
+        permanent: false,
       }];
     });
   }

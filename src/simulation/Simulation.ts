@@ -53,6 +53,7 @@ export class Simulation {
     const expeditionPhase = this.getExpeditionSnapshot().phase;
     if (expeditionPhase === "Combat") {
       this.expeditionSystem.step(deltaSeconds);
+      this.syncActiveRoster();
       return;
     }
     if (expeditionPhase === "Debrief") {
@@ -85,6 +86,14 @@ export class Simulation {
 
   getHero(id: string): Readonly<Hero> | undefined {
     return this.heroManager.getById(id);
+  }
+
+  getFallenHeroes() {
+    return this.heroManager.getFallen();
+  }
+
+  getFallenHero(heroId: string) {
+    return this.heroManager.getFallenByHeroId(heroId);
   }
 
   queueTraining(heroId: string, type: TrainingType): boolean {
@@ -162,5 +171,11 @@ export class Simulation {
 
   exitCombatSandbox(): void {
     this.combatSimulation.stop();
+  }
+
+  private syncActiveRoster(): void {
+    const heroes = this.getHeroes();
+    this.squadSystem.removeMissingHeroes(heroes);
+    this.state.heroCount = heroes.length;
   }
 }

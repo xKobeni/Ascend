@@ -168,8 +168,8 @@ export class ExpeditionOverlay {
       ${report.consequences.length > 0 ? `
         <section class="expedition-overlay__consequences">
           <span class="expedition-overlay__heading">Immediate consequences</span>
-          ${report.consequences.map((entry) => `<div><strong>${this.escape(entry.heroName)}</strong><span>${this.escape(entry.detail)}</span></div>`).join("")}
-          <small>Injuries persist after return. Treat them from the hero Training panel or allow infirmary rest.</small>
+          ${report.consequences.map((entry) => `<div data-permanent="${entry.permanent}"><strong>${this.escape(entry.heroName)}</strong><span>${this.escape(entry.detail)}</span></div>`).join("")}
+          <small>Injuries persist after return. Fallen heroes leave the active roster and enter the Refuge memorial.</small>
         </section>
       ` : ""}
       ${this.renderStockpile(expedition.resources)}

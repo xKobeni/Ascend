@@ -35,39 +35,28 @@ export class HeroRenderer {
   constructor(
     scene: THREE.Scene,
     heroes: readonly Readonly<Hero>[],
-    selectableRoots: THREE.Object3D[],
+    private readonly selectableRoots: THREE.Object3D[],
   ) {
     this.root.name = "Heroes";
-    heroes.forEach((hero, index) => {
-      const rig = this.meshGenerator.create(hero);
-      rig.root.position.set(hero.movement.position.x, 0.31, hero.movement.position.z);
-      rig.root.rotation.y = hero.movement.facingRadians;
-      markSelectable(rig.root, {
-        category: "hero",
-        detail: `Level ${hero.level} · Rank ${"★".repeat(hero.rank)}`,
-        id: hero.id,
-        label: hero.name,
-      });
-      selectableRoots.push(rig.root);
-      this.root.add(rig.root);
-      this.renderedHeroes.set(hero.id, {
-        anim: {
-          breathingPhase: index * 1.7,
-          idleLookTimer: 0,
-          idleLookTarget: 0,
-          lastActivity: "",
-          restShift: 0,
-          transitionAlpha: 0,
-          walkCycle: index * 2.1,
-        },
-        phaseOffset: index * 1.37,
-        rig,
-      });
-    });
+    heroes.forEach((hero, index) => this.addHero(hero, index));
     scene.add(this.root);
   }
 
   update(heroes: readonly Readonly<Hero>[], timestampSeconds: number, deltaSeconds: number): void {
+    const activeIds = new Set(heroes.map((hero) => hero.id));
+    this.renderedHeroes.forEach((rendered, heroId) => {
+      if (activeIds.has(heroId)) {
+        return;
+      }
+      this.removeSelectableRoot(rendered.rig.root);
+      this.disposeRig(rendered.rig.root);
+      this.renderedHeroes.delete(heroId);
+    });
+    heroes.forEach((hero, index) => {
+      if (!this.renderedHeroes.has(hero.id)) {
+        this.addHero(hero, index);
+      }
+    });
     const positionBlend = 1 - Math.exp(-12 * deltaSeconds);
     heroes.forEach((hero) => {
       const rendered = this.renderedHeroes.get(hero.id);
@@ -93,6 +82,52 @@ export class HeroRenderer {
       materials.forEach((material) => material.dispose());
     });
     this.root.removeFromParent();
+  }
+
+  private addHero(hero: Readonly<Hero>, index: number): void {
+    const rig = this.meshGenerator.create(hero);
+    rig.root.position.set(hero.movement.position.x, 0.31, hero.movement.position.z);
+    rig.root.rotation.y = hero.movement.facingRadians;
+    markSelectable(rig.root, {
+      category: "hero",
+      detail: `Level ${hero.level} · Rank ${"★".repeat(hero.rank)}`,
+      id: hero.id,
+      label: hero.name,
+    });
+    this.selectableRoots.push(rig.root);
+    this.root.add(rig.root);
+    this.renderedHeroes.set(hero.id, {
+      anim: {
+        breathingPhase: index * 1.7,
+        idleLookTimer: 0,
+        idleLookTarget: 0,
+        lastActivity: "",
+        restShift: 0,
+        transitionAlpha: 0,
+        walkCycle: index * 2.1,
+      },
+      phaseOffset: index * 1.37,
+      rig,
+    });
+  }
+
+  private removeSelectableRoot(root: THREE.Object3D): void {
+    const index = this.selectableRoots.indexOf(root);
+    if (index >= 0) {
+      this.selectableRoots.splice(index, 1);
+    }
+  }
+
+  private disposeRig(root: THREE.Object3D): void {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => material.dispose());
+    });
+    root.removeFromParent();
   }
 
   private updateTransition(anim: AnimationState, activity: string, deltaSeconds: number): void {

@@ -260,9 +260,27 @@ canvas {
 .hero-roster-card__footer { display: flex; justify-content: space-between; gap: 6px; padding: 6px 7px 3px; color: var(--faint); font: 7px/1.2 var(--numbers); letter-spacing: 0.08em; }
 .hero-roster-card[data-status="ready"] .hero-roster-card__footer span:last-child { color: var(--olive); }
 .hero-roster-card[data-status="recovering"] .hero-roster-card__footer span:last-child { color: #a26767; }
+.memorial-ledger { position: relative; z-index: 1; margin: 0 20px 22px; padding-top: 15px; border-top: 1px solid var(--line); }
+.memorial-ledger__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-top: 9px; }
+.memorial-ledger__list button { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid var(--line); border-left: 2px solid var(--burgundy); background: rgb(21 21 19 / 48%); color: var(--ink); cursor: pointer; text-align: left; }
+.memorial-ledger__list button:hover,
+.memorial-ledger__list button:focus-visible { border-color: var(--bronze); }
+.memorial-ledger__list strong { font: 500 12px/1.2 var(--display); letter-spacing: 0.04em; }
+.memorial-ledger__list span { color: var(--muted); font-size: 8px; }
 
 .hero-detail-panel { width: min(570px, calc(100vw - 44px)); }
 .selection-overlay__detail { display: block; padding: 10px 20px 0; color: var(--muted); font-size: 10px; }
+.memorial-record { position: relative; z-index: 1; padding: 22px 20px; }
+.memorial-record__mark { display: block; color: var(--bronze); font: 26px/1 var(--display); }
+.memorial-record > p { margin: 8px 0 18px; color: var(--muted); font-size: 9px; }
+.memorial-record dl { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid var(--line); }
+.memorial-record dl div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.memorial-record dl div:nth-child(odd) { padding-right: 12px; }
+.memorial-record dl div:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--line-soft); }
+.memorial-record dt { color: var(--muted); font-size: 8px; }
+.memorial-record dd { margin: 0; color: var(--ink); font: 9px/1.2 var(--numbers); }
+.memorial-record section { margin-top: 20px; padding: 13px; border-left: 2px solid var(--burgundy); background: rgb(122 69 69 / 7%); }
+.memorial-record section strong { color: #c58a8a; font: 500 14px/1.3 var(--display); }
 .hero-detail-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 12px 20px 0; border-bottom: 1px solid var(--line); }
 .hero-panel { position: relative; z-index: 1; padding: 16px 20px 22px; }
 .hero-panel section { margin-top: 19px; }
@@ -445,6 +463,8 @@ canvas {
 .expedition-overlay__outcome[data-success="true"] > strong { color: #aeb392; }
 .expedition-overlay__consequences > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 8px; }
 .expedition-overlay__consequences > div strong { color: var(--ink); }
+.expedition-overlay__consequences > div[data-permanent="true"] { border-left: 2px solid var(--burgundy); padding-left: 8px; }
+.expedition-overlay__consequences > div[data-permanent="true"] strong { color: #c58a8a; }
 .expedition-overlay__consequences > small,
 .expedition-overlay__empty { display: block; margin-top: 8px; color: var(--faint); font-size: 8px; }
 
@@ -550,10 +570,13 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .system-panel__header input { font-size: 20px; }
   .roster-filters { gap: 14px; overflow-x: auto; padding: 10px 14px 0; }
   .roster-grid { grid-template-columns: 1fr 1fr; gap: 9px; padding: 12px 14px 18px; }
+  .memorial-ledger { margin: 0 14px 18px; }
+  .memorial-ledger__list { grid-template-columns: 1fr; }
   .hero-detail-tabs { gap: 7px; margin: 10px 14px 0; }
   .hero-panel { padding: 13px 14px 18px; }
   .hero-panel__grid { grid-template-columns: 1fr 1fr; }
   .hero-panel__meters { grid-template-columns: 1fr; }
+  .memorial-record { padding: 18px 14px; }
   .party-layout { padding: 13px 14px; }
   .party-formation { grid-template-columns: 1fr; }
   .formation-slot { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }

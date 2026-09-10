@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 10, 2026
 
 ```text
-Gameplay phases implemented: 0–14
-Current playable milestone: Persistent expedition consequences and recovery
+Gameplay phases implemented: 0–15
+Current playable milestone: Permanent expedition loss and Refuge legacy records
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 15 — Permanent Death
+Next gameplay phase: Phase 16 — Memory System
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,7 +47,7 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 14 is complete. Phase 15 and later remain design context and require a new implementation
+Phase 15 is complete. Phase 16 and later remain design context and require a new implementation
 approval boundary.
 
 ---
@@ -1170,7 +1170,7 @@ available from hero details, and resting in the infirmary completes recovery.
 
 ---
 
-# Phase 15 — Permanent Death
+# Phase 15 — Permanent Death — Complete
 
 ## Goal
 
@@ -1182,6 +1182,11 @@ Make hero loss meaningful.
 
 Dead heroes cannot return.
 
+Expedition combatants reduced to zero HP become permanent casualties even when the remaining party
+wins the mission.
+They are removed atomically from the active hero registry, squad formation, 3D hero renderer,
+training, treatment, and future deployment. The Phase 9 Arena remains a consequence-free sandbox.
+
 ### 15.2 Relationship Reactions
 
 Friends:
@@ -1191,9 +1196,16 @@ Morale loss
 Memory created
 ```
 
+Companions, friends, and trusted friends receive increasing morale loss and a bounded loss record
+containing the fallen hero, relationship tier, day, and event summary. This is the narrow Phase 15
+legacy record; memory-driven behavior, fear, decay, and Utility AI effects remain Phase 16.
+
 ### 15.3 Memorial
 
 Create basic grave marker.
+
+The Refuge creates one restrained, selectable grave marker per fallen hero. The same authoritative
+record appears in the Heroes memorial ledger and opens through either the ledger or the 3D grave.
 
 ### 15.4 Hero History
 
@@ -1205,13 +1217,24 @@ Record:
 - Rank
 - Cause of death
 
+Combat now attributes kills and the final attacker. A serializable memorial record captures joined
+day, death day, days alive, missions, victories, kills, level, rank, occupation, final party, and
+cause of death before the active hero is removed. Disk persistence remains Phase 37.
+
 ### 15.5 Death Notifications
 
 Do not make them overly flashy.
 
-## Exit Criteria
+Mission consequences label permanent losses, while a compact burgundy side notice confirms that a
+memorial record was created. No glow, takeover animation, or new navigation destination is added.
+
+## Exit Criteria — Met
 
 Losing a veteran visibly changes the base and the surviving heroes.
+
+Deterministic validation confirms career and kill attribution, permanent roster and squad removal,
+friend morale and loss records, hero-mesh removal, selectable grave creation, memorial details, and
+death notification behavior.
 
 ---
 

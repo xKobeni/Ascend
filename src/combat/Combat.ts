@@ -37,10 +37,12 @@ export interface CombatantSnapshot {
   action: CombatAction;
   actionScores: readonly Readonly<ActionScoreSnapshot>[];
   decisionReason: string;
+  defeatedBy: string | null;
   defending: boolean;
   formation: FormationPosition;
   hp: number;
   id: string;
+  kills: number;
   label: string;
   position: CombatPosition;
   role: string;

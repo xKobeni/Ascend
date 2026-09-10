@@ -120,9 +120,7 @@ export class ExpeditionSystem {
     this.resources.riftShards += rewards.riftShards;
     this.resources.scrap += rewards.scrap;
     this.recordExperience(this.deployedSquad, successful);
-    const consequences = successful
-      ? []
-      : this.resolveConsequences(this.deployedSquad, combat, outcome);
+    const consequences = this.resolveConsequences(this.deployedSquad, combat, outcome);
     this.report = {
       consequences,
       outcome,

@@ -1,17 +1,21 @@
 import * as THREE from "three";
 
 import { markSelectable, type SelectionDetails } from "./SelectionRaycaster";
+import type { FallenHeroRecord } from "../heroes/Hero";
 
 type FacilityColor = "#49758a" | "#926d3f" | "#56765e" | "#755b8c";
 
 export class ProceduralBaseScene {
-  readonly selectableRoots: THREE.Object3D[] = [];
+  private readonly memorialRoots = new Map<string, THREE.Group>();
 
   private readonly fireGlow = new THREE.PointLight("#ff8a45", 54, 27, 2);
   private readonly flameCore: THREE.Mesh;
   private readonly root = new THREE.Group();
 
-  constructor(private readonly scene: THREE.Scene) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    readonly selectableRoots: THREE.Object3D[] = [],
+  ) {
     this.root.name = "Procedural Refuge";
     this.scene.background = new THREE.Color("#111820");
     this.scene.fog = new THREE.Fog("#111820", 66, 144);
@@ -37,6 +41,28 @@ export class ProceduralBaseScene {
     const flicker = 1 + Math.sin(timestampSeconds * 9.5) * 0.07 + Math.sin(timestampSeconds * 15.2) * 0.04;
     this.flameCore.scale.set(flicker, 0.95 + flicker * 0.08, flicker);
     this.fireGlow.intensity = 54 + Math.sin(timestampSeconds * 11) * 6.6;
+  }
+
+  syncMemorials(records: readonly Readonly<FallenHeroRecord>[]): void {
+    const activeIds = new Set(records.map((record) => record.heroId));
+    this.memorialRoots.forEach((root, heroId) => {
+      if (activeIds.has(heroId)) {
+        return;
+      }
+      this.removeSelectableRoot(root);
+      this.disposeObject(root);
+      this.memorialRoots.delete(heroId);
+    });
+    records.forEach((record, index) => {
+      let root = this.memorialRoots.get(record.heroId);
+      if (!root) {
+        root = this.addMemorial(record);
+        this.memorialRoots.set(record.heroId, root);
+      }
+      const column = index % 5;
+      const row = Math.floor(index / 5);
+      root.position.set(-5.2 + column * 2.55, 0.34, 20.2 + row * 2.4);
+    });
   }
 
   dispose(): void {
@@ -211,6 +237,31 @@ export class ProceduralBaseScene {
     this.root.add(group);
   }
 
+  private addMemorial(record: Readonly<FallenHeroRecord>): THREE.Group {
+    const group = this.createSelectableGroup({
+      category: "memorial",
+      detail: `Day ${record.joinedDay} — Day ${record.diedDay} · ${record.causeOfDeath}`,
+      id: record.heroId,
+      label: record.name,
+    });
+    const stone = new THREE.MeshStandardMaterial({ color: "#585750", roughness: 1 });
+    const bronze = new THREE.MeshStandardMaterial({ color: "#8b7047", metalness: 0.18, roughness: 0.78 });
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.28, 1.15), stone);
+    plinth.position.y = 0.14;
+    plinth.castShadow = true;
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(1.28, 1.72, 0.42), stone);
+    marker.position.set(0, 1.12, 0);
+    marker.castShadow = true;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.42, 12, 1, false, 0, Math.PI), stone);
+    cap.position.set(0, 1.98, 0);
+    cap.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+    cap.castShadow = true;
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.3, 0.08), bronze);
+    plate.position.set(0, 1.18, 0.25);
+    group.add(plinth, marker, cap, plate);
+    return group;
+  }
+
   private addTent(): void {
     const group = this.createSelectableGroup({ category: "prop", id: "basic-tent", label: "Basic Tent" });
     group.position.set(-17.1, 1.08, -13.2);
@@ -322,5 +373,24 @@ export class ProceduralBaseScene {
     this.selectableRoots.push(group);
     this.root.add(group);
     return group;
+  }
+
+  private removeSelectableRoot(root: THREE.Object3D): void {
+    const index = this.selectableRoots.indexOf(root);
+    if (index >= 0) {
+      this.selectableRoots.splice(index, 1);
+    }
+  }
+
+  private disposeObject(root: THREE.Object3D): void {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.LineSegments)) {
+        return;
+      }
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => material.dispose());
+    });
+    root.removeFromParent();
   }
 }

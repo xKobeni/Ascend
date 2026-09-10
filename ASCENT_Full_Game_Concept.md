@@ -114,11 +114,12 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–14 and the first persistent
-Train → Squad → Expedition → Combat → Injury → Recovery loop. Its live client contains Heroes,
-Party, Refuge, and Rift only. Permanent death, recruitment, facilities, equipment, classes, and
-campaign depth in this document describe future phases; they must remain absent from the playable
-interface until their authoritative systems are implemented.
+The implemented build currently covers Phases 0–15 and the first persistent
+Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
+contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
+records, and Refuge memorials are active. Recruitment, broad memories, facilities, equipment,
+classes, and campaign depth in this document describe future phases; they must remain absent from
+the playable interface until their authoritative systems are implemented.
 
 ---
 
@@ -254,6 +255,10 @@ If a hero dies:
 - Their name enters settlement history
 
 The player should remember deaths.
+
+Phase 15 implements this foundation for expedition casualties: fallen heroes leave the active
+roster and party, friends lose morale and retain a bounded loss record, and the Refuge gains a
+selectable grave. Equipment loss remains deferred until equipment exists.
 
 ---
 
@@ -1442,6 +1447,10 @@ Social Reaction Modifier
 
 Death is permanent by default.
 
+Phase 15 activates expedition death, immediate friend reactions, runtime history, and graves. The
+current record uses only authoritative systems already present; equipment recovery, behavioral
+memories, inheritance, and disk persistence remain in their own later phases.
+
 When a hero dies:
 
 1. Hero becomes inactive
@@ -1457,6 +1466,10 @@ When a hero dies:
 # 40. Memorial System
 
 The base contains a memorial area.
+
+The initial Phase 15 memorial is a compact grave row in the living Refuge plus an accessible Heroes
+ledger. The richer fields below describe the mature memorial after classes, deeper expeditions, and
+advanced relationships exist.
 
 Clicking a grave shows:
 
@@ -1943,16 +1956,17 @@ collapsed `F3` developer drawer.
 
 The four destinations grow with the game instead of multiplying into a dashboard:
 
-| Future system | Player-facing home once implemented |
-| --- | --- |
-| Injury and recovery | Heroes details, Recovering filter, contextual Refuge infirmary |
-| Permanent death and memories | Heroes history and contextual memorial records |
-| Recruitment and capacity | Recruit Gate or dormitory interactions inside Refuge |
-| Economy, facilities, and crafting | Refuge world locations and contextual work panels |
-| Equipment and classes | Hero details; Party shows only resulting squad impact |
-| Expedition variety and Rift depth | Rift mission selection and regional progression |
-| Doctrine and advanced relationships | Party planning and hero Relations details |
-| History, social events, and memorials | Chronicle or Refuge locations when event volume warrants it |
+| System | Player-facing home | Status |
+| --- | --- | --- |
+| Injury and recovery | Heroes details, Recovering filter, contextual Refuge infirmary | Implemented |
+| Permanent death and memorial records | Heroes ledger and contextual Refuge graves | Implemented |
+| Broad memories | Hero Relations or History context once behavior effects exist | Future |
+| Recruitment and capacity | Recruit Gate or dormitory interactions inside Refuge | Future |
+| Economy, facilities, and crafting | Refuge world locations and contextual work panels | Future |
+| Equipment and classes | Hero details; Party shows only resulting squad impact | Future |
+| Expedition variety and Rift depth | Rift mission selection and regional progression | Future |
+| Doctrine and advanced relationships | Party planning and hero Relations details | Future |
+| Chronicle-scale history | Refuge context when event volume warrants it | Future |
 
 No disabled future tab, fake counter, empty navigation destination, or invented data appears before
 its system ships.

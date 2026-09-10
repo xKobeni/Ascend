@@ -51,15 +51,17 @@ export class Game {
     );
     this.heroRosterOverlay = new HeroRosterOverlay(
       container,
-      heroes,
+      () => this.simulation.getHeroes(),
+      () => this.simulation.getFallenHeroes(),
       () => this.simulation.getSquad(),
       this.portraits,
       (heroId) => this.openHeroDetail(heroId, "Overview", "Heroes"),
+      (heroId) => this.openMemorial(heroId, "Heroes"),
       () => this.activateHudSection("Refuge", true),
     );
     this.squadOverlay = new SquadOverlay(
       container,
-      heroes,
+      () => this.simulation.getHeroes(),
       () => this.simulation.getSquad(),
       () => this.simulation.getSquadEvaluation(),
       this.portraits,
@@ -126,6 +128,10 @@ export class Game {
           this.openHeroDetail(selection.id, "Overview", "Refuge");
           return;
         }
+        if (selection.category === "memorial") {
+          this.openMemorial(selection.id, "Refuge");
+          return;
+        }
         this.closePlayerPanels();
         this.hudShell.setActive("Refuge");
         this.activeHudSection = "Refuge";
@@ -180,14 +186,23 @@ export class Game {
       : combatSnapshot.result !== "Idle"
         ? "combat"
         : "refuge";
-    this.renderer.render(timestampMs / 1_000, clockFrame.frameDeltaSeconds, combatSnapshot);
+    const heroes = this.simulation.getHeroes();
+    const fallenHeroes = this.simulation.getFallenHeroes();
+    this.renderer.render(
+      timestampMs / 1_000,
+      clockFrame.frameDeltaSeconds,
+      combatSnapshot,
+      heroes,
+      fallenHeroes,
+    );
     const simulationSnapshot = this.simulation.getSnapshot();
     this.hudShell.update(simulationSnapshot, expeditionSnapshot.resources);
     this.debugOverlay.update(timestampMs, simulationSnapshot, this.renderer.getCameraDiagnostics());
     this.notificationCenter.update(
-      this.simulation.getHeroes(),
+      heroes,
       this.simulation.getSocialEvents(),
       expeditionSnapshot,
+      fallenHeroes,
     );
     this.heroRosterOverlay.update();
     this.squadOverlay.updateEvaluation();
@@ -249,6 +264,21 @@ export class Game {
     this.activateHudSection(returnTo, true);
   }
 
+  private openMemorial(heroId: string, returnTo: "Heroes" | "Refuge"): void {
+    const record = this.simulation.getFallenHero(heroId);
+    if (!record || this.simulation.getExpeditionSnapshot().phase !== "Briefing" ||
+      this.simulation.getCombatSnapshot().result !== "Idle") {
+      return;
+    }
+    this.closePlayerPanels();
+    this.activeHudSection = "Heroes";
+    this.hudShell.setActive("Heroes");
+    this.heroDetailReturn = returnTo;
+    this.selectedHeroId = null;
+    this.renderer.setUiInteractionActive(true);
+    this.selectionOverlay.showMemorial(record);
+  }
+
   private closePlayerPanels(): void {
     this.heroRosterOverlay.close();
     this.selectionOverlay.close();
@@ -263,7 +293,7 @@ export class Game {
       return;
     }
     event.preventDefault();
-    if (this.selectedHeroId) {
+    if (this.selectionOverlay.isOpen()) {
       this.closeHeroDetail();
       return;
     }

@@ -4,7 +4,7 @@ import { CameraController, type CameraDiagnostics } from "../rendering/CameraCon
 import { ProceduralBaseScene } from "../rendering/ProceduralBaseScene";
 import { SelectionRaycaster, type SelectionDetails } from "../rendering/SelectionRaycaster";
 import { HeroRenderer } from "../rendering/heroes/HeroRenderer";
-import type { Hero } from "../heroes/Hero";
+import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { CombatSnapshot } from "../combat/Combat";
 import { CombatArenaScene } from "../rendering/combat/CombatArenaScene";
 
@@ -24,6 +24,7 @@ export class Renderer {
   private readonly heroRenderer: HeroRenderer;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
+  private readonly selectableRoots: THREE.Object3D[] = [];
   private readonly selectionRaycaster: SelectionRaycaster;
   private uiInteractionActive = false;
   private readonly resizeObserver: ResizeObserver;
@@ -35,7 +36,7 @@ export class Renderer {
     events: {
       emit<Key extends keyof RendererEvents>(event: Key, payload: RendererEvents[Key]): void;
     },
-    private readonly heroes: readonly Readonly<Hero>[],
+    heroes: readonly Readonly<Hero>[],
   ) {
     this.scene = new THREE.Scene();
     this.combatScene = new THREE.Scene();
@@ -51,16 +52,15 @@ export class Renderer {
     this.renderer.toneMappingExposure = 1.05;
     this.container.appendChild(this.renderer.domElement);
 
-    this.baseScene = new ProceduralBaseScene(this.scene);
+    this.baseScene = new ProceduralBaseScene(this.scene, this.selectableRoots);
     this.combatArena = new CombatArenaScene(this.combatScene);
-    const selectableRoots = [...this.baseScene.selectableRoots];
-    this.heroRenderer = new HeroRenderer(this.scene, heroes, selectableRoots);
+    this.heroRenderer = new HeroRenderer(this.scene, heroes, this.selectableRoots);
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
     this.selectionRaycaster = new SelectionRaycaster(
       this.camera,
       this.renderer.domElement,
       this.scene,
-      selectableRoots,
+      this.selectableRoots,
       (selection) => events.emit("selectionChanged", selection),
     );
 
@@ -81,6 +81,8 @@ export class Renderer {
     timestampSeconds: number,
     deltaSeconds: number,
     combatSnapshot: Readonly<CombatSnapshot>,
+    heroes: readonly Readonly<Hero>[],
+    fallenHeroes: readonly Readonly<FallenHeroRecord>[],
   ): void {
     this.cameraController.update(deltaSeconds);
     const combatMode = combatSnapshot.result !== "Idle";
@@ -99,8 +101,9 @@ export class Renderer {
       this.renderer.render(this.combatScene, this.camera);
       return;
     }
+    this.baseScene.syncMemorials(fallenHeroes);
     this.baseScene.update(timestampSeconds);
-    this.heroRenderer.update(this.heroes, timestampSeconds, deltaSeconds);
+    this.heroRenderer.update(heroes, timestampSeconds, deltaSeconds);
     this.selectionRaycaster.update();
     this.renderer.render(this.scene, this.camera);
   }

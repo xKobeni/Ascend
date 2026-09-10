@@ -1,6 +1,7 @@
 import type {
   Hero,
   HeroAttributes,
+  FallenHeroRecord,
   HeroNeeds,
   HeroSkills,
   Personality,
@@ -64,6 +65,7 @@ export class SelectionOverlay {
   private readonly detail: HTMLElement;
   private readonly label: HTMLElement;
   private readonly heroContent: HTMLElement;
+  private readonly memorialContent: HTMLElement;
   private selectedHeroId: string | null = null;
   private selectedTab: "Overview" | "Relations" | "Skills" | "Training" = "Overview";
   private skillForgeRenderSignature: string | null = null;
@@ -120,11 +122,13 @@ export class SelectionOverlay {
           <section><span class="hero-panel__heading">Relationships</span><div class="hero-panel__relationships" data-hero="relationships"></div></section>
         </div>
       </div>
+      <div class="memorial-record" data-selection="memorial" hidden></div>
     `;
     this.category = this.requireElement("category");
     this.detail = this.requireElement("detail");
     this.label = this.requireElement("label");
     this.heroContent = this.requireElement("hero");
+    this.memorialContent = this.requireElement("memorial");
     this.element.addEventListener("click", this.handleClick);
     container.appendChild(this.element);
   }
@@ -148,6 +152,7 @@ export class SelectionOverlay {
     this.detail.textContent = selection.detail ?? "";
     this.detail.hidden = !selection.detail;
     this.heroContent.hidden = !hero;
+    this.memorialContent.hidden = true;
     const tabs = this.requireElement("tabs");
     tabs.hidden = !hero;
     if (hero) {
@@ -164,6 +169,29 @@ export class SelectionOverlay {
       id: hero.id,
       label: hero.name,
     }, hero, heroes);
+  }
+
+  showMemorial(record: Readonly<FallenHeroRecord>): void {
+    this.setSelection({
+      category: "memorial",
+      detail: `Day ${record.joinedDay} — Day ${record.diedDay}`,
+      id: record.heroId,
+      label: record.name,
+    });
+    this.memorialContent.hidden = false;
+    this.memorialContent.innerHTML = `
+      <span class="memorial-record__mark" aria-hidden="true">◇</span>
+      <p>${this.escape(record.occupation)} · Level ${record.level}</p>
+      <dl>
+        <div><dt>Rank</dt><dd>${"★".repeat(record.rank)}</dd></div>
+        <div><dt>Days alive</dt><dd>${record.daysAlive}</dd></div>
+        <div><dt>Missions</dt><dd>${record.expeditions}</dd></div>
+        <div><dt>Victories</dt><dd>${record.victories}</dd></div>
+        <div><dt>Kills</dt><dd>${record.kills}</dd></div>
+        <div><dt>Final party</dt><dd>${this.escape(record.finalSquadName)}</dd></div>
+      </dl>
+      <section><span class="hero-panel__heading">Cause of death</span><strong>${this.escape(record.causeOfDeath)}</strong></section>
+    `;
   }
 
   close(): void {
@@ -544,5 +572,9 @@ export class SelectionOverlay {
       throw new Error(`Selection overlay is missing the ${name} element.`);
     }
     return element;
+  }
+
+  private escape(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 }
