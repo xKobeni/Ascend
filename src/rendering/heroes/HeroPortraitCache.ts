@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 import type { Hero } from "../../heroes/Hero";
+import { getHeroAppearanceSignature } from "../../heroes/HeroAppearanceConfig";
 import { HeroMeshGenerator } from "./HeroMeshGenerator";
 
 interface CachedPortrait {
@@ -24,7 +25,7 @@ export class HeroPortraitCache {
     onReady: () => void,
   ): Promise<void> {
     if (this.generation) {
-      return this.generation;
+      return this.generation.then(() => this.generateAll(heroes, onReady));
     }
     const pending = heroes.filter((hero) => {
       const cached = this.cache.get(hero.id);
@@ -108,7 +109,7 @@ export class HeroPortraitCache {
   }
 
   private getSignature(hero: Readonly<Hero>): string {
-    return JSON.stringify(hero.appearance);
+    return getHeroAppearanceSignature(hero.appearance);
   }
 
   private addPortraitFace(root: THREE.Group, headRadius: number): void {

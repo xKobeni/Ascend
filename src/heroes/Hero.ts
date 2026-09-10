@@ -20,13 +20,17 @@ export type HairLength = "short" | "medium" | "long";
 export type HeroGender = "female" | "male";
 
 export interface HeroAppearance {
+  armLength: number;
   bodyWidth: number;
   clothingColor: string;
   gender: HeroGender;
   hairColor: string;
   hairLength: HairLength;
   hairStyle: HairStyle;
+  headScale: number;
   height: number;
+  legLength: number;
+  shoulderWidth: number;
   skinTone: string;
 }
 
@@ -231,6 +235,7 @@ export interface Hero {
   appearance: HeroAppearance;
   attributes: HeroAttributes;
   career: HeroCareer;
+  generationSeed: number | null;
   hiddenPotential: HiddenPotential;
   heroClass: HeroClass;
   id: string;

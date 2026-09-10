@@ -57,18 +57,24 @@ export class HeroMeshGenerator {
     group.add(body);
 
     // Head - simple sphere
-    const headRadius = isFemale ? 0.26 : 0.28;
+    const headRadius = (isFemale ? 0.26 : 0.28) * hero.appearance.headScale;
     const head = new THREE.Mesh(new THREE.SphereGeometry(headRadius, 12, 10), skinMat);
     head.position.y = 1.95;
     group.add(head);
 
     // Hair - simplified
-    const hairPieces = this.addHair(group, hero.appearance.hairStyle, hero.appearance.hairLength, hairMat);
+    const hairPieces = this.addHair(
+      group,
+      hero.appearance.hairStyle,
+      hero.appearance.hairLength,
+      hero.appearance.headScale,
+      hairMat,
+    );
 
     // Arms - short stubby cylinders
-    const shoulderOffset = isFemale ? 0.38 : 0.42;
+    const shoulderOffset = (isFemale ? 0.38 : 0.42) * hero.appearance.shoulderWidth;
     const armRadius = 0.07;
-    const armLength = 0.32;
+    const armLength = 0.32 * hero.appearance.armLength;
 
     const armLeft = new THREE.Mesh(
       new THREE.CylinderGeometry(armRadius, armRadius * 0.9, armLength, 8),
@@ -100,13 +106,13 @@ export class HeroMeshGenerator {
     // Legs - short stubby cylinders
     const hipSpread = isFemale ? 0.18 : 0.16;
     const legRadius = 0.09;
-    const legLength = 0.28;
+    const legLength = 0.28 * hero.appearance.legLength;
 
     const legLeft = new THREE.Mesh(
       new THREE.CylinderGeometry(legRadius, legRadius * 0.85, legLength, 8),
       legMat,
     );
-    legLeft.position.set(-hipSpread * bodyW, 0.6, 0);
+    legLeft.position.set(-hipSpread * bodyW, 0.74 - legLength / 2, 0);
     group.add(legLeft);
 
     // Left foot as child of left leg
@@ -119,7 +125,7 @@ export class HeroMeshGenerator {
       new THREE.CylinderGeometry(legRadius, legRadius * 0.85, legLength, 8),
       legMat,
     );
-    legRight.position.set(hipSpread * bodyW, 0.6, 0);
+    legRight.position.set(hipSpread * bodyW, 0.74 - legLength / 2, 0);
     group.add(legRight);
 
     // Right foot as child of right leg
@@ -156,6 +162,7 @@ export class HeroMeshGenerator {
     group: THREE.Group,
     style: HairStyle,
     length: HairLength,
+    headScale: number,
     material: THREE.Material,
   ): THREE.Object3D[] {
     const pieces: THREE.Object3D[] = [];
@@ -164,12 +171,12 @@ export class HeroMeshGenerator {
     }
 
     // Hair cap - hemisphere on top of head
-    const capRadius = 0.29;
+    const capRadius = 0.29 * headScale;
     const cap = new THREE.Mesh(
       new THREE.SphereGeometry(capRadius, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
       material,
     );
-    cap.position.y = 2.0;
+    cap.position.y = 1.95 + 0.05 * headScale;
     group.add(cap);
     pieces.push(cap);
 
@@ -181,7 +188,7 @@ export class HeroMeshGenerator {
         new THREE.CylinderGeometry(0.06, 0.04, strandLength, 6),
         material,
       );
-      leftStrand.position.set(-0.2, 1.7, -0.1);
+      leftStrand.position.set(-0.2 * headScale, 1.7, -0.1);
       group.add(leftStrand);
       pieces.push(leftStrand);
 
@@ -189,7 +196,7 @@ export class HeroMeshGenerator {
         new THREE.CylinderGeometry(0.06, 0.04, strandLength, 6),
         material,
       );
-      rightStrand.position.set(0.2, 1.7, -0.1);
+      rightStrand.position.set(0.2 * headScale, 1.7, -0.1);
       group.add(rightStrand);
       pieces.push(rightStrand);
     } else if (style === "ponytail") {
@@ -205,7 +212,7 @@ export class HeroMeshGenerator {
     } else if (style === "bun") {
       const bunSize = length === "long" ? 0.14 : 0.11;
       const bun = new THREE.Mesh(new THREE.SphereGeometry(bunSize, 8, 6), material);
-      bun.position.set(0, 2.15, -0.18);
+      bun.position.set(0, 1.95 + 0.2 * headScale, -0.18 * headScale);
       group.add(bun);
       pieces.push(bun);
     } else if (style === "mohawk") {
@@ -213,7 +220,7 @@ export class HeroMeshGenerator {
         new THREE.BoxGeometry(0.08, 0.2, 0.35),
         material,
       );
-      crest.position.set(0, 2.2, 0);
+      crest.position.set(0, 1.95 + 0.25 * headScale, 0);
       group.add(crest);
       pieces.push(crest);
     } else if (style === "wild") {

@@ -33,7 +33,7 @@ export class ProceduralBaseScene {
     this.addTrainingDummy();
     this.addCrates();
     this.addStoragePile();
-    this.addGatePlaceholder();
+    this.addDimensionalGate();
     this.scene.add(this.root);
   }
 
@@ -349,8 +349,8 @@ export class ProceduralBaseScene {
     }
   }
 
-  private addGatePlaceholder(): void {
-    const group = this.createSelectableGroup({ category: "base", id: "dimensional-gate", label: "Gate Foundation" });
+  private addDimensionalGate(): void {
+    const group = this.createSelectableGroup({ category: "base", id: "dimensional-gate", label: "Dimensional Gate" });
     group.position.set(16.8, 1.08, 12.9);
     const stone = new THREE.MeshStandardMaterial({ color: "#555361", roughness: 0.72, metalness: 0.1 });
     for (const x of [-2.85, 2.85]) {
@@ -364,6 +364,20 @@ export class ProceduralBaseScene {
     lintel.position.y = 8.34;
     lintel.castShadow = true;
     group.add(lintel);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(2.28, 0.13, 8, 48),
+      new THREE.MeshStandardMaterial({ color: "#a78652", metalness: 0.34, roughness: 0.66 }),
+    );
+    ring.position.y = 4.35;
+    ring.scale.y = 1.28;
+    group.add(ring);
+    const threshold = new THREE.Mesh(
+      new THREE.CircleGeometry(2.18, 48),
+      new THREE.MeshBasicMaterial({ color: "#747b5d", opacity: 0.16, transparent: true, depthWrite: false }),
+    );
+    threshold.position.set(0, 4.35, -0.06);
+    threshold.scale.y = 1.28;
+    group.add(threshold);
   }
 
   private createSelectableGroup(details: SelectionDetails): THREE.Group {

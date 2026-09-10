@@ -5,11 +5,11 @@
 Current implementation boundary (verified September 10, 2026):
 
 ```text
-Gameplay phases implemented: 0–17
+Gameplay phases implemented: 0–18
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 18 — Recruitment System
-Procedural Character Forge: approved for Phase 18, not yet player-facing
+Next gameplay phase: Phase 19 — Hero Capacity and Dormitories
+Procedural Character Forge: human recruitment subset implemented
 ```
 
 This tutorial documents implemented code only. The roadmap and concept contain later ideas, but a
@@ -55,6 +55,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 7. Survivors remember rescues, trauma, and fallen allies
 8. Experience can award traits and gently change personality
 9. Fallen heroes get memorial graves in the refuge
+10. A victory's Rift Shards can recruit a seeded 1–3★ hero through the Gate
 
 Before and after a meaningful change, run:
 
@@ -66,7 +67,7 @@ git diff --check
 ```
 
 The browser playtest exercises the current UI, procedural portraits, camera gating, squad swaps,
-victory and withdrawal routes, recovery, permanent death, memories, and trait evolution. A successful
+victory and withdrawal routes, recovery, permanent death, memories, trait evolution, and recruitment. A successful
 static build alone does not prove those runtime paths.
 
 ### 1.1 Implemented Phase Map
@@ -85,10 +86,10 @@ static build alone does not prove those runtime paths.
 | 15 | Permanent death, survivor grief, memorial ledger and Refuge graves | `LegacySystem` |
 | 16 | Typed memories, reinforcement/decay, relationships and Utility AI influence | `memories/` |
 | 17 | Earned traits, provenance, notifications and bounded personality drift | `TraitEvolutionSystem` |
+| 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, `RecruitmentOverlay` |
 
-Phase 18 is the next boundary. It will introduce real recruitment and the first player-facing use of
-the approved Procedural Character Forge. Until that phase is implemented, the existing prototype is
-a reference—not a live destination, summon flow, or source of mocked recruits.
+Phase 19 is the next boundary. It will make roster capacity and dormitories authoritative. Until
+then, do not invent a population cap, bed requirement, comfort modifier, or dormitory upgrade cost.
 
 ---
 
@@ -252,6 +253,7 @@ interface Hero {
   // Origin
   origin: HeroOrigin;            // occupation, category, rarity, aptitudes
   career: HeroCareer;            // expeditions, kills, victories, joinedDay
+  generationSeed: number | null; // stored for Phase 18 recruits
 
   // Stats
   attributes: HeroAttributes;    // strength, agility, endurance, intelligence, willpower, leadership (2-7)
@@ -372,20 +374,28 @@ Player-assignable training queue (max 3 slots). Three training types:
 
 ### 4.7 Injury System (`src/heroes/InjurySystem.ts`)
 
-Four injury types:
+Eleven injury types are defined. The table below shows their direct modifiers:
 
 | Injury | Attack | Defense | Training | Recovery | Medicine Cost |
 |--------|--------|---------|----------|----------|--------------|
 | Minor Wound | -5% | -4% | -12% | 18 hours | 1 |
+| Sprain | -3% | -6% | -8% | 12 hours | 1 |
+| Bleed | -6% | -3% | -10% | 24 hours | 1 |
 | Burn | -8% | -18% | -25% | 48 hours | 2 |
+| Fracture | -15% | -12% | -28% | 54 hours | 2 |
+| Poison | -10% | -8% | -20% | 36 hours | 2 |
 | Concussion | -12% | -12% | -35% | 60 hours | 2 |
 | Broken Arm | -20% | -10% | -30% | 72 hours | 3 |
+| Burns (Severe) | -14% | -20% | -30% | 54 hours | 3 |
+| Concussion (Severe) | -18% | -18% | -40% | 72 hours | 3 |
+| Internal Bleeding | -18% | -15% | -35% | 66 hours | 3 |
 
-- **Training injuries** are always Minor Wounds
+- **Training injuries** are Sprains or Minor Wounds
+- **Bleed** can stack up to three times; other duplicate injuries aggravate the existing record
 - **Expedition injuries** depend on damage ratio (Defeat = higher severity)
-- **Permanent injuries:** 8% chance when damageRatio >= 0.92 on defeat
-- **Recovery rate:** `0.7 + endurance * 0.035` per game minute, doubled if treated
-- **Treatment:** Costs medicine, halves remaining recovery time
+- **Permanent injuries:** checked on defeat at damageRatio >= 0.92; severe definitions may raise the base 8% chance
+- **Recovery rate:** `0.7 + endurance * 0.035` per resting game minute, multiplied by 2.25 if treated
+- **Treatment:** Costs medicine and accelerates resting recovery; permanent effects are stabilized, not removed
 
 ### 4.8 Relationship System (`src/heroes/RelationshipSystem.ts`)
 
@@ -475,6 +485,30 @@ a combat-memory update; it is not polled every render frame.
 An initially generated Protective hero keeps a `Generated` source and is not awarded the same trait
 again. This is intentional compatibility behavior, not a missing evolution.
 
+### 4.12 Recruitment (`src/recruitment/RecruitmentSystem.ts`)
+
+Recruitment costs 3 Rift Shards and is allowed only while combat is idle and the expedition is in
+Briefing. The actual flow is coordinated by `Simulation.recruitHero()`:
+
+1. Check the real `ExpeditionSystem` shard stockpile.
+2. Create a deterministic seed/rank roll in `RecruitmentSystem`.
+3. Spend 3 shards.
+4. Generate and admit the hero through `HeroManager.recruit()`.
+5. Initialize relationships with all current residents.
+6. Return one `RecruitmentResult` to the reveal UI.
+
+Rank odds are 72% 1★, 23% 2★, and 5% 3★. Rank is assigned after hero generation, so it does not
+modify hidden potential. Recruits store their generation seed; the same seed reproduces the same
+appearance configuration.
+
+The approved prototype contributes bounded human body proportions (`headScale`, `shoulderWidth`,
+`armLength`, and `legLength`) in addition to height/bulk, hair, and colors. All consumers use the
+same `HeroMeshGenerator`. `HeroAppearanceConfig.ts` validates JSON-compatible appearance data and
+builds the portrait cache signature.
+
+The prototype's races, classes, weapons, armor, enemies, unrestricted sliders, standalone sidebar,
+and localStorage presets remain excluded.
+
 ---
 
 ## 5. Skill Forge
@@ -503,7 +537,11 @@ interface HeroSkillForge {
 }
 ```
 
-### 5.2 All 18 Skill Definitions (`src/skills/SkillDefinitionRegistry.ts`)
+### 5.2 Skill Definitions (`src/skills/SkillDefinitionRegistry.ts`)
+
+The registry currently contains 36 data-defined skills. This table shows the original core used by
+the first combat and expedition loop; consult the registry for the later survival, crafting,
+negotiation, tactical, magic, and weapon-expansion entries rather than duplicating their data here.
 
 | ID | Name | Type | Category | Rarity | Affinity | Prerequisites |
 |----|------|------|----------|--------|----------|---------------|
@@ -844,6 +882,7 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 | CombatOverlay | `CombatOverlay.ts` | Sandbox combat viewer |
 | DebugOverlay | `DebugOverlay.ts` | F3 diagnostics |
 | NotificationCenter | `NotificationCenter.ts` | Event feed |
+| RecruitmentOverlay | `RecruitmentOverlay.ts` | Seeded Dimensional Gate arrival reveal |
 | ControlsHint | `ControlsHint.ts` | Camera controls hint |
 | SocialLogOverlay | `SocialLogOverlay.ts` | Social event log |
 
@@ -1192,6 +1231,18 @@ The current production build may report a non-blocking warning for a JavaScript 
 also inspect the generated playtest screenshots at desktop, tablet, and mobile sizes rather than
 assuming a passing typecheck proves layout quality.
 
+### 10.11 Modify Recruitment Safely
+
+- Change `RECRUITMENT_COST` or rank thresholds in `src/recruitment/RecruitmentSystem.ts`.
+- Keep the button reading the cost through `Simulation`; never hardcode a second UI value.
+- Keep shard ownership in `ExpeditionSystem` and the full eligibility check in `Simulation`.
+- Add appearance fields across `HeroAppearance`, `HeroGenerator`, `HeroAppearanceConfig`, and
+  `HeroMeshGenerator` together so the world, portrait, and reveal cannot disagree.
+- Preserve `generationSeed` and prove the same seed reproduces the same appearance.
+- Do not expose hidden potential or player-controlled rank, class, equipment, or race selection.
+- Update the Phase 18 browser block to cover insufficient funds, spending, rank range, relationships,
+  validated JSON, portrait generation, reveal content, notification, and roster count.
+
 ---
 
 ## 11. Key Constants Reference
@@ -1199,6 +1250,8 @@ assuming a passing typecheck proves layout quality.
 | Constant | Value | File |
 |----------|-------|------|
 | Squad size | 3 | `src/squads/SquadSystem.ts` |
+| Recruitment cost | 3 Rift Shards | `src/recruitment/RecruitmentSystem.ts` |
+| Recruit rank odds | 72% / 23% / 5% for 1★ / 2★ / 3★ | `src/recruitment/RecruitmentSystem.ts` |
 | Max training slots | 3 | `src/heroes/TrainingSystem.ts` |
 | Active skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
 | Passive skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
@@ -1255,13 +1308,14 @@ assuming a passing typecheck proves layout quality.
 |------|---------|
 | `src/heroes/Hero.ts` | Complete hero data model (15+ interfaces). |
 | `src/heroes/HeroGenerator.ts` | Procedural hero creation. |
+| `src/heroes/HeroAppearanceConfig.ts` | Bounded appearance JSON validation and signatures. |
 | `src/heroes/HeroManager.ts` | Hero lifecycle management. |
 | `src/heroes/NameGenerator.ts` | Fantasy name generation. |
 | `src/heroes/OccupationDefinitions.ts` | 35 occupation definitions. |
 | `src/heroes/NeedsSystem.ts` | Hunger, fatigue, health, morale, social, stress. |
 | `src/heroes/HeroRoutineSystem.ts` | Daily schedule, movement, navigation. |
 | `src/heroes/TrainingSystem.ts` | Training queue and completion. |
-| `src/heroes/InjurySystem.ts` | 4 injury types, treatment, recovery. |
+| `src/heroes/InjurySystem.ts` | 11 injury types, stacking/aggravation, treatment, and recovery. |
 | `src/heroes/RelationshipSystem.ts` | 6-metric relationship simulation. |
 | `src/heroes/LegacySystem.ts` | Death memorialization, survivor reactions. |
 | `src/heroes/TraitEvolutionSystem.ts` | Earned-trait conditions and bounded personality drift. |
@@ -1276,12 +1330,17 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/skills/Skill.ts` | Skill data model and types. |
-| `src/skills/SkillDefinitionRegistry.ts` | 18 static skill definitions. |
+| `src/skills/SkillDefinitionRegistry.ts` | 36 static skill definitions. |
 | `src/skills/HeroSkillGenerator.ts` | Initial skill generation per hero. |
 | `src/skills/SkillProgressionSystem.ts` | XP, leveling, proficiency. |
 | `src/skills/SkillDiscoverySystem.ts` | Prerequisite-based skill unlocking. |
 | `src/skills/SkillLoadoutSystem.ts` | Active/passive loadout management. |
 | `src/skills/SkillEvolutionSystem.ts` | Evolution chains (stub). |
+
+### Recruitment
+| File | Purpose |
+|------|---------|
+| `src/recruitment/RecruitmentSystem.ts` | Recruitment cost, stored seed, and 1–3★ rank roll. |
 
 ### Combat
 | File | Purpose |
@@ -1330,6 +1389,7 @@ assuming a passing typecheck proves layout quality.
 | `src/ui/CombatOverlay.ts` | Sandbox combat viewer with AI debug. |
 | `src/ui/DebugOverlay.ts` | F3 developer diagnostics. |
 | `src/ui/NotificationCenter.ts` | Event-driven notification feed. |
+| `src/ui/RecruitmentOverlay.ts` | Dimensional Gate recruitment reveal. |
 | `src/ui/ControlsHint.ts` | Camera controls hint overlay. |
 | `src/ui/SocialLogOverlay.ts` | Social event log. |
 

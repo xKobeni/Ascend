@@ -1,6 +1,6 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 17. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 18. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
@@ -9,10 +9,10 @@ Last verified against the repository: September 10, 2026.
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–17
+Implemented gameplay phases: 0–18
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 18 — Recruitment System
-Procedural Character Forge activation: planned for Phase 18
+Next gameplay phase: 19 — Hero Capacity and Dormitories
+Procedural Character Forge activation: human recruitment subset implemented
 ```
 
 This file describes implemented code. Future features are clearly labelled so they are not mistaken
@@ -353,7 +353,7 @@ seed using browser crypto, and all choices made by that generator use the same R
 ### Important determinism limitation
 
 The current initial game does not store the generated seed. Reloading creates a new roster. The
-future Procedural Character Forge plan requires storing a seed or reproducible appearance signature,
+implemented Procedural Character Forge stores the recruitment seed and reproducible appearance configuration,
 but that is not implemented yet.
 
 ---
@@ -520,10 +520,10 @@ training system.
 
 ## 12. Skill Forge
 
-Do not confuse the implemented **Hero Skill Forge** with the future **Procedural Character Forge**.
+Do not confuse the implemented **Hero Skill Forge** with the **Procedural Character Forge**.
 
 - Hero Skill Forge: implemented Phase 12 system for skills and progression.
-- Procedural Character Forge: planned appearance/model technology, first player-facing in Phase 18.
+- Procedural Character Forge: Phase 18 human appearance and recruitment pipeline.
 
 ### Skill data flow
 
@@ -886,7 +886,7 @@ When changing appearance, test all three representations:
 - Heroes roster portrait
 - Party card portrait
 
-The future Procedural Character Forge should extend this shared path instead of creating a second,
+The Procedural Character Forge extends this shared path instead of creating a second,
 unrelated hero renderer.
 
 ---
@@ -1077,6 +1077,7 @@ whether a panel has intentionally gated input before editing camera math.
 | 15 | Permanent death, memorials, survivor loss | `LegacySystem`, consequence flow |
 | 16 | Typed memories, decay, relationship and Utility AI influence | `memories/`, `UtilityAI` |
 | 17 | Earned traits, provenance, and bounded personality drift | `TraitEvolutionSystem`, hero Overview |
+| 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, recruitment reveal |
 
 Anything beyond this table is future scope unless code and validation are added under an approved
 phase.
@@ -1224,12 +1225,12 @@ diagnostics.
 Do not pull in:
 
 - Trait evolution belongs to Phase 17 and is documented in the next section
-- Recruitment or the Procedural Character Forge from Phase 18
+- Recruitment belongs to Phase 18 and is documented below
 - Disk persistence from Phase 37
 - Boss encounters from Phase 30
 
 Phase 16 remained complete without absorbing those systems. Phase 17 is now implemented as a
-separate layer; recruitment and the Procedural Character Forge remain the next boundary in Phase 18.
+separate layer. Phase 18 recruitment is now implemented as another separate layer.
 
 ---
 
@@ -1306,12 +1307,87 @@ trait names during initialization and only announces later earned traits, preven
 5. Add a focused browser regression proving the threshold, provenance, drift, and duplicate suppression.
 6. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
 
-Do not add recruitment, Forge UI, classes, equipment, facilities, or save migration as part of a
-trait change. Those retain their own phase boundaries.
+Do not mix recruitment, classes, equipment, facilities, or save migration into a trait change.
+Recruitment is implemented separately in Phase 18; the other systems retain later boundaries.
 
 ---
 
-## 28. Debugging Method
+## 28. Phase 18 Reference: Recruitment and Procedural Character Forge
+
+Phase 18 adds a real acquisition loop without adding another primary destination:
+
+```text
+Win Rift expedition → receive 3 Rift Shards → Heroes / Dimensional Gate
+→ spend 3 Shards → generate seeded hero → reveal → active Refuge roster
+```
+
+### Recruitment ownership
+
+`src/recruitment/RecruitmentSystem.ts` owns the cost and seeded rank roll. The implemented rank
+distribution is 72% 1★, 23% 2★, and 5% 3★. Only these ranks exist in the current acquisition flow.
+
+`Simulation.recruitHero(seed?)` is the transaction boundary. It verifies that combat and expedition
+are idle, verifies the stockpile, spends Rift Shards through `ExpeditionSystem`, asks `HeroManager`
+to generate/admit the recruit, updates hero count, and returns the reveal result. Player code omits
+the seed; the optional argument exists for reproducible validation.
+
+`HeroManager.recruit` uses a fresh seeded `HeroGenerator`, sets `career.joinedDay`, applies the rolled
+rank after hidden potential is generated, admits the hero, and initializes directional relationships
+between the arrival and every resident.
+
+### Stored appearance and prototype adaptation
+
+Every hero appearance now includes:
+
+```text
+height + bodyWidth
+headScale + shoulderWidth
+armLength + legLength
+gender + human hair style/length
+skin + hair + clothing colors
+```
+
+Recruits store `generationSeed`. `HeroAppearanceConfig.ts` validates bounded plain JSON and provides
+the canonical appearance signature. `HeroMeshGenerator` is still the shared mesh path for the live
+Refuge, cached portrait, party card, roster card, and recruitment reveal.
+
+The imported prototype ideas stop at human proportions, hair, colors, seeded data, and modular mesh
+construction. Do not activate its fantasy races, classes, weapons, armor, enemy tiers, magic glow,
+standalone editor sidebar, or localStorage preset workflow under Phase 18.
+
+### Resource and UI flow
+
+Recruitment costs 3 actual `riftShards` from `ExpeditionSystem`; there is no separate currency copy.
+The Heroes header disables `OPEN GATE` when funds are insufficient. Selecting the Refuge's
+Dimensional Gate routes to Heroes. The `RecruitmentOverlay` then shows name, occupation, 1–3★ rank,
+visible traits, visible skills, and the cached procedural portrait while keeping potential concealed.
+
+The recruit is committed when the Gate opens, so closing the reveal cannot reroll or refund it.
+`NotificationCenter` recognizes a new hero as one arrival event and seeds their training, injury,
+trait, and skill baselines to avoid a burst of false discovery messages.
+
+### Portrait lifecycle
+
+`HeroPortraitCache.generateAll` queues a late recruit behind an active batch instead of silently
+dropping it. One temporary offscreen renderer handles each batch. Geometry/materials are disposed,
+the context is released, superseded URLs are revoked, and all remaining URLs are revoked on teardown.
+
+### Safe recipe: change recruitment
+
+1. Change cost or rank odds in `RecruitmentSystem`, not in the button text.
+2. Keep resource validation in `Simulation` and spending in `ExpeditionSystem`.
+3. Keep hidden potential generation independent from rank.
+4. Add appearance fields to `HeroAppearance`, its generator, validator, shared mesh, and signature.
+5. Never add unrestricted player sliders to randomized recruitment.
+6. Extend Phase 18 browser validation for spending, reproducibility, ranks, admission, portrait, and reveal.
+7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
+
+Phase 19 capacity and dormitory limits are not implemented. Phase 18 therefore does not invent a
+population cap, comfort modifier, bed requirement, or dormitory upgrade cost.
+
+---
+
+## 29. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1390,7 +1466,7 @@ git diff --check
 
 ---
 
-## 29. Safe Git Workflow
+## 30. Safe Git Workflow
 
 Before editing:
 
@@ -1418,7 +1494,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 30. Definition of Done for a Change
+## 31. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1442,7 +1518,7 @@ Use this checklist:
 
 ---
 
-## 31. Final Rule of Thumb
+## 32. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 

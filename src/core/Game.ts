@@ -7,6 +7,7 @@ import { ExpeditionOverlay } from "../ui/ExpeditionOverlay";
 import { HeroRosterOverlay } from "../ui/HeroRosterOverlay";
 import { HudShell, type HudSection } from "../ui/HudShell";
 import { NotificationCenter } from "../ui/NotificationCenter";
+import { RecruitmentOverlay } from "../ui/RecruitmentOverlay";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
 import { SquadOverlay } from "../ui/SquadOverlay";
 import { EventBus } from "./EventBus";
@@ -31,6 +32,7 @@ export class Game {
   private readonly notificationCenter: NotificationCenter;
   private readonly portraits = new HeroPortraitCache();
   private readonly renderer: Renderer;
+  private readonly recruitmentOverlay: RecruitmentOverlay;
   private selectedHeroId: string | null = null;
   private readonly selectionOverlay: SelectionOverlay;
   private readonly simulation = new Simulation();
@@ -49,14 +51,22 @@ export class Game {
       () => this.simulation.getExpeditionSnapshot().resources.medicine,
       () => this.closeHeroDetail(),
     );
+    this.recruitmentOverlay = new RecruitmentOverlay(
+      container,
+      this.portraits,
+      () => this.activateHudSection("Heroes", true),
+    );
     this.heroRosterOverlay = new HeroRosterOverlay(
       container,
       () => this.simulation.getHeroes(),
       () => this.simulation.getFallenHeroes(),
       () => this.simulation.getSquad(),
+      () => this.simulation.getExpeditionSnapshot().resources.riftShards,
+      () => this.simulation.getRecruitmentCost(),
       this.portraits,
       (heroId) => this.openHeroDetail(heroId, "Overview", "Heroes"),
       (heroId) => this.openMemorial(heroId, "Heroes"),
+      () => this.openRecruitment(),
       () => this.activateHudSection("Refuge", true),
     );
     this.squadOverlay = new SquadOverlay(
@@ -132,6 +142,10 @@ export class Game {
           this.openMemorial(selection.id, "Refuge");
           return;
         }
+        if (selection.category === "base" && selection.id === "dimensional-gate") {
+          this.activateHudSection("Heroes");
+          return;
+        }
         this.closePlayerPanels();
         this.hudShell.setActive("Refuge");
         this.activeHudSection = "Refuge";
@@ -170,6 +184,7 @@ export class Game {
     this.heroRosterOverlay.dispose();
     this.hudShell.dispose();
     this.notificationCenter.dispose();
+    this.recruitmentOverlay.dispose();
     this.selectionOverlay.dispose();
     this.squadOverlay.dispose();
     this.portraits.dispose();
@@ -257,6 +272,23 @@ export class Game {
     this.selectionOverlay.showHero(hero, this.simulation.getHeroes(), tab);
   }
 
+  private openRecruitment(): void {
+    const result = this.simulation.recruitHero();
+    if (!result) {
+      return;
+    }
+    this.closePlayerPanels();
+    this.activeHudSection = "Heroes";
+    this.hudShell.setActive("Heroes");
+    this.renderer.setUiInteractionActive(true);
+    this.recruitmentOverlay.open(result);
+    void this.portraits.generateAll([result.hero], () => {
+      this.recruitmentOverlay.refresh();
+      this.heroRosterOverlay.refresh();
+      this.squadOverlay.refresh();
+    });
+  }
+
   private closeHeroDetail(): void {
     const returnTo = this.heroDetailReturn;
     this.selectionOverlay.close();
@@ -281,6 +313,7 @@ export class Game {
 
   private closePlayerPanels(): void {
     this.heroRosterOverlay.close();
+    this.recruitmentOverlay.close();
     this.selectionOverlay.close();
     this.selectedHeroId = null;
     this.squadOverlay.close();
@@ -293,6 +326,10 @@ export class Game {
       return;
     }
     event.preventDefault();
+    if (this.recruitmentOverlay.isOpen()) {
+      this.activateHudSection("Heroes", true);
+      return;
+    }
     if (this.selectionOverlay.isOpen()) {
       this.closeHeroDetail();
       return;

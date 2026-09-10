@@ -36,6 +36,7 @@ export class HeroGenerator {
     initialMovement: HeroMovement,
     rosterIndex: number,
     usedNames?: ReadonlySet<string>,
+    generationSeed: number | null = null,
   ): Hero {
     const occupation = this.pickOccupation();
     const attributes = this.generateAttributes(occupation);
@@ -59,12 +60,14 @@ export class HeroGenerator {
     });
 
     const age = this.random.integer(18, 58);
+    const appearance = this.generateAppearance(attributes, age);
 
     return {
       age,
-      appearance: this.generateAppearance(attributes, age),
+      appearance,
       attributes,
       career: { expeditions: 0, joinedDay: 1, kills: 0, victories: 0 },
+      generationSeed,
       hiddenPotential,
       heroClass: "Unclassified",
       id: crypto.randomUUID(),
@@ -249,13 +252,17 @@ export class HeroGenerator {
     const height = Math.max(0.85, baseHeight - ageShrink);
 
     return {
+      armLength: this.random.float(0.9, 1.12),
       bodyWidth,
       clothingColor: this.random.pick(CLOTHING_COLORS),
       gender,
       hairColor,
       hairLength,
       hairStyle,
+      headScale: this.random.float(0.88, 1.12),
       height,
+      legLength: this.random.float(0.9, 1.12),
+      shoulderWidth: this.random.float(0.86, 1.16),
       skinTone: this.random.pick(SKIN_TONES),
     };
   }

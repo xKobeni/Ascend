@@ -106,6 +106,15 @@ export class ExpeditionSystem {
     return true;
   }
 
+  consumeRiftShards(amount: number): boolean {
+    const normalized = Math.max(0, Math.floor(amount));
+    if (normalized === 0 || this.resources.riftShards < normalized) {
+      return false;
+    }
+    this.resources.riftShards -= normalized;
+    return true;
+  }
+
   private resolve(
     combat: Readonly<CombatSnapshot>,
     outcome: Exclude<CombatResult, "Idle" | "Running">,

@@ -6,6 +6,12 @@ import type { FormationPosition, SquadRole } from "../squads/Squad";
 import { SquadSystem } from "../squads/SquadSystem";
 import { CombatSimulation } from "../combat/CombatSimulation";
 import { ExpeditionSystem } from "../expeditions/ExpeditionSystem";
+import { RECRUITMENT_COST, RecruitmentSystem, type RecruitmentRoll } from "../recruitment/RecruitmentSystem";
+
+export interface RecruitmentResult extends RecruitmentRoll {
+  cost: number;
+  hero: Readonly<Hero>;
+}
 
 const STARTING_MINUTE = 7 * 60;
 const GAME_MINUTES_PER_REAL_SECOND = 12;
@@ -37,6 +43,7 @@ export class Simulation {
     (squad, successful) => this.heroManager.recordExpeditionExperience(squad, successful),
   );
   private readonly squadSystem = new SquadSystem();
+  private readonly recruitmentSystem = new RecruitmentSystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
     elapsedSeconds: 0,
@@ -157,6 +164,29 @@ export class Simulation {
 
   getExpeditionSnapshot() {
     return this.expeditionSystem.getSnapshot();
+  }
+
+  getRecruitmentCost(): number {
+    return RECRUITMENT_COST;
+  }
+
+  canRecruit(): boolean {
+    return this.getExpeditionSnapshot().phase === "Briefing" &&
+      this.getCombatSnapshot().result === "Idle" &&
+      this.getExpeditionSnapshot().resources.riftShards >= RECRUITMENT_COST;
+  }
+
+  recruitHero(seed?: number): RecruitmentResult | null {
+    if (!this.canRecruit()) {
+      return null;
+    }
+    const roll = this.recruitmentSystem.createRoll(seed);
+    if (!this.expeditionSystem.consumeRiftShards(RECRUITMENT_COST)) {
+      return null;
+    }
+    const hero = this.heroManager.recruit(roll.seed, this.state.day, roll.rank);
+    this.state.heroCount = this.heroManager.getAll().length;
+    return { ...roll, cost: RECRUITMENT_COST, hero };
   }
 
   startExpedition(): boolean {

@@ -18,9 +18,12 @@ export class HeroRosterOverlay {
     private readonly getHeroes: () => readonly Readonly<Hero>[],
     private readonly getFallenHeroes: () => readonly Readonly<FallenHeroRecord>[],
     private readonly getSquad: () => Readonly<Squad>,
+    private readonly getRiftShards: () => number,
+    private readonly getRecruitmentCost: () => number,
     private readonly portraits: HeroPortraitCache,
     private readonly onInspect: (heroId: string) => void,
     private readonly onInspectMemorial: (heroId: string) => void,
+    private readonly onRecruit: () => void,
     private readonly onClose: () => void,
   ) {
     this.element = document.createElement("section");
@@ -30,6 +33,7 @@ export class HeroRosterOverlay {
     this.element.innerHTML = `
       <header class="system-panel__header">
         <div><span>REFUGE PERSONNEL</span><h1>Heroes</h1></div>
+        <button type="button" class="roster-recruit" data-roster-action="recruit">OPEN GATE · ${this.getRecruitmentCost()} SHARDS</button>
         <strong data-roster-count>${this.getHeroes().length}</strong>
         <button type="button" data-roster-action="close" aria-label="Close hero roster">×</button>
       </header>
@@ -86,6 +90,11 @@ export class HeroRosterOverlay {
     const count = this.element.querySelector<HTMLElement>("[data-roster-count]");
     if (count) {
       count.textContent = String(heroes.length);
+    }
+    const recruit = this.element.querySelector<HTMLButtonElement>("[data-roster-action='recruit']");
+    if (recruit) {
+      recruit.disabled = this.getRiftShards() < this.getRecruitmentCost();
+      recruit.title = recruit.disabled ? "Secure Rift Shards through a successful expedition." : "Open the Dimensional Gate";
     }
     this.grid.replaceChildren(...visibleHeroes.map((hero) => {
       const card = document.createElement("button");
@@ -151,6 +160,10 @@ export class HeroRosterOverlay {
     }
     if (button.dataset.rosterAction === "close") {
       this.onClose();
+      return;
+    }
+    if (button.dataset.rosterAction === "recruit") {
+      this.onRecruit();
       return;
     }
     if (this.isFilter(button.dataset.rosterFilter)) {
@@ -223,6 +236,7 @@ export class HeroRosterOverlay {
     const squad = this.getSquad();
     return JSON.stringify({
       filter: this.filter,
+      riftShards: this.getRiftShards(),
       heroes: this.getHeroes().map((hero) => [
         hero.id,
         Math.round(hero.needs.health),

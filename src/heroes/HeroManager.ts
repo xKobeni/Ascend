@@ -18,6 +18,7 @@ import { LegacySystem } from "./LegacySystem";
 import type { CombatMemoryEvent } from "../memories/HeroMemory";
 import { MemorySystem } from "../memories/MemorySystem";
 import { TraitEvolutionSystem } from "./TraitEvolutionSystem";
+import { Random } from "../core/Random";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -54,6 +55,22 @@ export class HeroManager {
     const heroes = this.getAll();
     this.relationshipSystem.initialize(heroes);
     return heroes;
+  }
+
+  recruit(seed: number, day: number, rank: 1 | 2 | 3): Readonly<Hero> {
+    const generator = new HeroGenerator(new Random(seed));
+    const hero = generator.generate(
+      createInitialMovement(this.heroes.size),
+      this.heroes.size,
+      this.usedNames,
+      seed,
+    );
+    hero.career.joinedDay = Math.max(1, Math.floor(day));
+    hero.rank = rank;
+    this.usedNames.add(hero.name);
+    this.heroes.set(hero.id, hero);
+    this.relationshipSystem.initialize(this.getAll());
+    return hero;
   }
 
   getAll(): readonly Hero[] {

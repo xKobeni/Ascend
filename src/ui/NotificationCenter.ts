@@ -24,6 +24,7 @@ export class NotificationCenter {
   private readonly trainingOutcomes = new Map<string, string | null>();
   private readonly injurySignatures = new Map<string, string>();
   private readonly knownMemorialIds = new Set<string>();
+  private readonly knownHeroIds = new Set<string>();
   private readonly recoveryOutcomes = new Map<string, string | null>();
   private readonly traitNames = new Map<string, Set<string>>();
 
@@ -85,6 +86,7 @@ export class NotificationCenter {
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
   ): void {
     heroes.forEach((hero) => {
+      this.knownHeroIds.add(hero.id);
       this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
       this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
       this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
@@ -117,6 +119,18 @@ export class NotificationCenter {
 
   private captureHeroChanges(heroes: readonly Readonly<Hero>[]): void {
     heroes.forEach((hero) => {
+      if (!this.knownHeroIds.has(hero.id)) {
+        this.knownHeroIds.add(hero.id);
+        this.trainingOutcomes.set(hero.id, hero.training.lastOutcome);
+        this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
+        this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
+        this.traitNames.set(hero.id, new Set(hero.traits));
+        Object.values(hero.skillForge.known).forEach((skill) => {
+          this.skillLevels.set(`${hero.id}:${skill.definitionId}`, skill.level);
+        });
+        this.push(`${hero.name} emerged from the Dimensional Gate and joined the refuge.`, "success", 30_000);
+        return;
+      }
       const previousOutcome = this.trainingOutcomes.get(hero.id) ?? null;
       if (hero.training.lastOutcome && hero.training.lastOutcome !== previousOutcome) {
         this.push(`${hero.name} · ${hero.training.lastOutcome}`, "success");

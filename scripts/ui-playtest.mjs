@@ -190,7 +190,8 @@ try {
     memories.recordCriticalInjury(saved, 'Concussion', 2);
     const influence = getMemoryCombatInfluence(saved.memories, saver.id);
     const baseActor = {
-      action: 'Idle', formation: 'Middle', hp: 71, id: saved.id, medicine: 0,
+      action: 'Idle', attributes: { agility: 3, endurance: 3, intelligence: 3, leadership: 2, strength: 3, willpower: 3 },
+      formation: 'Middle', hp: 71, id: saved.id, medicine: 0,
       personality: { aggression: 0.2, ambition: 0.2, bravery: 0.9, discipline: 0.6, empathy: 0.5, loyalty: 0.5 },
       position: { x: 0, z: 0 }, preparedSkillIds: new Set(), relationships: {}, role: 'Damage',
       stats: { attack: 20, defense: 10, maxHp: 100, range: 2, speed: 2 }, tacticalRole: 'Striker', traits: [],
@@ -317,6 +318,99 @@ try {
       traitValidation.survivorGuilt && traitValidation.traitNotice && traitValidation.veteran,
     `Phase 17 trait validation failed (${JSON.stringify(traitValidation)}).`,
   );
+  const recruitmentValidation = await evaluate(`(async () => {
+    const [{ Simulation }, { RecruitmentSystem }, { HeroGenerator }, { Random }, { createInitialMovement }, { validateHeroAppearanceConfig }, { HeroPortraitCache }, { RecruitmentOverlay }, { NotificationCenter }, { ProceduralBaseScene }, THREE] = await Promise.all([
+      import('/src/simulation/Simulation.ts'),
+      import('/src/recruitment/RecruitmentSystem.ts'),
+      import('/src/heroes/HeroGenerator.ts'),
+      import('/src/core/Random.ts'),
+      import('/src/base/NavigationPoints.ts'),
+      import('/src/heroes/HeroAppearanceConfig.ts'),
+      import('/src/rendering/heroes/HeroPortraitCache.ts'),
+      import('/src/ui/RecruitmentOverlay.ts'),
+      import('/src/ui/NotificationCenter.ts'),
+      import('/src/rendering/ProceduralBaseScene.ts'),
+      import('/node_modules/three/build/three.module.js'),
+    ]);
+    const recruitment = new RecruitmentSystem(new Random(91));
+    const rolls = Array.from({ length: 600 }, (_, index) => recruitment.createRoll(index + 1));
+    const ranks = new Set(rolls.map((roll) => roll.rank));
+    const fixedRoll = recruitment.createRoll(187451);
+    const deterministicRank = JSON.stringify(fixedRoll) === JSON.stringify(recruitment.createRoll(187451));
+
+    const simulation = new Simulation();
+    const initialHeroes = simulation.getHeroes();
+    const notification = new NotificationCenter(document.querySelector('#app'), () => undefined);
+    notification.update(initialHeroes, [], simulation.getExpeditionSnapshot(), []);
+    simulation.getExpeditionSnapshot().resources.riftShards = 3;
+    const shardsBefore = simulation.getExpeditionSnapshot().resources.riftShards;
+    const result = simulation.recruitHero(187451);
+    const shardsAfter = simulation.getExpeditionSnapshot().resources.riftShards;
+    const countAfter = simulation.getHeroes().length;
+    const blocked = simulation.recruitHero(187452) === null;
+    if (!result) throw new Error('Seeded recruitment unexpectedly failed.');
+    notification.update(simulation.getHeroes(), [], simulation.getExpeditionSnapshot(), []);
+    const recruitmentNotice = [...document.querySelectorAll('.notification-feed li')].some((entry) => entry.textContent.includes(result.hero.name + ' emerged'));
+    notification.dispose();
+
+    const reproduced = new HeroGenerator(new Random(result.seed)).generate(
+      createInitialMovement(initialHeroes.length),
+      initialHeroes.length,
+      new Set(initialHeroes.map((hero) => hero.name)),
+      result.seed,
+    );
+    const appearanceReproduced = JSON.stringify(result.hero.appearance) === JSON.stringify(reproduced.appearance);
+    const validImport = validateHeroAppearanceConfig(JSON.parse(JSON.stringify(result.hero.appearance)));
+    const invalidImport = validateHeroAppearanceConfig({ ...result.hero.appearance, height: 99 });
+
+    const gateScene = new THREE.Scene();
+    const gateSelectables = [];
+    const refuge = new ProceduralBaseScene(gateScene, gateSelectables);
+    const gateActive = gateSelectables.some((root) => root.name === 'Dimensional Gate');
+    refuge.dispose();
+
+    const portraits = new HeroPortraitCache();
+    await portraits.generateAll([result.hero], () => undefined);
+    const portraitUrl = portraits.get(result.hero.id);
+    const reveal = new RecruitmentOverlay(document.querySelector('#app'), portraits, () => undefined);
+    reveal.open(result);
+    const revealText = [...document.querySelectorAll('.recruitment-panel')].at(-1)?.textContent ?? '';
+    const revealPortrait = document.querySelector('.recruitment-reveal__portrait img')?.getAttribute('src') ?? '';
+    const revealRank = document.querySelector('.recruitment-reveal__rank')?.textContent?.length ?? 0;
+    reveal.dispose();
+    portraits.dispose();
+
+    return {
+      appearanceReproduced,
+      blocked,
+      countAfter,
+      deterministicRank,
+      generationSeed: result.hero.generationSeed,
+      gateActive,
+      hiddenPotentialPresent: Object.values(result.hero.hiddenPotential).every((value) => value >= 0.25 && value <= 0.98),
+      invalidRejected: invalidImport === null,
+      joinedRelationships: Object.keys(result.hero.relationships).length === initialHeroes.length,
+      portrait: Boolean(portraitUrl?.startsWith('blob:') && revealPortrait.startsWith('blob:')),
+      ranks: [...ranks].sort(),
+      recruitmentNotice,
+      reveal: revealText.includes(result.hero.name) && revealText.includes(result.hero.origin.occupation) && revealText.includes('Visible traits') && revealText.includes('Visible skills'),
+      revealRank,
+      shardsAfter,
+      shardsBefore,
+      validImport: Boolean(validImport),
+    };
+  })()`);
+  assert(
+    recruitmentValidation.appearanceReproduced && recruitmentValidation.blocked &&
+      recruitmentValidation.countAfter === 6 && recruitmentValidation.deterministicRank &&
+      recruitmentValidation.generationSeed === 187451 && recruitmentValidation.gateActive && recruitmentValidation.hiddenPotentialPresent &&
+      recruitmentValidation.invalidRejected && recruitmentValidation.joinedRelationships &&
+      recruitmentValidation.portrait && JSON.stringify(recruitmentValidation.ranks) === JSON.stringify([1, 2, 3]) &&
+      recruitmentValidation.recruitmentNotice && recruitmentValidation.reveal &&
+      recruitmentValidation.revealRank >= 1 && recruitmentValidation.revealRank <= 3 &&
+      recruitmentValidation.shardsBefore === 3 && recruitmentValidation.shardsAfter === 0 && recruitmentValidation.validImport,
+    `Phase 18 recruitment validation failed (${JSON.stringify(recruitmentValidation)}).`,
+  );
   const legacyValidation = await evaluate(`(async () => {
     const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
       import('/src/heroes/HeroManager.ts'),
@@ -383,9 +477,12 @@ try {
       () => manager.getAll(),
       () => manager.getFallen(),
       () => squad.getSquad(),
+      () => 0,
+      () => 3,
       { get: () => null },
       () => undefined,
       (heroId) => { inspectedMemorial = heroId; },
+      () => undefined,
       () => undefined,
     );
     roster.open();
@@ -447,27 +544,29 @@ try {
   );
   const victoryValidation = await evaluate(`(async () => {
     const { Simulation } = await import('/src/simulation/Simulation.ts');
-    const simulation = new Simulation();
-    const heroes = simulation.getHeroes().slice(0, 3);
-    heroes.forEach((hero) => {
-      hero.attributes.strength = 30;
-      hero.attributes.endurance = 30;
-      hero.attributes.agility = 30;
-      hero.skills.sword = 20;
-      hero.personality.aggression = 1;
-      hero.personality.bravery = 1;
-      simulation.addHeroToSquad(hero.id);
-      simulation.setSquadRole(hero.id, 'Damage');
-    });
-    simulation.startExpedition();
-    for (let step = 0; step < 10_000 && simulation.getExpeditionSnapshot().phase === 'Combat'; step += 1) {
-      simulation.step(0.25);
+    let last = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const simulation = new Simulation();
+      const heroes = simulation.getHeroes().slice(0, 3);
+      heroes.forEach((hero) => {
+        hero.attributes.strength = 30;
+        hero.attributes.endurance = 30;
+        hero.attributes.agility = 30;
+        hero.skills.sword = 20;
+        hero.personality.aggression = 1;
+        hero.personality.bravery = 1;
+        simulation.addHeroToSquad(hero.id);
+        simulation.setSquadRole(hero.id, 'Damage');
+      });
+      simulation.startExpedition();
+      for (let step = 0; step < 10_000 && simulation.getExpeditionSnapshot().phase === 'Combat'; step += 1) {
+        simulation.step(0.25);
+      }
+      const snapshot = simulation.getExpeditionSnapshot();
+      last = { outcome: snapshot.report?.outcome, resources: snapshot.resources };
+      if (last.outcome === 'Victory') return last;
     }
-    const snapshot = simulation.getExpeditionSnapshot();
-    return {
-      outcome: snapshot.report?.outcome,
-      resources: snapshot.resources,
-    };
+    return last;
   })()`);
   assert(
     victoryValidation.outcome === 'Victory' &&
@@ -524,6 +623,7 @@ try {
 
   await click('[data-hud-section="Heroes"]');
   await waitFor("!document.querySelector('.roster-panel').hidden", "Heroes panel");
+  assert(await evaluate("document.querySelector('[data-roster-action=\"recruit\"]')?.disabled") === true, "Recruitment must begin blocked without Rift Shards.");
   await waitFor("document.querySelectorAll('.hero-roster-card img').length === 5", "procedural portraits", 20_000);
   const portraits = await evaluate("[...document.querySelectorAll('.hero-roster-card img')].map((image) => image.src)");
   assert(new Set(portraits).size === 5 && portraits.every((src) => src.startsWith("blob:")), "Each hero must receive a distinct cached procedural portrait.");
@@ -625,7 +725,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

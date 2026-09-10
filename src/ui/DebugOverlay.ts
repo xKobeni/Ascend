@@ -28,7 +28,7 @@ export class DebugOverlay {
     this.element.dataset.renderStatus = "ready";
     this.element.setAttribute("aria-label", "Developer diagnostics");
     this.element.innerHTML = `
-      <header><div><span>DEVELOPER</span><strong>Phase 17 diagnostics</strong></div><button type="button" data-debug-action="close" aria-label="Close diagnostics">×</button></header>
+      <header><div><span>DEVELOPER</span><strong>Phase 18 diagnostics</strong></div><button type="button" data-debug-action="close" aria-label="Close diagnostics">×</button></header>
       <div class="debug-overlay__grid">
         <div><span>FPS</span><b data-debug="fps">0</b></div>
         <div><span>SIM TICK</span><b data-debug="tick">0</b></div>

@@ -201,6 +201,9 @@ canvas {
 .system-panel__empty { grid-column: 1 / -1; color: var(--muted); }
 
 .roster-panel { width: min(900px, calc(100vw - 44px)); }
+.roster-panel > .system-panel__header { grid-template-columns: 1fr auto auto auto; }
+.system-panel__header .roster-recruit { width: auto; padding: 0 10px; border-color: var(--bronze); color: var(--ink); font: 8px/1.2 var(--numbers); letter-spacing: .08em; }
+.system-panel__header .roster-recruit:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
 .roster-filters { display: flex; gap: 20px; padding: 13px 20px 0; }
 .roster-filters button,
 .hero-detail-tabs button {
@@ -267,6 +270,23 @@ canvas {
 .memorial-ledger__list button:focus-visible { border-color: var(--bronze); }
 .memorial-ledger__list strong { font: 500 12px/1.2 var(--display); letter-spacing: 0.04em; }
 .memorial-ledger__list span { color: var(--muted); font-size: 8px; }
+
+.recruitment-panel { width: min(760px, calc(100vw - 44px)); }
+.recruitment-reveal { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(210px, .8fr) minmax(280px, 1.2fr); gap: 24px; padding: 24px 24px 18px; }
+.recruitment-reveal__portrait { position: relative; display: grid; aspect-ratio: 4 / 5; overflow: hidden; border: 1px solid #574b38; background: linear-gradient(160deg, #28261f, #151513 72%); color: var(--bronze); place-items: center; font: 42px/1 var(--display); }
+.recruitment-reveal__portrait::after { position: absolute; inset: 8px; border: 1px solid rgb(167 134 82 / 22%); content: ""; pointer-events: none; }
+.recruitment-reveal__portrait img { width: 100%; height: 100%; object-fit: cover; }
+.recruitment-reveal__record { align-self: center; }
+.recruitment-reveal__record > span { color: var(--faint); font: 8px/1.2 var(--numbers); letter-spacing: .12em; }
+.recruitment-reveal__rank { margin-top: 14px; color: var(--bronze); font-size: 13px; letter-spacing: .18em; }
+.recruitment-reveal__record h2 { margin: 5px 0 0; font: 500 30px/1.1 var(--display); letter-spacing: .03em; }
+.recruitment-reveal__record > p { margin: 7px 0 20px; color: var(--muted); font-size: 10px; }
+.recruitment-reveal__record section { margin-top: 14px; padding-top: 11px; border-top: 1px solid var(--line); }
+.recruitment-reveal__record section > strong { color: var(--bronze); font: 8px/1.2 var(--numbers); letter-spacing: .12em; text-transform: uppercase; }
+.recruitment-reveal__record section > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.recruitment-reveal__record section span { padding: 4px 6px; border: 1px solid var(--line); color: var(--muted); font-size: 8px; }
+.recruitment-reveal__record > small { display: block; margin-top: 18px; color: var(--faint); font-size: 8px; line-height: 1.5; }
+.recruitment-reveal__continue { position: relative; z-index: 1; display: block; width: calc(100% - 48px); margin: 0 24px 24px; padding: 11px; border: 0; border-top: 1px solid var(--bronze); border-bottom: 1px solid var(--bronze); background: transparent; color: var(--ink); cursor: pointer; font: 9px/1.2 var(--numbers); letter-spacing: .12em; }
 
 .hero-detail-panel { width: min(570px, calc(100vw - 44px)); }
 .selection-overlay__detail { display: block; padding: 10px 20px 0; color: var(--muted); font-size: 10px; }
@@ -583,6 +603,8 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .system-panel__header input { font-size: 20px; }
   .roster-filters { gap: 14px; overflow-x: auto; padding: 10px 14px 0; }
   .roster-grid { grid-template-columns: 1fr 1fr; gap: 9px; padding: 12px 14px 18px; }
+  .roster-panel > .system-panel__header { grid-template-columns: 1fr auto auto; gap: 9px; }
+  .system-panel__header .roster-recruit { grid-column: 1 / -1; grid-row: 2; min-height: 38px; }
   .memorial-ledger { margin: 0 14px 18px; }
   .memorial-ledger__list { grid-template-columns: 1fr; }
   .hero-detail-tabs { gap: 7px; margin: 10px 14px 0; }
@@ -590,6 +612,10 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .hero-panel__grid { grid-template-columns: 1fr 1fr; }
   .hero-panel__meters { grid-template-columns: 1fr; }
   .memorial-record { padding: 18px 14px; }
+  .recruitment-reveal { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 14px; }
+  .recruitment-reveal__portrait { width: min(210px, 68vw); margin: 0 auto; }
+  .recruitment-reveal__record h2 { font-size: 24px; }
+  .recruitment-reveal__continue { width: calc(100% - 28px); margin: 0 14px 18px; min-height: 44px; }
   .party-layout { padding: 13px 14px; }
   .party-formation { grid-template-columns: 1fr; }
   .formation-slot { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }

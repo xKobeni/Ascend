@@ -4,6 +4,8 @@ import type {
   TacticalRole,
   UtilityAction,
 } from "./Combat";
+import type { HeroMemory } from "../memories/HeroMemory";
+import { getMemoryCombatInfluence } from "../memories/MemorySystem";
 
 export const ACTION_ORDER: readonly UtilityAction[] = [
   "Attack",
@@ -64,7 +66,7 @@ export interface UtilityActor {
   hp: number;
   id: string;
   leadership: number;
-  memories: CombatMemory[];
+  memories: readonly Readonly<HeroMemory>[];
   medicine: number;
   personality: {
     aggression: number;
@@ -94,35 +96,6 @@ export interface UtilityActor {
   focusTargetTicks: number;
   buffTicks: number;
   assistBoost: number;
-}
-
-interface CombatMemory {
-  type: "protect" | "retreat" | "fear" | "assist" | "berserk" | "regroup";
-  value: number;
-  allyId?: string;
-}
-
-function getMemoryCombatInfluence(
-  memories: readonly CombatMemory[],
-  allyId: string | null,
-): { protect: number; retreat: number; fear: number; assist: number; berserk: number; regroup: number } {
-  let protect = 0;
-  let retreat = 0;
-  let fear = 0;
-  let assist = 0;
-  let berserk = 0;
-  let regroup = 0;
-
-  for (const mem of memories) {
-    if (mem.type === "protect" && mem.allyId === allyId) protect = Math.max(protect, mem.value);
-    if (mem.type === "retreat") retreat = Math.max(retreat, mem.value);
-    if (mem.type === "fear") fear = Math.max(fear, mem.value);
-    if (mem.type === "assist" && mem.allyId === allyId) assist = Math.max(assist, mem.value);
-    if (mem.type === "berserk") berserk = Math.max(berserk, mem.value);
-    if (mem.type === "regroup") regroup = Math.max(regroup, mem.value);
-  }
-
-  return { protect, retreat, fear, assist, berserk, regroup };
 }
 
 function getPreferredRange(role: TacticalRole): number {

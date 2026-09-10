@@ -114,18 +114,18 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–17 and the first persistent
+The implemented build currently covers Phases 0–18 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
-decisions, earned traits, and bounded personality drift are active. Recruitment, facilities, equipment,
+decisions, earned traits, bounded personality drift, and Rift-funded procedural recruitment are active. Facilities, equipment,
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
-The standalone character-generator prototype is accepted as the technical and visual foundation
-for a future **Procedural Character Forge**. It is not currently a new playable destination. Its
-first player-facing use belongs to Dimensional Gate recruitment, while equipment and class modules
-remain locked to their later gameplay phases.
+The standalone character-generator prototype now supplies the bounded human-generation core of the
+**Procedural Character Forge**. Recruitment is accessed through Heroes or the selectable Refuge Gate,
+not a fifth destination. Equipment, classes, non-human races, enemy authoring, and unrestricted
+appearance controls remain locked to later phases.
 
 ---
 
@@ -518,6 +518,10 @@ ASCENT adapts the reusable core of the existing character-generator prototype in
 Procedural Character Forge. The Forge creates the visual embodiment of generated people; it does
 not replace the hero simulation or decide gameplay facts from mesh choices.
 
+Phase 18 activates the human recruitment subset. A roll costs 3 real Rift Shards, produces only
+1–3★ recruits, stores its seed, and creates the authoritative hero before the reveal. Visible rank
+does not rewrite hidden potential.
+
 Its initial appearance vocabulary includes:
 
 - Height, bulk, and individual head, shoulder, arm, and leg proportions
@@ -545,12 +549,11 @@ The configuration is plain data and is validated before rendering. Three.js geom
 result only and never stores authoritative stats, class, equipment, potential, relationships, or
 history.
 
-The prototype's JSON presets may support a developer-only Forge workbench for testing silhouettes
-and appearance ranges. This tooling belongs in the developer drawer and does not create a fifth
-player navigation destination.
+`validateHeroAppearanceConfig` provides bounded JSON compatibility for developer tooling. The
+prototype's persistent editor, unrestricted sliders, and localStorage presets were not imported.
 
-Prototype concepts activate only when the game supports them. Human appearance generation joins
-recruitment first; visual weapons and armor join equipment later; class-linked silhouettes join the
+Prototype concepts activate only when the game supports them. Human appearance generation now joins
+recruitment; visual weapons and armor join equipment later; class-linked silhouettes join the
 class system later. Additional fantasy races, magical glow treatments, and enemy tiers remain
 future proposals rather than current canon.
 

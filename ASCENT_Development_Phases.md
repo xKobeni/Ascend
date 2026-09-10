@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 10, 2026
 
 ```text
-Gameplay phases implemented: 0–17
-Current playable milestone: Experience-shaped heroes with earned traits and personality drift
+Gameplay phases implemented: 0–18
+Current playable milestone: Rift-funded procedural recruitment through the Dimensional Gate
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 18 — Recruitment System
+Next gameplay phase: Phase 19 — Hero Capacity and Dormitories
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,13 +47,13 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 17 is complete. Phase 18 and later remain design context and require a new implementation
+Phase 18 is complete. Phase 19 and later remain design context and require a new implementation
 approval boundary.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
-adapted into ASCENT as the **Procedural Character Forge**. Its first player-facing activation is
-scheduled for Phase 18 recruitment. Until that phase is approved and implemented, it remains a
-development reference and does not add a new destination or player-facing character creator.
+adapted into ASCENT as the **Procedural Character Forge**. Its human hero-generation core is now
+active through Phase 18 recruitment inside Heroes. It does not add a fifth destination or expose
+prototype races, classes, equipment, enemies, sliders, or localStorage authoring controls.
 
 ---
 
@@ -1422,7 +1422,7 @@ recovery, memory, legacy, expedition, party, roster, and camera regression paths
 
 ---
 
-# Phase 18 — Recruitment System
+# Phase 18 — Recruitment System — Complete
 
 ## Goal
 
@@ -1434,9 +1434,15 @@ Add procedural hero acquisition.
 
 Create summon facility.
 
+The Refuge's existing Gate Foundation is now an active, selectable Dimensional Gate. Selecting it
+opens Heroes, where the real recruitment action lives; it does not create a fifth HUD destination.
+
 ### 18.2 Rift Shards
 
 Add recruitment currency.
+
+Recruitment spends 3 actual Rift Shards from the expedition resource stockpile. Insufficient funds,
+active combat, and active expedition states block the operation without changing the roster.
 
 ### 18.3 Recruitment
 
@@ -1445,6 +1451,10 @@ Generate a new hero through the Procedural Character Forge pipeline.
 The recruitment roll creates authoritative hero gameplay data first, then derives a validated
 visual configuration for both the live model and cached portrait. Store the generation seed or
 equivalent reproducible appearance signature with the hero.
+
+`RecruitmentSystem` creates a stored seed and rank roll. `HeroManager` generates authoritative hero
+data from that seed, records the current join day, admits the hero to the roster, and initializes
+directional relationships with every resident.
 
 ### 18.4 Rank Distribution
 
@@ -1458,9 +1468,15 @@ Example:
 
 Do not add extreme ranks yet.
 
+The implemented distribution is 72% 1★, 23% 2★, and 5% 3★. Rank generation uses a separate
+deterministic stream derived from the stored seed.
+
 ### 18.5 Hidden Potential
 
 Generate independently from visible rank.
+
+Hidden potential continues to use the existing generated attribute-potential model. Rank is applied
+after hero generation and does not rewrite or reveal those values.
 
 ### 18.6 Recruitment Reveal
 
@@ -1475,6 +1491,10 @@ Show:
 The reveal uses the recruited hero's real procedural model and portrait. It may frame the result
 ceremonially, but it must not expose unrestricted sliders that let the player bypass randomized
 recruitment, rank uncertainty, or hidden potential.
+
+The full-height reveal shows the same cached procedural portrait used by the roster and party, plus
+name, occupation, rank, starting traits, visible skills, and a resonance seed. It explicitly keeps
+hidden potential concealed and does not assign a class or equipment.
 
 ### 18.7 Procedural Character Forge Integration
 
@@ -1499,12 +1519,23 @@ An optional Forge workbench may exist inside the `F3` developer drawer for appea
 is developer tooling, not a fifth player destination and not proof that deferred gameplay systems
 are implemented.
 
+The implemented Forge subset adds independently generated head, shoulder, arm, and leg proportions
+alongside the existing height, bulk, human hair, skin, clothing, and color vocabulary. The shared
+`HeroMeshGenerator` consumes this configuration for the Refuge, cached portraits, and reveal.
+`validateHeroAppearanceConfig` accepts only bounded human appearance JSON, and the portrait cache
+queues late recruits safely while continuing to revoke URLs and release its temporary WebGL context.
+
 ## Exit Criteria
 
 The player can recruit visually distinct heroes without external character assets. A fixed seed or
 saved appearance signature reproduces the same model and portrait, repeated generation does not
 leak WebGL resources, and recruitment does not expose deferred class, equipment, race, or enemy
 systems.
+
+Automated browser validation confirms shard spending and insufficient-funds blocking, seeded
+appearance reproduction, all three supported ranks, hidden-potential independence, new relationship
+profiles, bounded JSON import, cached portrait creation, recruitment notification and reveal content,
+plus the complete earlier UI, expedition, recovery, legacy, memory, and trait regression paths.
 
 ---
 

@@ -52,7 +52,16 @@ export const IDLE_NAVIGATION_POINTS: readonly NavigationPoint[] = [
 ] as const;
 
 export function createInitialMovement(index: number): HeroMovement {
-  const spawnPoint = INITIAL_HERO_SPAWN_POINTS[index];
+  const base = INITIAL_HERO_SPAWN_POINTS[index % INITIAL_HERO_SPAWN_POINTS.length];
+  const arrivalWave = Math.floor(index / INITIAL_HERO_SPAWN_POINTS.length);
+  const spawnPoint = base && arrivalWave > 0
+    ? {
+        ...base,
+        id: `arrival-${index + 1}`,
+        x: base.x + Math.sin(index * 2.17) * arrivalWave * 1.15,
+        z: base.z + Math.cos(index * 2.17) * arrivalWave * 1.15,
+      }
+    : base;
   if (!spawnPoint) {
     throw new Error(`No initial hero spawn point exists for index ${index}.`);
   }
