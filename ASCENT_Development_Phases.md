@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 10, 2026
 
 ```text
-Gameplay phases implemented: 0–15
-Current playable milestone: Permanent expedition loss and Refuge legacy records
+Gameplay phases implemented: 0–16
+Current playable milestone: Memory-shaped heroes and persistent expedition consequences
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 16 — Memory System
+Next gameplay phase: Phase 17 — Trait Evolution
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,7 +47,7 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 15 is complete. Phase 16 and later remain design context and require a new implementation
+Phase 16 is complete. Phase 17 and later remain design context and require a new implementation
 approval boundary.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
@@ -1270,7 +1270,7 @@ death notification behavior.
 
 ---
 
-# Phase 16 — Memory System
+# Phase 16 — Memory System — Complete
 
 ## Goal
 
@@ -1280,16 +1280,25 @@ Allow experiences to shape heroes.
 
 ### 16.1 Memory Data
 
-Example:
+Implemented:
 
 ```ts
 interface HeroMemory {
-  type: string;
-  targetId?: string;
-  day: number;
+  createdDay: number;
+  id: string;
+  lastReinforcedDay: number;
+  persistent: boolean;
+  summary: string;
+  targetHeroId: string | null;
+  type: HeroMemoryType;
   weight: number;
 }
 ```
+
+`MemorySystem` owns creation, same-day duplicate suppression, later-day reinforcement, bounded
+weight, capacity, decay, and combat-influence queries. New heroes initialize with an empty general
+memory list. Phase 15 `lossMemories` remain as a compatibility record rather than being silently
+deleted or reinterpreted.
 
 ### 16.2 Initial Memories
 
@@ -1303,6 +1312,10 @@ CRITICAL_INJURY
 WON_BOSS
 ```
 
+Current combat and expedition events create `ALLY_DIED`, `WAS_SAVED`, `SAVED_ALLY`, and
+`CRITICAL_INJURY`. `WON_BOSS` is typed for compatibility but remains dormant until Phase 30 provides
+a real boss victory event.
+
 ### 16.3 Behavior Effects
 
 Memories affect:
@@ -1312,15 +1325,35 @@ Memories affect:
 - Fear
 - Utility AI
 
+Healing and protection create reciprocal memories, modest morale changes, greater trust and respect,
+and reduced fear toward the rescuer. Ally death and critical injury create lasting trauma. Utility
+AI consumes normalized `0..1` memory influence: trauma can raise retreat pressure, while prior
+rescues can strengthen protection of a specific vulnerable ally. Decision diagnostics name
+`past trauma` or `remembered bond` when memory is the dominant consideration.
+
 ### 16.4 Memory Decay
 
 Minor memories fade.
 
 Major memories persist.
 
-## Exit Criteria
+Non-persistent rescue memories decay by in-game time and are removed below the minimum useful
+weight. Major ally-loss and critical-injury records persist. Memory count is capped per hero, and
+repeated same-day combat events do not repeatedly apply relationship or morale changes.
+
+### 16.5 Client Integration
+
+The shared hero detail panel displays memories inside Relations with formation day, reinforcement
+day, readable summary, and lasting or fading state. Memory data remains authoritative outside the
+DOM and Three.js render graph.
+
+## Exit Criteria — Met
 
 Past events influence future behavior.
+
+Automated browser validation confirms rescue pairing, duplicate suppression, relationship and fear
+changes, normalized influence, trauma-driven Utility AI changes, minor-memory decay, persistent
+major memories, Phase 15 ally-loss compatibility, and hero-detail presentation.
 
 ---
 

@@ -2,7 +2,7 @@ import { createInitialMovement } from "../base/NavigationPoints";
 import type { FallenHeroRecord, Hero } from "./Hero";
 import { HeroGenerator } from "./HeroGenerator";
 import { NeedsSystem } from "./NeedsSystem";
-import { RelationshipSystem } from "./RelationshipSystem";
+import { getRelationshipLabel, RelationshipSystem } from "./RelationshipSystem";
 import { HeroRoutineSystem } from "./HeroRoutineSystem";
 import { TrainingSystem } from "./TrainingSystem";
 import type { TrainingType } from "./Hero";
@@ -15,11 +15,14 @@ import type { ExpeditionConsequence, ExpeditionReport } from "../expeditions/Exp
 import type { Squad } from "../squads/Squad";
 import { InjurySystem, type TreatmentResult } from "./InjurySystem";
 import { LegacySystem } from "./LegacySystem";
+import type { CombatMemoryEvent } from "../memories/HeroMemory";
+import { MemorySystem } from "../memories/MemorySystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
   private readonly injurySystem = new InjurySystem();
   private readonly legacySystem = new LegacySystem();
+  private readonly memorySystem = new MemorySystem();
   private readonly needsSystem = new NeedsSystem();
   private readonly relationshipSystem = new RelationshipSystem();
   private readonly routineSystem = new HeroRoutineSystem();
@@ -92,6 +95,10 @@ export class HeroManager {
     return result;
   }
 
+  recordCombatMemory(event: Readonly<CombatMemoryEvent>, day: number, minuteOfDay = 0): void {
+    this.memorySystem.recordCombatEvent(this.getAll(), event, day, minuteOfDay);
+  }
+
   recordExpeditionExperience(squad: Readonly<Squad>, successful: boolean): void {
     squad.members.forEach((member) => {
       const survivalSkill = member.formation === "Back" ? "scouting" : "tracking";
@@ -154,6 +161,15 @@ export class HeroManager {
       fallenRecords,
       day,
     );
+    fallenHeroes.forEach(({ hero: fallen }) => {
+      this.getAll()
+        .filter((survivor) => !fallenIds.has(survivor.id))
+        .forEach((survivor) => {
+          const profile = survivor.relationships[fallen.id];
+          const relationship = profile ? getRelationshipLabel(profile) : "Neutral";
+          this.memorySystem.recordAllyDeath(survivor, fallen, relationship, day);
+        });
+    });
     fallenIds.forEach((heroId) => this.heroes.delete(heroId));
 
     return squad.members.flatMap<ExpeditionConsequence>((member) => {
@@ -189,6 +205,9 @@ export class HeroManager {
         damageRatio,
         day,
       );
+      if (injury.severity !== "Minor" || damageRatio >= 0.72) {
+        this.memorySystem.recordCriticalInjury(hero, injury.type, day);
+      }
       return [{
         detail: `${injury.severity} ${injury.type} · Health -${healthLoss} · Morale -${moraleLoss}`,
         heroId: hero.id,
@@ -223,6 +242,7 @@ export class HeroManager {
     );
     this.trainingSystem.step(heroes, gameMinutes, this.needsSystem, day);
     this.injurySystem.step(heroes, gameMinutes);
+    this.memorySystem.step(heroes, gameMinutes);
     this.relationshipSystem.step(heroes, gameMinutes, day, minuteOfDay);
   }
 

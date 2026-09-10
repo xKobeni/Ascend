@@ -71,6 +71,7 @@ export class HeroGenerator {
       injuries: [],
       level: 1,
       lossMemories: [],
+      memories: [],
       movement: initialMovement,
       name: this.names.generate(usedNames),
       needs: this.generateNeeds(rosterIndex),

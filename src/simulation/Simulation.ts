@@ -23,6 +23,8 @@ export class Simulation {
   private readonly heroManager = new HeroManager();
   private readonly combatSimulation = new CombatSimulation((event) => {
     this.heroManager.recordSkillUsage(event);
+  }, (event) => {
+    this.heroManager.recordCombatMemory(event, this.state.day, this.state.minuteOfDay);
   });
   private readonly expeditionSystem = new ExpeditionSystem(
     this.combatSimulation,

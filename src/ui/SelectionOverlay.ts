@@ -120,6 +120,7 @@ export class SelectionOverlay {
         </div>
         <div data-hero-view="Relations" hidden>
           <section><span class="hero-panel__heading">Relationships</span><div class="hero-panel__relationships" data-hero="relationships"></div></section>
+          <section><span class="hero-panel__heading">Memories</span><div class="hero-panel__memories" data-hero="memories"></div></section>
         </div>
       </div>
       <div class="memorial-record" data-selection="memorial" hidden></div>
@@ -230,6 +231,7 @@ export class SelectionOverlay {
     this.renderRecovery(hero);
     this.renderTraining(hero);
     this.renderRelationships(hero, heroes);
+    this.renderMemories(hero);
     this.renderValueGrid(this.requireHeroElement("attributes"), ATTRIBUTE_LABELS, hero.attributes);
     this.renderValueGrid(this.requireHeroElement("skills"), SKILL_LABELS, hero.skills);
     this.renderSkillForge(hero);
@@ -465,6 +467,44 @@ export class SelectionOverlay {
           return row;
         }),
     );
+  }
+
+  private renderMemories(hero: Readonly<Hero>): void {
+    const container = this.requireHeroElement("memories");
+    if (hero.memories.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "hero-panel__memory-empty";
+      empty.textContent = "No defining memories recorded yet.";
+      container.replaceChildren(empty);
+      return;
+    }
+    container.replaceChildren(...hero.memories.map((memory) => {
+      const row = document.createElement("article");
+      row.className = "hero-memory";
+      row.dataset.persistent = String(memory.persistent);
+      const heading = document.createElement("div");
+      const type = document.createElement("strong");
+      const state = document.createElement("span");
+      type.textContent = this.getMemoryLabel(memory.type);
+      state.textContent = memory.persistent ? "Lasting" : `${Math.round(memory.weight)}% influence`;
+      heading.append(type, state);
+      const summary = document.createElement("p");
+      summary.textContent = memory.summary;
+      const time = document.createElement("small");
+      time.textContent = memory.lastReinforcedDay === memory.createdDay
+        ? `Formed on Day ${memory.createdDay}`
+        : `Formed Day ${memory.createdDay} · Reinforced Day ${memory.lastReinforcedDay}`;
+      row.append(heading, summary, time);
+      return row;
+    }));
+  }
+
+  private getMemoryLabel(type: Hero["memories"][number]["type"]): string {
+    if (type === "ALLY_DIED") return "Ally Lost";
+    if (type === "CRITICAL_INJURY") return "Critical Injury";
+    if (type === "SAVED_ALLY") return "Saved an Ally";
+    if (type === "WAS_SAVED") return "Was Saved";
+    return "Guardian Defeated";
   }
 
   private renderNeeds(hero: Readonly<Hero>): void {

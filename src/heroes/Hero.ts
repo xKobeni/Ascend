@@ -1,4 +1,5 @@
 import type { HeroSkillForge } from "../skills/Skill";
+import type { HeroMemory } from "../memories/HeroMemory";
 
 export type HairStyle =
   | "bald"
@@ -215,6 +216,7 @@ export interface Hero {
   injuries: HeroInjury[];
   level: number;
   lossMemories: HeroLossMemory[];
+  memories: HeroMemory[];
   movement: HeroMovement;
   name: string;
   needs: HeroNeeds;

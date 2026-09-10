@@ -9,6 +9,8 @@ import type {
 } from "./Combat";
 import type { FormationPosition } from "../squads/Squad";
 import { getPreferredRange } from "./FormationSystem";
+import type { HeroMemory } from "../memories/HeroMemory";
+import { getMemoryCombatInfluence } from "../memories/MemorySystem";
 
 export interface UtilityTarget {
   action: CombatAction;
@@ -22,6 +24,7 @@ export interface UtilityTarget {
 
 export interface UtilityActor extends UtilityTarget {
   medicine: number;
+  memories: readonly Readonly<HeroMemory>[];
   personality: Readonly<Personality>;
   preparedSkillIds: ReadonlySet<string>;
   relationships: Readonly<Record<string, Readonly<RelationshipProfile>>>;
@@ -82,6 +85,7 @@ export function scoreCombatActions(
   const allyRisk = vulnerableAlly ? allyDanger(vulnerableAlly, livingOpponents) : 0;
   const bond = vulnerableAlly ? relationshipBond(actor.relationships[vulnerableAlly.id]) : 0;
   const woundedRatio = woundedAlly ? 1 - ratio(woundedAlly.hp, woundedAlly.stats.maxHp) : 0;
+  const memory = getMemoryCombatInfluence(actor.memories, vulnerableAlly?.id ?? null);
 
   const raw: Record<UtilityAction, { reason: string; score: number; targetId: string | null; valid: boolean }> = {
     Attack: {
@@ -114,12 +118,15 @@ export function scoreCombatActions(
         [(1 - bravery) * 34, "low bravery"],
         [threat * 16, "enemy threat"],
         [isCowardly ? 16 : 0, "cowardly trait"],
+        [memory.retreat * 22, "past trauma"],
       ]),
-      score: 2 + missingHealth * 72 + (1 - bravery) * 34 + threat * 16 + (isCowardly ? 16 : 0) - loyalty * 8,
+      score: 2 + missingHealth * 72 + (1 - bravery) * 34 + threat * 16 +
+        (isCowardly ? 16 : 0) + memory.retreat * 22 - loyalty * 8,
       targetId: null,
       valid: Boolean(
         preferredEnemy &&
-        (health <= (isCowardly ? 0.82 : 0.68) || (threat >= 0.92 && health < 0.9)),
+        (health <= (isCowardly ? 0.82 : 0.68) + memory.fear * 0.1 ||
+          (threat >= 0.92 - memory.fear * 0.12 && health < 0.9)),
       ),
     },
     Protect: {
@@ -130,14 +137,17 @@ export function scoreCombatActions(
         [loyalty * 16, "loyalty"],
         [isProtective ? 22 : 0, "protective trait"],
         [actor.tacticalRole === "Defender" ? 28 : 0, "defender duty"],
+        [memory.protect * 26, "remembered bond"],
       ]),
-      score: 4 + allyRisk * 44 + bond * 24 + empathy * 18 + loyalty * 16 + (isProtective ? 22 : 0) + (actor.tacticalRole === "Defender" ? 28 : 0),
+      score: 4 + allyRisk * 44 + bond * 24 + empathy * 18 + loyalty * 16 +
+        (isProtective ? 22 : 0) + (actor.tacticalRole === "Defender" ? 28 : 0) +
+        memory.protect * 26,
       targetId: vulnerableAlly?.id ?? null,
       valid: Boolean(
         vulnerableAlly &&
         (actor.preparedSkillIds.has("interpose") || actor.preparedSkillIds.has("protective_instinct")) &&
         (vulnerableAlly.formation !== "Front" || actor.tacticalRole === "Defender") &&
-        (allyRisk >= 0.3 || isProtective),
+        (allyRisk >= 0.3 || isProtective || memory.protect >= 0.28),
       ),
     },
     Heal: {

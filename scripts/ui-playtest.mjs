@@ -166,6 +166,73 @@ try {
       recoveryValidation.consequenceInjuries,
     `Phase 14 recovery validation failed (${JSON.stringify(recoveryValidation)}).`,
   );
+  const memoryValidation = await evaluate(`(async () => {
+    const [{ HeroManager }, { MemorySystem, getMemoryCombatInfluence }, { scoreCombatActions }, { SelectionOverlay }] = await Promise.all([
+      import('/src/heroes/HeroManager.ts'),
+      import('/src/memories/MemorySystem.ts'),
+      import('/src/combat/UtilityAI.ts'),
+      import('/src/ui/SelectionOverlay.ts'),
+    ]);
+    const manager = new HeroManager();
+    const heroes = manager.generateInitialRoster(3);
+    const saver = heroes[0];
+    const saved = heroes[1];
+    const trustBefore = saved.relationships[saver.id].metrics.trust;
+    const fearBefore = saved.relationships[saver.id].metrics.fear;
+    manager.recordCombatMemory({ actorId: saver.id, targetId: saved.id, type: 'PROTECTED_ALLY' }, 1);
+    const trustAfterFirst = saved.relationships[saver.id].metrics.trust;
+    manager.recordCombatMemory({ actorId: saver.id, targetId: saved.id, type: 'PROTECTED_ALLY' }, 1);
+    const trustAfterDuplicate = saved.relationships[saver.id].metrics.trust;
+    manager.recordCombatMemory({ actorId: saver.id, targetId: saved.id, type: 'PROTECTED_ALLY' }, 2);
+    const rescueMemory = saved.memories.find((memory) => memory.type === 'WAS_SAVED');
+
+    const memories = new MemorySystem();
+    memories.recordCriticalInjury(saved, 'Concussion', 2);
+    const influence = getMemoryCombatInfluence(saved.memories, saver.id);
+    const baseActor = {
+      action: 'Idle', formation: 'Middle', hp: 71, id: saved.id, medicine: 0,
+      personality: { aggression: 0.2, ambition: 0.2, bravery: 0.9, discipline: 0.6, empathy: 0.5, loyalty: 0.5 },
+      position: { x: 0, z: 0 }, preparedSkillIds: new Set(), relationships: {}, role: 'Damage',
+      stats: { attack: 20, defense: 10, maxHp: 100, range: 2, speed: 2 }, tacticalRole: 'Striker', traits: [],
+    };
+    const opponent = {
+      action: 'Idle', formation: 'Front', hp: 100, id: 'memory-threat', position: { x: 1, z: 0 },
+      stats: { attack: 20, defense: 8, maxHp: 100, range: 2, speed: 2 }, tacticalRole: 'Skirmisher',
+    };
+    const withoutMemory = scoreCombatActions({ ...baseActor, memories: [] }, [baseActor], [opponent]);
+    const withMemory = scoreCombatActions({ ...baseActor, memories: saved.memories }, [baseActor], [opponent]);
+    const retreatWithout = withoutMemory.scores.find((score) => score.action === 'Retreat');
+    const retreatWith = withMemory.scores.find((score) => score.action === 'Retreat');
+
+    const overlay = new SelectionOverlay(document.querySelector('#app'), () => undefined, () => undefined, () => undefined, () => 0, () => undefined);
+    overlay.showHero(saved, heroes, 'Relations');
+    const renderedMemories = document.querySelectorAll('.hero-memory').length;
+    const lastingMemory = [...document.querySelectorAll('.hero-memory')].some((entry) => entry.dataset.persistent === 'true');
+    overlay.dispose();
+
+    memories.step(heroes, 20 * 24 * 60);
+    return {
+      duplicateSuppressed: trustAfterDuplicate === trustAfterFirst,
+      fearReduced: saved.relationships[saver.id].metrics.fear < fearBefore,
+      historyRecorded: saved.relationships[saver.id].history[0]?.type === 'help',
+      influenceBounded: influence.fear > 0 && influence.fear <= 1 && influence.protect > 0 && influence.protect <= 1,
+      lastingMemory,
+      persistentRetained: saved.memories.some((memory) => memory.type === 'CRITICAL_INJURY'),
+      relationshipChanged: trustAfterFirst > trustBefore,
+      renderedMemories,
+      rescueDecayed: !saved.memories.some((memory) => memory.type === 'WAS_SAVED'),
+      rescueRecorded: Boolean(rescueMemory && rescueMemory.lastReinforcedDay === 2),
+      utilityChanged: !retreatWithout.valid && retreatWith.valid && retreatWith.score > retreatWithout.score,
+    };
+  })()`);
+  assert(
+    memoryValidation.duplicateSuppressed && memoryValidation.fearReduced && memoryValidation.historyRecorded &&
+      memoryValidation.influenceBounded && memoryValidation.lastingMemory &&
+      memoryValidation.persistentRetained && memoryValidation.relationshipChanged &&
+      memoryValidation.renderedMemories === 2 && memoryValidation.rescueDecayed &&
+      memoryValidation.rescueRecorded && memoryValidation.utilityChanged,
+    `Phase 16 memory validation failed (${JSON.stringify(memoryValidation)}).`,
+  );
   const legacyValidation = await evaluate(`(async () => {
     const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
       import('/src/heroes/HeroManager.ts'),
@@ -275,6 +342,7 @@ try {
       deathNotice,
       graveCreated,
       lossMemory: friend.lossMemories[0]?.fallenHeroId === fallen.id,
+      generalMemory: friend.memories.some((memory) => memory.type === 'ALLY_DIED' && memory.targetHeroId === fallen.id && memory.persistent),
       lossRelationship: friend.lossMemories[0]?.relationship,
       memorialLedger: ledgerEntries === 1 && inspectedMemorial === fallen.id,
       moraleLoss: Math.round(moraleBefore - friend.needs.morale),
@@ -288,7 +356,7 @@ try {
     legacyValidation.activeHeroes === 2 && legacyValidation.activeSelectableCount === 2 &&
       legacyValidation.careerRecorded && legacyValidation.cause === 'Rift Stalker II' &&
       legacyValidation.consequencePermanent && legacyValidation.deathNotice && legacyValidation.graveCreated &&
-      legacyValidation.lossMemory && legacyValidation.lossRelationship === 'Trusted Friend' && legacyValidation.memorialLedger &&
+      legacyValidation.generalMemory && legacyValidation.lossMemory && legacyValidation.lossRelationship === 'Trusted Friend' && legacyValidation.memorialLedger &&
       legacyValidation.moraleLoss >= 18 && legacyValidation.removedFromRoster && legacyValidation.removedFromSquad &&
       legacyValidation.rosterCards === 2 && legacyValidation.victoryDeathResolved,
     `Phase 15 legacy validation failed (${JSON.stringify(legacyValidation)}).`,
@@ -473,7 +541,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

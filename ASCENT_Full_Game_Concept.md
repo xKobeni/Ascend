@@ -114,10 +114,11 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–15 and the first persistent
+The implemented build currently covers Phases 0–16 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
-records, and Refuge memorials are active. Recruitment, broad memories, facilities, equipment,
+records, Refuge memorials, rescue memories, lasting trauma, memory decay, and memory-shaped combat
+decisions are active. Recruitment, trait evolution, facilities, equipment,
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
@@ -814,6 +815,19 @@ Possible memories:
 - Survived alone
 
 Memories influence future behavior.
+
+The implemented memory layer records ally death, being saved, saving an ally, and critical injury.
+Rescue memories are reinforced at most once per in-game day, improve the relevant directed
+relationship, and fade with in-game time. Ally-loss and critical-injury memories persist. Their
+weights are normalized before reaching Utility AI so trauma can raise retreat pressure and remembered
+rescues can strengthen protection without making either action certain.
+
+The `WON_BOSS` memory is reserved in the typed vocabulary but is not generated before an actual boss
+system exists. Other examples above remain future event vocabulary rather than mocked current data.
+
+Players can inspect readable memory records in the Relations section of the existing hero detail
+panel. Exact AI calculations remain visible through combat diagnostics rather than becoming a new
+player-facing stat or navigation destination.
 
 ---
 

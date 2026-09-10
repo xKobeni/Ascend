@@ -19,10 +19,12 @@ import {
 import type { SkillUsageEvent } from "../skills/Skill";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import { getInjuryModifiers } from "../heroes/InjurySystem";
+import type { CombatMemoryEvent } from "../memories/HeroMemory";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
   medicine: number;
+  memories: Hero["memories"];
   personality: Hero["personality"];
   preparedSkillIds: ReadonlySet<string>;
   relationships: Hero["relationships"];
@@ -54,6 +56,7 @@ export class CombatSimulation {
 
   constructor(
     private readonly onSkillUsage: (event: Readonly<SkillUsageEvent>) => void = () => undefined,
+    private readonly onMemoryEvent: (event: Readonly<CombatMemoryEvent>) => void = () => undefined,
   ) {}
 
   start(
@@ -98,6 +101,7 @@ export class CombatSimulation {
         kills: 0,
         label: entry.hero.name,
         medicine: entry.hero.skills.medicine,
+        memories: entry.hero.memories,
         personality: entry.hero.personality,
         position: getFormationStart(entry.member.formation, lane),
         preparedSkillIds: new Set([
@@ -140,6 +144,7 @@ export class CombatSimulation {
         kills: 0,
         label,
         medicine: 0,
+        memories: [],
         personality: {
           aggression: 0.7,
           ambition: 0,
@@ -214,6 +219,7 @@ export class CombatSimulation {
       }
       if (plan.action === "Protect" && plan.actor.action !== "Protect" && plan.target) {
         this.addLog(`${plan.actor.label} moved to protect ${plan.target.label}.`, "success");
+        this.recordMemoryEvent(plan.actor, plan.target, "PROTECTED_ALLY");
         const protectionSkill = plan.actor.preparedSkillIds.has("interpose")
           ? "interpose"
           : "protective_instinct";
@@ -304,6 +310,9 @@ export class CombatSimulation {
         target.hp += restored;
         actor.attackCooldown = 1.1;
         this.addLog(`${actor.label} restored ${restored} HP to ${target.label}.`, "success");
+        if (restored > 0) {
+          this.recordMemoryEvent(actor, target, "HEALED_ALLY");
+        }
         this.recordCombatUsage(
           actor,
           "field_treatment",
@@ -515,6 +524,16 @@ export class CombatSimulation {
       source: "combat",
       successful,
     });
+  }
+
+  private recordMemoryEvent(
+    actor: Readonly<Combatant>,
+    target: Readonly<Combatant>,
+    type: CombatMemoryEvent["type"],
+  ): void {
+    if (actor.team === "Hero" && target.team === "Hero") {
+      this.onMemoryEvent({ actorId: actor.id, targetId: target.id, type });
+    }
   }
 
   private getDistance(left: Readonly<CombatPosition>, right: Readonly<CombatPosition>): number {
