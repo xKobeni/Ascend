@@ -25,6 +25,7 @@ export class Renderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly selectionRaycaster: SelectionRaycaster;
+  private uiInteractionActive = false;
   private readonly resizeObserver: ResizeObserver;
   private readonly onContextLost: (event: Event) => void;
   private readonly onContextRestored: () => void;
@@ -85,7 +86,7 @@ export class Renderer {
     const combatMode = combatSnapshot.result !== "Idle";
     if (combatMode !== this.combatMode) {
       this.combatMode = combatMode;
-      this.selectionRaycaster.setEnabled(!combatMode);
+      this.syncInputState();
       this.renderer.domElement.setAttribute(
         "aria-label",
         combatMode
@@ -108,6 +109,14 @@ export class Renderer {
     return this.cameraController.getDiagnostics();
   }
 
+  setUiInteractionActive(active: boolean): void {
+    if (this.uiInteractionActive === active) {
+      return;
+    }
+    this.uiInteractionActive = active;
+    this.syncInputState();
+  }
+
   dispose(): void {
     this.resizeObserver.disconnect();
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
@@ -127,5 +136,11 @@ export class Renderer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+  }
+
+  private syncInputState(): void {
+    const enabled = !this.combatMode && !this.uiInteractionActive;
+    this.cameraController.setEnabled(enabled);
+    this.selectionRaycaster.setEnabled(enabled);
   }
 }

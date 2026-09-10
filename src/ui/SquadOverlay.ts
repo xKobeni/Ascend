@@ -1,17 +1,14 @@
 import type { Hero } from "../heroes/Hero";
-import type {
-  FormationPosition,
-  Squad,
-  SquadEvaluation,
-  SquadRole,
-} from "../squads/Squad";
+import { getRelationshipLabel } from "../heroes/RelationshipSystem";
+import type { HeroPortraitCache } from "../rendering/heroes/HeroPortraitCache";
+import type { FormationPosition, Squad, SquadEvaluation, SquadRole } from "../squads/Squad";
 import { SQUAD_SIZE } from "../squads/SquadSystem";
 
 interface SquadActions {
   addHero(heroId: string): void;
+  moveFormation(heroId: string, formation: FormationPosition): void;
   removeHero(heroId: string): void;
   rename(name: string): void;
-  setFormation(heroId: string, formation: FormationPosition): void;
   setRole(heroId: string, role: SquadRole): void;
 }
 
@@ -20,8 +17,6 @@ const ROLES: readonly SquadRole[] = ["Vanguard", "Damage", "Support"];
 
 export class SquadOverlay {
   private readonly element: HTMLElement;
-  private readonly panel: HTMLElement;
-  private readonly toggle: HTMLButtonElement;
   private expanded = false;
 
   constructor(
@@ -29,153 +24,213 @@ export class SquadOverlay {
     private readonly heroes: readonly Readonly<Hero>[],
     private readonly getSquad: () => Readonly<Squad>,
     private readonly getEvaluation: () => Readonly<SquadEvaluation>,
+    private readonly portraits: HeroPortraitCache,
     private readonly actions: SquadActions,
+    private readonly onClose: () => void,
   ) {
-    this.element = document.createElement("aside");
-    this.element.className = "squad-overlay";
-    this.element.setAttribute("aria-label", "Squad editor");
-    this.element.innerHTML = `
-      <button class="squad-overlay__toggle" type="button" aria-expanded="false"></button>
-      <div class="squad-overlay__panel" hidden></div>
-    `;
-    const toggle = this.element.querySelector<HTMLButtonElement>(".squad-overlay__toggle");
-    const panel = this.element.querySelector<HTMLElement>(".squad-overlay__panel");
-    if (!toggle || !panel) {
-      throw new Error("Squad editor structure is incomplete.");
-    }
-    this.toggle = toggle;
-    this.panel = panel;
+    this.element = document.createElement("section");
+    this.element.className = "system-panel party-panel";
+    this.element.hidden = true;
+    this.element.setAttribute("aria-label", "Party formation");
     this.element.addEventListener("click", this.handleClick);
     this.element.addEventListener("change", this.handleChange);
+    this.element.addEventListener("dragstart", this.handleDragStart);
+    this.element.addEventListener("dragover", this.handleDragOver);
+    this.element.addEventListener("drop", this.handleDrop);
     container.appendChild(this.element);
+  }
+
+  open(): void {
+    this.expanded = true;
+    this.element.hidden = false;
     this.render();
   }
 
-  updateEvaluation(): void {
-    if (!this.expanded) {
-      return;
+  close(): void {
+    this.expanded = false;
+    this.element.hidden = true;
+  }
+
+  refresh(): void {
+    if (this.expanded) {
+      this.render();
     }
-    this.renderEvaluation(this.getEvaluation());
+  }
+
+  updateEvaluation(): void {
+    if (this.expanded) {
+      this.renderSummary();
+    }
   }
 
   dispose(): void {
     this.element.removeEventListener("click", this.handleClick);
     this.element.removeEventListener("change", this.handleChange);
+    this.element.removeEventListener("dragstart", this.handleDragStart);
+    this.element.removeEventListener("dragover", this.handleDragOver);
+    this.element.removeEventListener("drop", this.handleDrop);
     this.element.remove();
   }
 
   private render(): void {
     const squad = this.getSquad();
-    const evaluation = this.getEvaluation();
-    this.toggle.textContent = `SQUAD ${squad.members.length}/${SQUAD_SIZE}`;
-    this.toggle.dataset.ready = String(evaluation.isComplete);
-    this.toggle.setAttribute("aria-expanded", String(this.expanded));
-    this.panel.hidden = !this.expanded;
-    if (!this.expanded) {
-      return;
-    }
-
-    this.panel.innerHTML = `
-      <header>
-        <div>
-          <span class="squad-overlay__eyebrow">Expedition team</span>
-          <input aria-label="Squad name" maxlength="28" value="${this.escapeAttribute(squad.name)}">
-        </div>
-        <button type="button" data-squad-action="close" aria-label="Close squad editor">×</button>
+    this.element.innerHTML = `
+      <header class="system-panel__header">
+        <div><span>EXPEDITION FORMATION</span><input aria-label="Party name" maxlength="28" value="${this.escape(squad.name)}"></div>
+        <strong>${squad.members.length}/${SQUAD_SIZE}</strong>
+        <button type="button" data-party-action="close" aria-label="Close party panel">×</button>
       </header>
-      <div class="squad-overlay__meta">
-        <span>Doctrine · ${squad.doctrine} · Chemistry <b data-squad="chemistry">${evaluation.chemistry} ${evaluation.cohesion}%</b> · Trust <b data-squad="trust">${evaluation.trust}%</b></span>
-        <strong data-squad="status">${evaluation.isComplete ? "READY" : `${squad.members.length} OF ${SQUAD_SIZE}`}</strong>
+      <div class="party-layout">
+        <div class="party-formation" aria-label="Formation slots"></div>
+        <aside class="party-summary" data-party="summary"></aside>
       </div>
-      <div class="squad-overlay__evaluation" data-squad="evaluation"></div>
-      <section>
-        <span class="squad-overlay__heading">Formation</span>
-        <div class="squad-overlay__members" data-squad="members"></div>
-      </section>
-      <section>
-        <span class="squad-overlay__heading">Available heroes</span>
-        <div class="squad-overlay__roster" data-squad="roster"></div>
+      <section class="party-reserves">
+        <div class="section-heading"><span>Available heroes</span><small>Assign up to three</small></div>
+        <div class="party-reserves__list"></div>
       </section>
     `;
-    this.renderEvaluation(evaluation);
-    this.renderMembers(squad);
-    this.renderRoster(squad);
+    const formation = this.element.querySelector<HTMLElement>(".party-formation");
+    const reserves = this.element.querySelector<HTMLElement>(".party-reserves__list");
+    if (!formation || !reserves) {
+      throw new Error("Party panel structure is incomplete.");
+    }
+    formation.replaceChildren(...FORMATIONS.map((position) => this.renderSlot(position, squad)));
+    this.renderReserves(reserves, squad);
+    this.renderSummary();
   }
 
-  private renderEvaluation(evaluation: Readonly<SquadEvaluation>): void {
-    const container = this.panel.querySelector<HTMLElement>("[data-squad='evaluation']");
-    const status = this.panel.querySelector<HTMLElement>("[data-squad='status']");
-    const chemistry = this.panel.querySelector<HTMLElement>("[data-squad='chemistry']");
-    const trust = this.panel.querySelector<HTMLElement>("[data-squad='trust']");
-    if (!container || !status || !chemistry || !trust) {
-      return;
+  private renderSlot(position: FormationPosition, squad: Readonly<Squad>): HTMLElement {
+    const slot = document.createElement("section");
+    slot.className = "formation-slot";
+    slot.dataset.formation = position;
+    const label = document.createElement("span");
+    label.className = "formation-slot__label";
+    label.textContent = position.toUpperCase();
+    slot.appendChild(label);
+    const member = squad.members.find((candidate) => candidate.formation === position);
+    const hero = member ? this.heroes.find((candidate) => candidate.id === member.heroId) : undefined;
+    if (!member || !hero) {
+      const empty = document.createElement("div");
+      empty.className = "formation-slot__empty";
+      empty.textContent = "Drop hero here";
+      slot.appendChild(empty);
+      return slot;
     }
-    status.textContent = evaluation.isComplete
-      ? "READY"
-      : `${this.getSquad().members.length} OF ${SQUAD_SIZE}`;
-    status.dataset.ready = String(evaluation.isComplete);
-    chemistry.textContent = `${evaluation.chemistry} ${evaluation.cohesion}%`;
-    trust.textContent = `${evaluation.trust}%`;
-    container.innerHTML = `
-      <div><span>AVG LEVEL</span><strong>${evaluation.averageLevel.toFixed(1)}</strong></div>
-      <div><span>COMBAT</span><strong>${evaluation.combatPower}</strong></div>
-      <div><span>HEALING</span><strong>${evaluation.healing}</strong></div>
-      <div><span>DEFENSE</span><strong>${evaluation.defense}</strong></div>
-    `;
+    const card = this.createPartyCard(hero, member.role);
+    card.draggable = true;
+    card.dataset.heroId = hero.id;
+    const controls = document.createElement("div");
+    controls.className = "party-card__controls";
+    const formationLabel = document.createElement("label");
+    formationLabel.textContent = "Position";
+    const formationSelect = document.createElement("select");
+    formationSelect.dataset.partyField = "formation";
+    formationSelect.dataset.heroId = hero.id;
+    formationSelect.setAttribute("aria-label", `${hero.name} formation position`);
+    formationSelect.innerHTML = this.renderOptions(FORMATIONS, position);
+    formationLabel.appendChild(formationSelect);
+    const roleLabel = document.createElement("label");
+    roleLabel.textContent = "Role";
+    const roleSelect = document.createElement("select");
+    roleSelect.dataset.partyField = "role";
+    roleSelect.dataset.heroId = hero.id;
+    roleSelect.setAttribute("aria-label", `${hero.name} party role`);
+    roleSelect.innerHTML = this.renderOptions(ROLES, member.role);
+    roleLabel.appendChild(roleSelect);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.partyAction = "remove";
+    remove.dataset.heroId = hero.id;
+    remove.textContent = "Remove";
+    controls.append(formationLabel, roleLabel, remove);
+    slot.append(card, controls);
+    return slot;
   }
 
-  private renderMembers(squad: Readonly<Squad>): void {
-    const container = this.panel.querySelector<HTMLElement>("[data-squad='members']");
-    if (!container) {
-      return;
+  private createPartyCard(hero: Readonly<Hero>, role: SquadRole): HTMLElement {
+    const card = document.createElement("article");
+    card.className = "party-hero-card";
+    const portrait = document.createElement("div");
+    portrait.className = "party-hero-card__portrait";
+    const url = this.portraits.get(hero.id);
+    if (url) {
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = "";
+      portrait.appendChild(image);
+    } else {
+      portrait.textContent = this.getInitials(hero.name);
     }
-    if (squad.members.length === 0) {
-      container.textContent = "Add three heroes to create the squad.";
-      container.className = "squad-overlay__members squad-overlay__empty";
-      return;
-    }
-
-    container.replaceChildren(
-      ...squad.members.map((member) => {
-        const hero = this.heroes.find((candidate) => candidate.id === member.heroId);
-        const card = document.createElement("article");
-        card.className = "squad-member";
-        card.innerHTML = `
-          <div class="squad-member__identity">
-            <strong>${hero?.name ?? "Unknown hero"}</strong>
-            <span>Lv ${hero?.level ?? 0} · ${hero?.heroClass ?? "Unknown"} · ${hero?.origin.occupation ?? "Unknown"}</span>
-          </div>
-          <button type="button" data-squad-action="remove" data-hero-id="${member.heroId}" aria-label="Remove ${hero?.name ?? "hero"}">×</button>
-          <label>Position<select data-squad-field="formation" data-hero-id="${member.heroId}">${this.renderOptions(FORMATIONS, member.formation)}</select></label>
-          <label>Role<select data-squad-field="role" data-hero-id="${member.heroId}">${this.renderOptions(ROLES, member.role)}</select></label>
-        `;
-        return card;
-      }),
-    );
+    const stars = document.createElement("span");
+    stars.className = "party-hero-card__rank";
+    stars.textContent = "★".repeat(hero.rank);
+    const name = document.createElement("strong");
+    name.textContent = hero.name;
+    const details = document.createElement("span");
+    details.textContent = `${role} · Level ${hero.level}`;
+    card.append(portrait, stars, name, details);
+    return card;
   }
 
-  private renderRoster(squad: Readonly<Squad>): void {
-    const container = this.panel.querySelector<HTMLElement>("[data-squad='roster']");
-    if (!container) {
-      return;
-    }
+  private renderReserves(container: HTMLElement, squad: Readonly<Squad>): void {
     const full = squad.members.length >= SQUAD_SIZE;
-    container.replaceChildren(
-      ...this.heroes.map((hero) => {
-        const assigned = squad.members.some((member) => member.heroId === hero.id);
-        const row = document.createElement("div");
-        const identity = document.createElement("span");
-        const button = document.createElement("button");
-        identity.textContent = `${hero.name} · Lv ${hero.level}`;
-        button.type = "button";
-        button.textContent = assigned ? "Assigned" : "Add";
-        button.dataset.squadAction = "add";
-        button.dataset.heroId = hero.id;
-        button.disabled = assigned || full;
-        row.append(identity, button);
-        return row;
-      }),
-    );
+    const available = this.heroes.filter((hero) => !squad.members.some((member) => member.heroId === hero.id));
+    container.replaceChildren(...available.map((hero) => {
+      const row = document.createElement("div");
+      row.className = "reserve-hero";
+      const identity = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = hero.name;
+      const detail = document.createElement("small");
+      detail.textContent = `Level ${hero.level} · ${hero.origin.occupation}`;
+      identity.append(name, detail);
+      const add = document.createElement("button");
+      add.type = "button";
+      add.dataset.partyAction = "add";
+      add.dataset.heroId = hero.id;
+      add.disabled = full;
+      add.textContent = "Assign →";
+      row.append(identity, add);
+      return row;
+    }));
+    if (available.length === 0) {
+      container.textContent = "Every resident is assigned.";
+    }
+  }
+
+  private renderSummary(): void {
+    const container = this.element.querySelector<HTMLElement>("[data-party='summary']");
+    if (!container) {
+      return;
+    }
+    const squad = this.getSquad();
+    const evaluation = this.getEvaluation();
+    const members = squad.members
+      .map((member) => this.heroes.find((hero) => hero.id === member.heroId))
+      .filter((hero): hero is Readonly<Hero> => hero !== undefined);
+    const pairings: string[] = [];
+    members.forEach((hero, index) => {
+      members.slice(index + 1).forEach((other) => {
+        const profile = hero.relationships[other.id];
+        if (profile) {
+          pairings.push(`${hero.name.split(" ")[0]} ↔ ${other.name.split(" ")[0]} · ${getRelationshipLabel(profile)}`);
+        }
+      });
+    });
+    container.innerHTML = `
+      <span class="section-heading">Party record</span>
+      <dl>
+        <div><dt>Status</dt><dd data-ready="${evaluation.isComplete}">${evaluation.isComplete ? "READY" : "FORMING"}</dd></div>
+        <div><dt>Power</dt><dd>${evaluation.combatPower}</dd></div>
+        <div><dt>Defense</dt><dd>${evaluation.defense}</dd></div>
+        <div><dt>Healing</dt><dd>${evaluation.healing}</dd></div>
+        <div><dt>Average level</dt><dd>${evaluation.averageLevel.toFixed(1)}</dd></div>
+        <div><dt>Cohesion</dt><dd>${evaluation.chemistry} · ${evaluation.cohesion}%</dd></div>
+        <div><dt>Trust</dt><dd>${evaluation.trust}%</dd></div>
+        <div><dt>Doctrine</dt><dd>${squad.doctrine}</dd></div>
+      </dl>
+      <div class="party-chemistry"><span class="section-heading">Chemistry</span>${pairings.length ? pairings.map((pairing) => `<p>${this.escape(pairing)}</p>`).join("") : "<p>Assign two heroes to reveal squad dynamics.</p>"}</div>
+    `;
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
@@ -183,18 +238,17 @@ export class SquadOverlay {
     if (!button) {
       return;
     }
-    if (button === this.toggle || button.dataset.squadAction === "close") {
-      this.expanded = button === this.toggle ? !this.expanded : false;
-      this.render();
+    if (button.dataset.partyAction === "close") {
+      this.onClose();
       return;
     }
     const heroId = button.dataset.heroId;
     if (!heroId) {
       return;
     }
-    if (button.dataset.squadAction === "add") {
+    if (button.dataset.partyAction === "add") {
       this.actions.addHero(heroId);
-    } else if (button.dataset.squadAction === "remove") {
+    } else if (button.dataset.partyAction === "remove") {
       this.actions.removeHero(heroId);
     }
     this.render();
@@ -210,29 +264,60 @@ export class SquadOverlay {
     if (!(target instanceof HTMLSelectElement) || !target.dataset.heroId) {
       return;
     }
-    if (target.dataset.squadField === "formation" && this.isFormation(target.value)) {
-      this.actions.setFormation(target.dataset.heroId, target.value);
-    } else if (target.dataset.squadField === "role" && this.isRole(target.value)) {
+    if (target.dataset.partyField === "formation" && this.isFormation(target.value)) {
+      this.actions.moveFormation(target.dataset.heroId, target.value);
+    } else if (target.dataset.partyField === "role" && this.isRole(target.value)) {
       this.actions.setRole(target.dataset.heroId, target.value);
     }
     this.render();
   };
 
+  private readonly handleDragStart = (event: DragEvent): void => {
+    const card = (event.target as Element | null)?.closest<HTMLElement>("[data-hero-id]");
+    if (card?.dataset.heroId && event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.heroId);
+    }
+  };
+
+  private readonly handleDragOver = (event: DragEvent): void => {
+    if ((event.target as Element | null)?.closest("[data-formation]")) {
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+    }
+  };
+
+  private readonly handleDrop = (event: DragEvent): void => {
+    const slot = (event.target as Element | null)?.closest<HTMLElement>("[data-formation]");
+    const heroId = event.dataTransfer?.getData("text/plain");
+    const formation = slot?.dataset.formation;
+    if (!heroId || !this.isFormation(formation)) {
+      return;
+    }
+    event.preventDefault();
+    this.actions.moveFormation(heroId, formation);
+    this.render();
+  };
+
   private renderOptions<T extends string>(options: readonly T[], selected: T): string {
-    return options
-      .map((option) => `<option${option === selected ? " selected" : ""}>${option}</option>`)
-      .join("");
+    return options.map((option) => `<option${option === selected ? " selected" : ""}>${option}</option>`).join("");
   }
 
-  private isFormation(value: string): value is FormationPosition {
-    return FORMATIONS.includes(value as FormationPosition);
+  private getInitials(name: string): string {
+    return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  }
+
+  private isFormation(value: string | undefined): value is FormationPosition {
+    return value !== undefined && FORMATIONS.includes(value as FormationPosition);
   }
 
   private isRole(value: string): value is SquadRole {
     return ROLES.includes(value as SquadRole);
   }
 
-  private escapeAttribute(value: string): string {
-    return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  private escape(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 }

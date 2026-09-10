@@ -27,6 +27,29 @@ Hero
 → Repeat
 ```
 
+## Current Implementation Status — September 10, 2026
+
+```text
+Gameplay phases implemented: 0–13
+Current playable milestone: First complete expedition loop
+Current UI milestone: Current-System Client Foundation complete
+Next gameplay phase: Phase 14 — Injury and Recovery
+```
+
+The Phase 13 client now exposes only implemented player destinations:
+
+- **Heroes** — roster filters, cached procedural portraits, and shared hero details
+- **Party** — three-member Front/Middle/Back formation and real squad evaluation
+- **Refuge** — the living 3D simulation and world selection
+- **Rift** — expedition briefing, combat, results, and return
+
+Developer diagnostics and the Phase 9 Arena remain available through the `F3` drawer. They are not
+part of player navigation. Future systems must not receive a destination, resource counter, or
+placeholder panel before their gameplay phase exists.
+
+The next implementation boundary is Phase 14 only. Phase 15 and later remain design context, not
+approved implementation scope.
+
 ---
 
 # Phase 0 — Project Foundation
@@ -1027,6 +1050,58 @@ This is the first real vertical slice.
 
 ---
 
+# UI Milestone U1 — Current-System Client Foundation — Complete
+
+## Goal
+
+Turn the Phase 0–13 interfaces into one coherent game client without pulling later systems forward.
+This is a cross-phase presentation milestone; it does not replace or renumber Phase 14.
+
+## Implemented
+
+- Matte dark-fantasy visual system using charcoal, bone, bronze, olive, burgundy, and slate
+- Restrained top status bar for time, hero count, and actual expedition resources
+- Exclusive bottom navigation for Heroes, Party, Refuge, and Rift
+- Tall geometric hero cards generated from cached stills of real procedural hero models
+- One hero detail surface with Overview, Skills, Training, and Relations sections
+- Visual Front/Middle/Back party formation with pointer and accessible movement controls
+- Atomic formation swaps that preserve roles and the three-member limit
+- Rift presentation for briefing, live encounter, victory, withdrawal, consequences, and debrief
+- UI-only notices for social events, training, skill progression, deployment, and mission results
+- Explicit camera and world-selection gating while an interface panel is active
+- Responsive mobile layouts and reduced-motion behavior
+- Collapsed `F3` developer drawer containing renderer diagnostics and the Arena
+
+## Compatibility Rules
+
+- Simulation state remains authoritative; portrait rendering owns no hero gameplay state.
+- The living refuge continues behind panels while camera and selection input are gated.
+- Existing training, loadout, squad, combat, expedition, reward, and consequence behavior is retained.
+- New destinations appear only when their corresponding gameplay systems are implemented.
+- The four primary destinations are the stable information architecture; later systems expand them
+  contextually before any new permanent navigation item is considered.
+
+## Future Design Sequence
+
+- **Phase 14:** deepen Heroes with injury, treatment, and recovery feedback.
+- **Phases 15–17:** add loss, memory, and trait evolution to hero history without crowding the
+  default roster card.
+- **Phases 18–23:** make recruitment, capacity, facilities, equipment, and crafting physical Refuge
+  activities with focused work panels.
+- **Phases 24–26:** grow hero progression and mentorship inside the shared hero details.
+- **Phases 27–35:** turn Rift and Party into the campaign-planning layer for mission variety,
+  regions, bosses, doctrine, loyalty, and long-term squad stories.
+- **Phases 36–40:** add memorial, persistence, audio, and visual polish while retaining the same
+  navigation hierarchy and playfield-first layout.
+
+## Exit Criteria — Met
+
+The Phase 0–13 loop can be operated without visible diagnostic UI. Desktop and mobile layouts,
+cached portraits, panel exclusivity, camera handoff, party swaps, victory, withdrawal, debrief,
+resource updates, and developer Arena access have browser validation coverage.
+
+---
+
 # Phase 14 — Injury and Recovery
 
 ## Goal
@@ -1067,6 +1142,17 @@ Healing consumes medicine.
 ### 14.5 Permanent Injuries
 
 Rare severe injuries create long-term effects.
+
+### 14.6 Client Integration
+
+Extend the established client rather than adding a new top-level destination:
+
+- Show injury severity and recovery state on existing hero cards and Overview details.
+- Use the existing **Recovering** roster filter for injured and resting heroes.
+- Put treatment and recovery actions in the hero Training/Recovery context.
+- Add Medicine to the top status bar only when it becomes a real persisted resource.
+- Expose an Infirmary through the 3D Refuge only when the facility and its interactions exist.
+- Use burgundy shape, label, and icon changes for danger; never rely on glow or color alone.
 
 ## Exit Criteria
 
@@ -1995,27 +2081,41 @@ Reloading restores the same simulation state.
 
 ---
 
-# Phase 38 — UI Pass
+# Phase 38 — Production UI Expansion
 
 ## Goal
 
-Turn debug interfaces into usable game UI.
+Extend the established Phase 13 client to every system that has actually shipped. This phase is a
+production-depth pass, not a replacement redesign.
 
-## Screens
+## Information Architecture
 
-- Main HUD
-- Hero Panel
-- Squad Builder
-- Recruitment
-- Expedition Selection
-- Inventory
-- Facilities
-- Event Log
-- Memorial
+- **Heroes** expands with injuries, equipment, classes, memories, and history.
+- **Party** expands with saved squads, deeper doctrine, and expedition comparison.
+- **Refuge** exposes recruitment, facilities, crafting, and memorials through world locations and
+  contextual panels.
+- **Rift** expands with mission selection, regions, progression, bosses, and expedition history.
+- The notification center may become a Chronicle only when event volume justifies a persistent log.
+- Developer diagnostics and validation sandboxes remain in the `F3` drawer.
+
+## Activation Rule
+
+Never add a disabled future tab, invented resource, empty destination, or placeholder screen. A UI
+entry is introduced in the same phase as the real state and player action it represents.
+
+## Visual Continuity
+
+- Preserve the matte charcoal, bone, and bronze material language.
+- Reserve olive for healthy/ready states, burgundy for harm or irreversible risk, and slate for
+  neutral information.
+- Keep the 3D refuge dominant whenever the player is not performing a focused task.
+- Prefer contextual drawers and layered details over dashboard grids.
+- Preserve restrained motion and reduced-motion parity as content density grows.
 
 ## Exit Criteria
 
-Core game can be played without developer controls.
+Every implemented system is usable without developer controls, and adding late-game depth has not
+compromised playfield visibility, input handoff, mobile operation, or the established hierarchy.
 
 ---
 

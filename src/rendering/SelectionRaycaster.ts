@@ -71,7 +71,6 @@ export class SelectionRaycaster {
     if (!enabled) {
       this.selectedRoot = null;
       this.highlight.visible = false;
-      this.onSelection(null);
     }
   }
 

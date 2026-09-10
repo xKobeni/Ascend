@@ -64,69 +64,53 @@ export class SelectionOverlay {
   private readonly label: HTMLElement;
   private readonly heroContent: HTMLElement;
   private selectedHeroId: string | null = null;
+  private selectedTab: "Overview" | "Relations" | "Skills" | "Training" = "Overview";
   private skillForgeRenderSignature: string | null = null;
 
   constructor(
     container: HTMLElement,
     private readonly onQueueTraining: (heroId: string, type: TrainingType) => void,
     private readonly onToggleSkillLoadout: (heroId: string, definitionId: string) => void,
+    private readonly onClose: () => void,
   ) {
     this.element = document.createElement("aside");
-    this.element.className = "selection-overlay";
+    this.element.className = "system-panel hero-detail-panel selection-overlay";
     this.element.hidden = true;
     this.element.setAttribute("aria-live", "polite");
     this.element.innerHTML = `
-      <span class="selection-overlay__eyebrow" data-selection="category"></span>
-      <strong data-selection="label"></strong>
+      <header class="system-panel__header">
+        <div><span class="selection-overlay__eyebrow" data-selection="category"></span><h1 data-selection="label" tabindex="-1"></h1></div>
+        <button type="button" data-selection-action="close" aria-label="Close hero details">×</button>
+      </header>
       <span class="selection-overlay__detail" data-selection="detail"></span>
+      <nav class="hero-detail-tabs" data-selection="tabs" aria-label="Hero detail sections">
+        <button type="button" data-hero-tab="Overview" aria-pressed="true">Overview</button>
+        <button type="button" data-hero-tab="Skills" aria-pressed="false">Skills</button>
+        <button type="button" data-hero-tab="Training" aria-pressed="false">Training</button>
+        <button type="button" data-hero-tab="Relations" aria-pressed="false">Relations</button>
+      </nav>
       <div class="hero-panel" data-selection="hero" hidden>
-        <div class="hero-panel__identity" data-hero="identity"></div>
-        <div class="hero-panel__path" data-hero="path"></div>
-        <div class="hero-panel__status" data-hero="status"></div>
-        <div class="hero-panel__decision" data-hero="decision" hidden></div>
-        <section>
-          <span class="hero-panel__heading">Needs</span>
-          <div class="hero-panel__meters hero-panel__needs" data-hero="needs"></div>
-        </section>
-        <section>
-          <span class="hero-panel__heading">Traits</span>
-          <div class="hero-panel__traits" data-hero="traits"></div>
-        </section>
-        <section>
-          <span class="hero-panel__heading">Core attributes</span>
-          <div class="hero-panel__grid" data-hero="attributes"></div>
-        </section>
-        <section>
-          <span class="hero-panel__heading">Skills</span>
-          <div class="hero-panel__grid" data-hero="skills"></div>
-        </section>
-        <section class="hero-panel__skill-forge">
-          <span class="hero-panel__heading">Hero Skill Forge</span>
-          <div class="hero-panel__skill-summary" data-hero="skill-summary"></div>
-          <div class="hero-panel__skill-list" data-hero="skill-forge"></div>
-          <div class="hero-panel__skill-potential" data-hero="skill-potential"></div>
-        </section>
-        <section class="hero-panel__training">
-          <span class="hero-panel__heading">Training queue</span>
-          <div data-hero="training-active"></div>
-          <div class="hero-panel__training-progress"><i data-hero="training-progress"></i></div>
-          <div class="hero-panel__training-queue" data-hero="training-queue"></div>
-          <div class="hero-panel__training-actions">
-            <button type="button" data-training-type="Strength Training">Strength</button>
-            <button type="button" data-training-type="Weapon Training">Weapon</button>
-            <button type="button" data-training-type="Defense Training">Defense</button>
-          </div>
-          <div class="hero-panel__training-outcome" data-hero="training-outcome"></div>
-        </section>
-        <section>
-          <span class="hero-panel__heading">Personality</span>
-          <div class="hero-panel__meters" data-hero="personality"></div>
-        </section>
-        <section>
-          <span class="hero-panel__heading">Relationships</span>
-          <div class="hero-panel__relationships" data-hero="relationships"></div>
-        </section>
-        <div class="hero-panel__potential">Potential · Undiscovered</div>
+        <div data-hero-view="Overview">
+          <div class="hero-panel__identity" data-hero="identity"></div>
+          <div class="hero-panel__path" data-hero="path"></div>
+          <div class="hero-panel__status" data-hero="status"></div>
+          <div class="hero-panel__decision" data-hero="decision" hidden></div>
+          <section><span class="hero-panel__heading">Needs</span><div class="hero-panel__meters hero-panel__needs" data-hero="needs"></div></section>
+          <section><span class="hero-panel__heading">Traits</span><div class="hero-panel__traits" data-hero="traits"></div></section>
+          <section><span class="hero-panel__heading">Core attributes</span><div class="hero-panel__grid" data-hero="attributes"></div></section>
+          <section><span class="hero-panel__heading">Personality</span><div class="hero-panel__meters" data-hero="personality"></div></section>
+          <div class="hero-panel__potential">Potential · Undiscovered</div>
+        </div>
+        <div data-hero-view="Skills" hidden>
+          <section><span class="hero-panel__heading">Current disciplines</span><div class="hero-panel__grid" data-hero="skills"></div></section>
+          <section class="hero-panel__skill-forge"><span class="hero-panel__heading">Known skills</span><div class="hero-panel__skill-summary" data-hero="skill-summary"></div><div class="hero-panel__skill-list" data-hero="skill-forge"></div><div class="hero-panel__skill-potential" data-hero="skill-potential"></div></section>
+        </div>
+        <div data-hero-view="Training" hidden>
+          <section class="hero-panel__training"><span class="hero-panel__heading">Training queue</span><div data-hero="training-active"></div><div class="hero-panel__training-progress"><i data-hero="training-progress"></i></div><div class="hero-panel__training-queue" data-hero="training-queue"></div><div class="hero-panel__training-actions"><button type="button" data-training-type="Strength Training">Strength</button><button type="button" data-training-type="Weapon Training">Weapon</button><button type="button" data-training-type="Defense Training">Defense</button></div><div class="hero-panel__training-outcome" data-hero="training-outcome"></div></section>
+        </div>
+        <div data-hero-view="Relations" hidden>
+          <section><span class="hero-panel__heading">Relationships</span><div class="hero-panel__relationships" data-hero="relationships"></div></section>
+        </div>
       </div>
     `;
     this.category = this.requireElement("category");
@@ -156,9 +140,30 @@ export class SelectionOverlay {
     this.detail.textContent = selection.detail ?? "";
     this.detail.hidden = !selection.detail;
     this.heroContent.hidden = !hero;
+    const tabs = this.requireElement("tabs");
+    tabs.hidden = !hero;
     if (hero) {
       this.renderHero(hero, heroes);
+      this.applySelectedTab();
     }
+  }
+
+  showHero(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[], tab: typeof this.selectedTab = "Overview"): void {
+    this.selectedTab = tab;
+    this.setSelection({
+      category: "hero",
+      detail: `Level ${hero.level} · Rank ${"★".repeat(hero.rank)}`,
+      id: hero.id,
+      label: hero.name,
+    }, hero, heroes);
+  }
+
+  close(): void {
+    this.setSelection(null);
+  }
+
+  isOpen(): boolean {
+    return !this.element.hidden;
   }
 
   dispose(): void {
@@ -212,6 +217,16 @@ export class SelectionOverlay {
 
   private readonly handleClick = (event: MouseEvent): void => {
     const target = event.target as Element | null;
+    const tab = target?.closest<HTMLButtonElement>("[data-hero-tab]")?.dataset.heroTab;
+    if (this.isHeroTab(tab)) {
+      this.selectedTab = tab;
+      this.applySelectedTab();
+      return;
+    }
+    if (target?.closest("[data-selection-action='close']")) {
+      this.onClose();
+      return;
+    }
     const skillButton = target?.closest<HTMLButtonElement>("[data-skill-id]");
     if (skillButton && this.selectedHeroId && skillButton.dataset.skillId) {
       this.onToggleSkillLoadout(this.selectedHeroId, skillButton.dataset.skillId);
@@ -223,6 +238,19 @@ export class SelectionOverlay {
       this.onQueueTraining(this.selectedHeroId, type);
     }
   };
+
+  private applySelectedTab(): void {
+    this.heroContent.querySelectorAll<HTMLElement>("[data-hero-view]").forEach((view) => {
+      view.hidden = view.dataset.heroView !== this.selectedTab;
+    });
+    this.element.querySelectorAll<HTMLButtonElement>("[data-hero-tab]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.heroTab === this.selectedTab));
+    });
+  }
+
+  private isHeroTab(value: string | undefined): value is typeof this.selectedTab {
+    return value !== undefined && ["Overview", "Skills", "Training", "Relations"].includes(value);
+  }
 
   private renderSkillForge(hero: Readonly<Hero>): void {
     const knownSkills = Object.values(hero.skillForge.known).sort((left, right) => {

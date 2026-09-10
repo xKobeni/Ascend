@@ -2,6 +2,7 @@ import type { CombatSnapshot, CombatantSnapshot } from "../combat/Combat";
 import type { ExpeditionSnapshot } from "../expeditions/Expedition";
 
 interface ExpeditionActions {
+  close(): void;
   deploy(): boolean;
   returnToRefuge(): boolean;
 }
@@ -22,7 +23,7 @@ export class ExpeditionOverlay {
     private readonly actions: ExpeditionActions,
   ) {
     this.element = document.createElement("aside");
-    this.element.className = "expedition-overlay";
+    this.element.className = "system-panel rift-panel expedition-overlay";
     this.element.setAttribute("aria-label", "Expedition command");
     this.element.innerHTML = `
       <button class="expedition-overlay__toggle" type="button" aria-expanded="false">EXPEDITION</button>
@@ -65,6 +66,21 @@ export class ExpeditionOverlay {
     }
     this.lastRenderKey = renderKey;
     this.render(expedition, combat);
+  }
+
+  open(): void {
+    this.expanded = true;
+    this.lastRenderKey = "";
+    this.update();
+  }
+
+  close(): void {
+    if (this.getExpedition().phase !== "Briefing") {
+      return;
+    }
+    this.expanded = false;
+    this.lastRenderKey = "";
+    this.update();
   }
 
   dispose(): void {
@@ -191,11 +207,12 @@ export class ExpeditionOverlay {
     if (button === this.toggle) {
       this.expanded = !this.expanded;
     } else if (button.dataset.expeditionAction === "close") {
-      this.expanded = false;
+      this.actions.close();
     } else if (button.dataset.expeditionAction === "deploy" && this.actions.deploy()) {
       this.expanded = true;
     } else if (button.dataset.expeditionAction === "return" && this.actions.returnToRefuge()) {
       this.expanded = false;
+      this.actions.close();
     }
     this.lastRenderKey = "";
     this.update();

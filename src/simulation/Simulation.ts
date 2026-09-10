@@ -118,6 +118,10 @@ export class Simulation {
     return this.squadSystem.setFormation(heroId, formation);
   }
 
+  moveHeroToSquadFormation(heroId: string, formation: FormationPosition): boolean {
+    return this.squadSystem.moveHeroToFormation(heroId, formation);
+  }
+
   setSquadRole(heroId: string, role: SquadRole): boolean {
     return this.squadSystem.setRole(heroId, role);
   }

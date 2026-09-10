@@ -112,6 +112,14 @@ The player should become emotionally attached to individual heroes.
 
 A weak recruit from Day 2 may become the strongest veteran in the settlement by Day 80.
 
+## 4.1 Current Build and Future Vision
+
+The implemented build currently covers Phases 0–13 and the first complete
+Train → Squad → Expedition → Combat → Return loop. Its live client contains Heroes, Party, Refuge,
+and Rift only. Injury, death, recruitment, facilities, equipment, classes, and campaign depth in
+this document describe future phases; they must remain absent from the playable interface until
+their authoritative systems are implemented.
+
 ---
 
 # 5. Design Pillars
@@ -1842,6 +1850,17 @@ Environment:
 - Crystals
 - Debris
 
+The world and interface use two related layers:
+
+- The **world layer** is a readable, low-poly refuge with strong silhouettes, grounded lighting,
+  and restrained environmental color.
+- The **client layer** is a minimal dark-fantasy command surface using matte charcoal, bone text,
+  thin bronze geometry, and state colors drawn from olive, burgundy, and slate.
+
+The interface should frame the diorama rather than compete with it. Avoid neon glow, glassmorphism,
+rounded dashboard cards, ornate fantasy clutter, external anime portrait art, and permanent panels
+around every edge of the viewport.
+
 ---
 
 # 56. Procedural Hero Appearance
@@ -1888,31 +1907,95 @@ Use HTML/CSS for interface panels.
 
 Three.js should handle the world.
 
-HUD example:
+## 58.1 Visual Language
 
 ```text
-DAY 18
-
-Food        214
-Medicine     18
-Scrap        83
-Rift Shards 120
-
-Heroes:
-12 / 16
-
-Squads:
-2
-
-Morale:
-74%
+Charcoal  #151513  primary surfaces
+Bone      #E7E1D4  primary text
+Bronze    #A78652  structure, selection, rank
+Olive     #747B5D  ready, healthy, success
+Burgundy  #7A4545  injury, danger, loss
+Slate     #697282  neutral and secondary information
 ```
+
+Use thin geometric borders, squared controls, compact labels, and an editorial hierarchy. State
+must be communicated with words, shape, and contrast in addition to color. Strong motion is
+reserved for discovery, danger, mission resolution, and other meaningful state changes.
+
+## 58.2 Stable Navigation Model
+
+The living 3D refuge is the default and remains visually dominant. The primary command layer uses
+four destinations:
+
+```text
+Heroes | Party | Refuge | Rift
+```
+
+Only one focused panel is open at a time. The simulation continues behind Refuge panels, while
+camera movement and world selection pause until the player closes the panel. Active expeditions
+temporarily replace normal navigation but preserve the top status layer.
+
+The top bar shows only current, authoritative state: day/time, hero count, and resources that the
+implemented economy actually owns. Debug controls never share the player HUD; they live in the
+collapsed `F3` developer drawer.
+
+## 58.3 Progressive Disclosure for Future Systems
+
+The four destinations grow with the game instead of multiplying into a dashboard:
+
+| Future system | Player-facing home once implemented |
+| --- | --- |
+| Injury and recovery | Heroes details, Recovering filter, contextual Refuge infirmary |
+| Permanent death and memories | Heroes history and contextual memorial records |
+| Recruitment and capacity | Recruit Gate or dormitory interactions inside Refuge |
+| Economy, facilities, and crafting | Refuge world locations and contextual work panels |
+| Equipment and classes | Hero details; Party shows only resulting squad impact |
+| Expedition variety and Rift depth | Rift mission selection and regional progression |
+| Doctrine and advanced relationships | Party planning and hero Relations details |
+| History, social events, and memorials | Chronicle or Refuge locations when event volume warrants it |
+
+No disabled future tab, fake counter, empty navigation destination, or invented data appears before
+its system ships.
+
+## 58.4 Responsive Behavior
+
+- Desktop panels preserve a meaningful view of the refuge whenever the task allows it.
+- Mobile uses a compact four-item dock, two-column hero cards, full-height focused drawers, and
+  vertically stacked formation slots.
+- Touch targets remain operable without translating every control into oversized pills.
+- Reduced-motion mode removes nonessential transitions without removing state feedback.
+
+## 58.5 Hero and Party Framing
+
+Hero cards borrow the vertical composition and rank readability of collectible character cards,
+but they function as refuge personnel records rather than detached summon art:
+
+- Portraits come from the hero's current procedural 3D appearance.
+- Thin geometric frames communicate hierarchy without becoming highly ornate.
+- Rank stars describe rarity, not worth or final potential.
+- Name, level, occupation or assigned role, and present condition remain concise and readable.
+- Injury, recovery, training, and readiness are more actionable than decorative rarity effects.
+
+Party presentation uses the same cards in a spatial Front/Middle/Back formation. The layout should
+make composition, role, chemistry, and movement consequences understandable before deployment,
+while detailed statistics remain secondary.
 
 ---
 
 # 59. Hero Panel
 
-Example:
+The hero panel is one shared surface opened from a roster card or the hero's 3D model. It begins
+with only currently implemented sections:
+
+```text
+Overview | Skills | Training | Relations
+```
+
+Future phases extend these sections or add a section only when the underlying state exists. Injury
+belongs in Overview and recovery context; equipment and class development belong in Skills or a
+later implemented progression section; memories and history remain hidden until their phases.
+
+Mature-game example:
 
 ```text
 ELIAS VANE

@@ -7,6 +7,8 @@ dist/
 # Local tooling
 *.local
 .vite/
+.agents/
+artifacts/
 
 # Logs
 *.log

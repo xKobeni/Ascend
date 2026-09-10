@@ -68,6 +68,20 @@ export class SquadSystem {
     return true;
   }
 
+  moveHeroToFormation(heroId: string, formation: FormationPosition): boolean {
+    const member = this.squad.members.find((candidate) => candidate.heroId === heroId);
+    if (!member || member.formation === formation) {
+      return member !== undefined;
+    }
+    const occupied = this.squad.members.find((candidate) => candidate.formation === formation);
+    const previousFormation = member.formation;
+    member.formation = formation;
+    if (occupied) {
+      occupied.formation = previousFormation;
+    }
+    return true;
+  }
+
   setRole(heroId: string, role: SquadRole): boolean {
     const member = this.squad.members.find((candidate) => candidate.heroId === heroId);
     if (!member) {

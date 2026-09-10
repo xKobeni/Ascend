@@ -10,6 +10,7 @@ export interface CameraDiagnostics {
 export class CameraController {
   private readonly activeKeys = new Set<string>();
   private distance = 57;
+  private enabled = true;
   private readonly elevation = THREE.MathUtils.degToRad(43);
   private readonly target = new THREE.Vector3(0, 0.35, 0);
   private yaw = THREE.MathUtils.degToRad(42);
@@ -32,6 +33,9 @@ export class CameraController {
   }
 
   update(deltaSeconds: number): void {
+    if (!this.enabled) {
+      return;
+    }
     const rotationDirection = Number(this.activeKeys.has("KeyQ")) - Number(this.activeKeys.has("KeyE"));
     if (rotationDirection !== 0) {
       this.yaw += rotationDirection * deltaSeconds * 1.15;
@@ -62,6 +66,13 @@ export class CameraController {
     };
   }
 
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.activeKeys.clear();
+    }
+  }
+
   dispose(): void {
     this.inputElement.removeEventListener("pointerdown", this.handlePointerDown);
     this.inputElement.removeEventListener("wheel", this.handleWheel);
@@ -81,17 +92,23 @@ export class CameraController {
   }
 
   private readonly handlePointerDown = (): void => {
+    if (!this.enabled) {
+      return;
+    }
     this.inputElement.focus({ preventScroll: true });
   };
 
   private readonly handleWheel = (event: WheelEvent): void => {
+    if (!this.enabled) {
+      return;
+    }
     event.preventDefault();
     this.distance = THREE.MathUtils.clamp(this.distance + event.deltaY * 0.036, 30, 84);
     this.applyCameraTransform();
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (!this.isCameraKey(event.code) || this.isEditableTarget(event.target)) {
+    if (!this.enabled || !this.isCameraKey(event.code) || this.isEditableTarget(event.target)) {
       return;
     }
     event.preventDefault();
