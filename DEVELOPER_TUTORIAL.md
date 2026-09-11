@@ -5,10 +5,10 @@
 Current implementation boundary (verified September 11, 2026):
 
 ```text
-Gameplay phases implemented: 0–20
+Gameplay phases implemented: 0–21
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 21 — Refuge Layout System
+Next gameplay phase: Phase 22 — Facility Construction
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -43,7 +43,7 @@ npm run dev
 
 Open the URL shown in the terminal (usually `http://localhost:5173`). The game loads with 5 procedurally generated heroes in a 3D refuge.
 
-**Controls:** WASD or right/middle mouse drag to pan the camera, Q/E to rotate, mouse wheel to zoom, click heroes to select, F3 for the developer drawer.
+**Controls:** The default preset uses WASD or middle-drag to pan, right-drag to orbit, Q/E to rotate yaw, and the wheel to zoom. Open **CAMERA** beside the ASCENT title to choose Prototype controls instead: left-drag orbits, right-drag pans, middle-drag/wheel zooms, and WASD camera movement is disabled. A short left click still selects or places. Press F3 for the developer drawer. In Refuge Build Mode, R rotates, Enter confirms, and Escape cancels or exits.
 
 **Core gameplay loop:**
 1. Heroes walk around the refuge eating, training, socializing, resting
@@ -58,6 +58,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 10. A victory's Scrap can expand the Dormitory when the 5-bed refuge is full
 11. Available beds and Rift Shards allow a seeded 1–3★ recruit through the Gate
 12. Active residents consume Food and shortages weaken meal recovery and morale
+13. Refuge Build Mode can reorganize all starting structures, store ordinary facilities, edit smooth trails, and move or remove seeded trees and rocks
 
 Before and after a meaningful change, run:
 
@@ -69,8 +70,8 @@ git diff --check
 ```
 
 The browser playtest exercises the current UI, procedural portraits, camera gating, squad swaps,
-victory and withdrawal routes, recovery, permanent death, memories, trait evolution, and recruitment. A successful
-static build alone does not prove those runtime paths.
+victory and withdrawal routes, recovery, permanent death, memories, trait evolution, recruitment,
+and the Refuge layout editor. A successful static build alone does not prove those runtime paths.
 
 ### 1.1 Implemented Phase Map
 
@@ -91,10 +92,10 @@ static build alone does not prove those runtime paths.
 | 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, `RecruitmentOverlay` |
 | 19 | Authoritative hero capacity, Dormitory upgrades and rest comfort | `refuge/DormitorySystem`, `NeedsSystem` |
 | 20 | Daily Food demand, provision shortages and balanced mission resources | `economy/ResourceEconomySystem` |
+| 21 | Broad editable Refuge plane, Build Mode, movable structures, trails, routing, trees and rocks | `refuge/RefugeLayoutSystem`, `RefugeBuildOverlay` |
 
-Phase 21 is the next boundary. Do not add Build Mode, movable facilities, trail editing, or seeded
-environment placement before that phase is implemented. Construction sites, builders, timers,
-facility recipes, and Metal remain Phase 22.
+Phase 22 is the next boundary. Construction sites, builders, progress timers, build recipes, new
+facilities, and Metal are not implemented by the Phase 21 layout editor.
 
 ---
 
@@ -806,17 +807,28 @@ combatPower = strength*4 + agility*2 + max(weaponSkills)*5 + level*10  (injury-m
 
 ### 8.1 Camera Controller (`src/rendering/CameraController.ts`)
 
-Elevated isometric orbital camera:
-- **WASD:** Pan (7.5 units/sec, clamped to -24..24)
-- **Right or middle mouse drag:** Pan relative to the current camera yaw. Drag distance scales with zoom and uses the same -24..24 target bounds.
+Elevated free-orbit camera shared by two player-selectable input presets:
+
+- **ASCENT Default:** WASD pans, right-drag orbits, middle-drag pans, and the wheel zooms.
+- **Prototype:** left-drag orbits, right-drag pans, middle-drag or the wheel zooms, and WASD camera movement is disabled.
+- **Orbit pitch:** clamped from 3.6–86.4 degrees.
+- **Pan:** the forward/backward pointer axis uses the accepted inverted direction in both presets.
 - **Q/E:** Rotate yaw (1.15 rad/sec)
-- **Mouse wheel:** Zoom (distance 30-84)
-- **Elevation:** Fixed at 43 degrees
-- **Initial:** distance 57, yaw 42 degrees
+- **Mouse wheel:** Smooth multiplicative zoom (distance 14–130)
+- **Initial:** approximately distance 72, pitch 34 degrees, yaw 40 degrees—the framing used by the approved base prototype
+- **Motion:** Orbit, pan, keyboard movement, and zoom converge with frame-rate-independent damping equivalent to the prototype's `dampingFactor = 0.08`
+
+The `CameraControlScheme` action map changes pointer bindings without duplicating camera math.
+`CameraSettingsOverlay` saves the choice to `localStorage`; it falls back to ASCENT Default when
+storage is unavailable. In Prototype mode, selection and Build Mode defer a left click until
+pointer-up: movement beyond six pixels becomes orbit input and never commits placement. Disabling
+camera input also clears pending inertia, so closing a panel cannot release old movement.
 
 ### 8.2 Selection Raycaster (`src/rendering/SelectionRaycaster.ts`)
 
-Left-click to select heroes and objects in the 3D scene. Right and middle buttons are reserved for camera panning. Selection uses Three.js raycasting from mouse position to selectable meshes.
+Short left-clicks select heroes and objects in both presets. A left drag is camera orbit only under
+Prototype controls; the existing six-pixel selection threshold prevents a drag from becoming a
+click. Selection uses Three.js raycasting from mouse position to selectable meshes.
 
 Selection categories: `hero`, `facility`, `prop`, `base`, `memorial`
 
@@ -828,8 +840,8 @@ The entire refuge is built from Three.js primitives:
 
 | Object | Geometry | Notes |
 |--------|----------|-------|
-| Ground | PlaneGeometry (162x162) | Color #1b211f |
-| Platform | CylinderGeometry (35 radius) | Elevated, with grid |
+| Surrounding ground | PlaneGeometry (162x162) | Dark forest boundary beneath the Refuge |
+| Refuge floor | PlaneGeometry (72x72) | Mostly level, continuous natural ground; hidden 2-unit snap grid |
 | Campfire | ConeGeometry flames + PointLight | Animated flickering |
 | Tent | ConeGeometry | DoubleSide fabric |
 | Infirmary | 3 BoxGeometry cots | |
@@ -839,11 +851,14 @@ The entire refuge is built from Three.js primitives:
 | Gate | 2 BoxGeometry pillars + lintel | Stone |
 | Memorial Graves | plinth + marker + cap + bronze plate | Per fallen hero |
 
-**Facility zones:** Color-coded CylinderGeometry pads with TorusGeometry rings:
-- Dormitory (blue-ish)
-- Training (orange-ish)
-- Storage (green-ish)
-- Gate (red-ish)
+Facility identity comes from the low-poly structures themselves rather than color-coded dashboard
+pads. Subtle ground patches create visual variation only; they do not grant terrain bonuses.
+
+Every structure and environment render root is grounded through
+`placeObjectOnRefugeGround()` in `RefugeGround.ts`. The helper measures the object's actual world
+bounding box and aligns its lowest point with `REFUGE_GROUND_Y`. Hero rigs record the same measured
+resting height, then apply walking or activity animation relative to it. Use this helper when adding
+or replacing a model instead of copying an old hardcoded `position.y` value.
 
 ### 8.4 Hero Renderer (`src/rendering/heroes/HeroRenderer.ts`)
 
@@ -878,7 +893,41 @@ Renders 320x400 portrait images using a separate offscreen Three.js renderer:
 - Caches by appearance signature (JSON.stringify of appearance)
 - Used by hero roster cards in the UI
 
-### 8.7 Combat Arena (`src/rendering/combat/CombatArenaScene.ts`)
+### 8.7 Refuge Layout Rendering and Input
+
+The layout system is deliberately split across four layers:
+
+```text
+RefugeLayoutSystem (plain authoritative data)
+        ↓ snapshot/revision
+ProceduralBaseScene (structure, trail, tree, rock, and preview meshes)
+        ↑ ground coordinates
+RefugeBuildInput (left-pointer ground raycast)
+        ↑ actions
+RefugeBuildOverlay + Game (tools, drafts, commits, input gating)
+```
+
+`RefugeLayoutSystem` owns structure transforms, trail cells, seed, version, tree and rock records,
+and the one-step committed undo history. It subtly snaps to a hidden two-unit grid and validates the
+72×72 boundary, footprints, entrances, environment props, and flood-filled access to critical
+destinations before a move is accepted. `Simulation` owns the one live instance and exposes narrow
+mutation methods.
+
+`ProceduralBaseScene.syncLayout()` reacts only when `snapshot.revision` changes. It transforms all
+eight registered starting structures, rebuilds smooth trail geometry, and rebuilds 28 deterministic
+tree plus 16 rock objects. The renderer does not own placement state. Critical landmarks can move
+but cannot be removed; ordinary facilities can be stored and placed again.
+
+`createRefugeNavigationPoints(layout)` derives activity targets from the current facility records.
+`HeroRoutineSystem` notices revision changes and reroutes heroes already assigned to affected
+activities. Never reintroduce hardcoded activity coordinates inside a hero system.
+
+`RefugeBuildInput` is active only in Build Mode. Left pointer events raycast the ground for structure
+or environment drafts and trail paint/erase. Right drag orbits and middle drag pans. World raycasting
+remains available for selecting structures, trees, and rocks while normal hero inspection is
+suppressed; the living simulation and camera input remain enabled.
+
+### 8.8 Combat Arena (`src/rendering/combat/CombatArenaScene.ts`)
 
 Separate 3D scene for combat:
 - Circular ground disc with torus ring and center line
@@ -945,6 +994,7 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 | RecruitmentOverlay | `RecruitmentOverlay.ts` | Seeded Dimensional Gate arrival reveal |
 | Dormitory status | inside `HeroRosterOverlay.ts` | Beds, comfort effects, Scrap upgrade action |
 | Provision status | inside `HudShell.ts` | Food runway, daily demand, and shortage state |
+| RefugeBuildOverlay | `RefugeBuildOverlay.ts` | Contextual facility/trail tools, validation, undo, and accessible controls |
 | ControlsHint | `ControlsHint.ts` | Camera controls hint |
 | SocialLogOverlay | `SocialLogOverlay.ts` | Social event log |
 
@@ -1261,16 +1311,17 @@ this.scene.add(well);
 **Key patterns:**
 - Use `MeshStandardMaterial` for most objects (PBR shading)
 - Set `castShadow = true` and `receiveShadow = true` for shadows
-- Position objects relative to the platform center (0, 0, 0)
+- Position fixed landmarks relative to the platform center (0, 0, 0)
 - The ground is at y=0, platform surface is at y~0.63
-- Add to `this.scene` directly for static objects
-- Add to `this.propGroup` for props that might need cleanup
-- Add to `this.memorialGroup` for memorial-specific objects
+- Add fixed scene objects to the existing Refuge root so disposal remains centralized
+- Register movable facility visuals through the existing facility anchor mechanism
+- Keep every movable transform in `RefugeLayoutSystem`, never only on a mesh
+- Use shared geometry/material or instancing for repeated environment objects
 
 **To modify existing objects:**
 - Campfire flames: search for `flame` in the build method
 - Facility zones: search for `facilityZone` 
-- Hero spawn points: edit `NavigationPoints.ts`
+- Hero activity destinations: derive them in `createRefugeNavigationPoints(layout)`
 
 ### 10.10 Validate a Change
 
@@ -1325,6 +1376,26 @@ assuming a passing typecheck proves layout quality.
 - Test Stocked, Low, Empty, restored supplies, partial availability, and zero-resource rejection.
 - Do not introduce Metal until Phase 22 implements a real material-consuming recipe.
 
+### 10.14 Modify the Refuge Layout Safely
+
+- Change footprint, seed, grid, protected-zone, or initial-placement rules in
+  `src/refuge/RefugeLayoutSystem.ts`; do not encode them in CSS or Three.js meshes.
+- Keep `RefugeLayoutSnapshot` plain and serialization-ready. Disk save/load is still Phase 38.
+- Add a movable structure ID to the model, initial records, `ProceduralBaseScene` anchor registration,
+  the Build Mode tool list, and dynamic navigation mapping together.
+- Validate first and commit once through `Simulation`. A rejected draft must not increment the
+  revision or partially move a selectable root.
+- Preserve `removable: false` for Command Hall, campfire, Gate, and memorial grounds. If their
+  navigation behavior changes, update the layout and navigation adapters together.
+- Keep tree and rock records deterministic and independent from authored structures. To replace a
+  temporary prop, change only the rendering adapter; do not store GLTF objects in layout state.
+- Keep pointer actions routed through `CameraControlScheme`. Prototype left-drag must retain the
+  six-pixel click/placement threshold in `SelectionRaycaster` and `RefugeBuildInput`.
+- Extend `scripts/ui-playtest.mjs` for deterministic seeds, rejection, revision changes, routing,
+  trail commit/undo, desktop/mobile controls, and regression paths.
+- Do not add prices, construction sites, builders, timers, Metal, or new completed facilities here;
+  those belong to Phase 22.
+
 ---
 
 ## 11. Key Constants Reference
@@ -1338,6 +1409,10 @@ assuming a passing typecheck proves layout quality.
 | Dormitory upgrade costs | 12 / 24 Scrap | `src/refuge/DormitorySystem.ts` |
 | Dormitory fatigue recovery | ×1.00 / ×1.15 / ×1.30 while Resting | `src/refuge/DormitorySystem.ts` |
 | Dormitory morale recovery | +0.0 / +0.5 / +1.0 per game hour while Resting | `src/refuge/DormitorySystem.ts` |
+| Refuge layout grid | 2 world units | `src/refuge/RefugeLayoutSystem.ts` |
+| Initial Refuge plane | 72×72 world units (3×3 planning area) | `src/refuge/RefugeLayoutSystem.ts` |
+| Prepared expansion plane | 120×120 world units (5×5, locked) | `src/refuge/RefugeLayoutSystem.ts` |
+| Seeded environment | 28 trees and 16 rocks, capped at 520 attempts | `src/refuge/RefugeLayoutSystem.ts` |
 | Starting Food | 12 | `src/expeditions/ExpeditionSystem.ts` |
 | Food consumption | 1 per active hero per game day | `src/economy/ResourceEconomySystem.ts` |
 | First mission reward | 8 Food, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
@@ -1435,6 +1510,7 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/refuge/DormitorySystem.ts` | Hero capacity tiers, Scrap upgrade costs, and rest comfort modifiers. |
+| `src/refuge/RefugeLayoutSystem.ts` | Authoritative facility/trail layout, placement validation, undo, and deterministic tree records. |
 
 ### Economy
 | File | Purpose |
@@ -1469,9 +1545,12 @@ assuming a passing typecheck proves layout quality.
 ### Rendering
 | File | Purpose |
 |------|---------|
-| `src/rendering/CameraController.ts` | WASD/QE/scroll camera. |
+| `src/rendering/CameraController.ts` | Damped camera motion and player-selectable input schemes. |
 | `src/rendering/SelectionRaycaster.ts` | Click-to-select 3D objects. |
 | `src/rendering/ProceduralBaseScene.ts` | Entire 3D refuge scene. |
+| `src/rendering/RefugeGround.ts` | Shared surface elevation and geometry-based grounding helper. |
+| `src/rendering/RefugeBuildInput.ts` | Build Mode ground raycast and left-pointer placement input. |
+| `src/ui/CameraSettingsOverlay.ts` | Player-facing camera presets and local preference storage. |
 | `src/rendering/heroes/HeroRenderer.ts` | Hero mesh placement and animation. |
 | `src/rendering/heroes/HeroMeshGenerator.ts` | Procedural hero mesh construction. |
 | `src/rendering/heroes/HeroPortraitCache.ts` | Offscreen portrait rendering. |
@@ -1481,6 +1560,7 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/ui/HudShell.ts` | Top status bar, Refuge provisioning record, and bottom navigation. |
+| `src/ui/RefugeBuildOverlay.ts` | Contextual Refuge layout tools and accessible build controls. |
 | `src/ui/SelectionOverlay.ts` | Hero detail panel (4 tabs). |
 | `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |

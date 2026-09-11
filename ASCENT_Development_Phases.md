@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 11, 2026
 
 ```text
-Gameplay phases implemented: 0–20
-Current playable milestone: Refuge provisioning and expedition-funded resource decisions
+Gameplay phases implemented: 0–21
+Current playable milestone: Editable, living Refuge layout with seeded environment generation
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 21 — Refuge Layout System
+Next gameplay phase: Phase 22 — Facility Construction
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,8 +47,9 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 20 is complete. Phase 21 and later remain design context and require a new implementation
-approval boundary.
+Phase 21 is complete. Phase 22 and later remain design context and require a new implementation
+approval boundary. Construction costs, construction sites, builders, timers, new facility recipes,
+and Metal are not part of the current build.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
 adapted into ASCENT as the **Procedural Character Forge**. Its human hero-generation core is now
@@ -1678,7 +1679,7 @@ recruitment using one authoritative stockpile.
 
 ---
 
-# Phase 21 — Refuge Layout System
+# Phase 21 — Refuge Layout System — Complete
 
 ## Goal
 
@@ -1721,8 +1722,8 @@ Cancel
 Undo the current unconfirmed placement
 ```
 
-Use a ground raycast and a restrained grid or snap increment. Right or middle mouse drag continues
-to pan the camera; left click operates the build cursor; `R` rotates; `Escape` cancels or exits.
+Use a ground raycast and a restrained hidden grid or snap increment. Right mouse drag orbits, middle
+mouse drag pans, left click operates the build cursor, `R` rotates, and `Escape` cancels or exits.
 
 ### 21.3 Placement Validation
 
@@ -1731,7 +1732,7 @@ Validate before changing authoritative layout data:
 - Refuge boundary containment
 - Facility-footprint overlap
 - Entrance clearance
-- Reserved Gate, campfire, and memorial space
+- Entrance and landmark clearance
 - A usable walking route between critical Refuge destinations
 
 Show valid placement with olive or bronze geometry and invalid placement with burgundy geometry.
@@ -1743,8 +1744,9 @@ Convert existing movable Refuge facilities into individually positioned layout r
 facility moves, its selectable root, activity destination, and hero movement target must resolve
 from the new layout position.
 
-Keep critical landmarks explicitly fixed when moving them would break spawning, expedition access,
-or memorial behavior. The renderer must not silently decide which structures are movable.
+Critical landmarks may move when navigation and interaction targets follow their layout records, but
+they cannot be removed. The renderer must not silently decide which structures are movable or
+removable.
 
 ### 21.5 Trail Editing
 
@@ -1781,6 +1783,43 @@ During one running session, the player can enter Refuge Build Mode, reorganize s
 facilities, rotate and validate placements, paint or erase trails, and exit without disrupting hero
 simulation. Trees reproduce from a fixed seed and never overlap protected layout regions. World
 selection, hero destinations, camera controls, desktop layout, and mobile layout remain usable.
+
+## Implemented Result
+
+`RefugeLayoutSystem` now owns versioned plain-data records for eight movable structures, trail
+segments, the layout seed, revision, 28 tree placements, and 16 rock placements. The starting floor
+is a broad 72×72 continuous plane corresponding to the initial 3×3 planning area. Metadata reserves
+a future 120×120 5×5 expansion, but no expansion unlock or construction cost exists yet. All
+placement commits subtly snap to a hidden two-unit grid and pass boundary, overlap, entrance, and
+critical-route validation before the authoritative snapshot changes. A single committed change can
+be undone; an unconfirmed draft can be cancelled without touching simulation state.
+
+Refuge Build Mode opens contextually from the Refuge with a horizontal bottom tool rail and a right
+inspector. Left click or tap selects and positions a structure or environment draft or paints/erases
+trails; `R` rotates; `Enter` confirms; `Escape` cancels then exits. Right-drag freely orbits the
+camera, middle-drag pans, and the wheel zooms. Keyboard/touch nudge and camera controls provide an
+accessible alternative to ground-pointer placement.
+
+The completed refinement also exposes a player-facing camera preset. ASCENT Default retains the
+above mapping and WASD pan. Prototype Controls use left-drag orbit, right-drag pan, middle-drag or
+wheel zoom, and disable WASD camera movement. A six-pixel click-versus-drag threshold preserves
+selection and Build Mode placement, and the UI-only choice is saved locally.
+
+`ProceduralBaseScene` renders structure transforms, smooth connected trail strips, the placement
+preview, and individually editable low-poly trees and rocks from the snapshot. The grid remains an
+internal placement aid rather than visible floor tiling. The Command Hall, campfire, Gate, memorial
+grounds, Dormitory, Infirmary, Storage, and Training Yard can all move. Critical landmarks are
+protected from removal; ordinary facilities can be moved into a reusable layout-storage tray, which
+pauses their associated gameplay service until placed again. `HeroRoutineSystem` derives activity
+destinations from the current layout revision and safely falls back to Command Hall for a stored
+facility.
+
+The browser regression suite verifies deterministic regeneration, invalid placement rejection,
+structure movement, environment removal and undo, protected-landmark removal, facility storage,
+dynamic navigation destinations, trail commit/undo, free orbit and pan controls, responsive Build
+Mode controls, and all earlier gameplay flows. Terrain zones are visual only; bonuses remain future
+work. Disk persistence remains Phase 38, and temporary tree/rock geometry stays behind the renderer
+boundary until supplied models are available.
 
 ---
 

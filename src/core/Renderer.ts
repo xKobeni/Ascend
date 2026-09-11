@@ -1,14 +1,23 @@
 import * as THREE from "three";
 
-import { CameraController, type CameraDiagnostics } from "../rendering/CameraController";
+import {
+  CameraController,
+  type CameraControlScheme,
+  type CameraDiagnostics,
+} from "../rendering/CameraController";
 import { ProceduralBaseScene } from "../rendering/ProceduralBaseScene";
 import { SelectionRaycaster, type SelectionDetails } from "../rendering/SelectionRaycaster";
 import { HeroRenderer } from "../rendering/heroes/HeroRenderer";
 import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { CombatSnapshot } from "../combat/Combat";
 import { CombatArenaScene } from "../rendering/combat/CombatArenaScene";
+import { RefugeBuildInput, type RefugeGroundPoint } from "../rendering/RefugeBuildInput";
+import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
+import type { RefugeBuildPreview } from "../rendering/ProceduralBaseScene";
 
 export interface RendererEvents {
+  buildGroundActivated: RefugeGroundPoint;
+  buildGroundHovered: RefugeGroundPoint;
   contextLost: undefined;
   contextRestored: undefined;
   selectionChanged: SelectionDetails | null;
@@ -21,6 +30,8 @@ export class Renderer {
   private readonly combatArena: CombatArenaScene;
   private readonly combatScene: THREE.Scene;
   private combatMode = false;
+  private buildMode = false;
+  private readonly buildInput: RefugeBuildInput;
   private readonly heroRenderer: HeroRenderer;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
@@ -37,11 +48,12 @@ export class Renderer {
       emit<Key extends keyof RendererEvents>(event: Key, payload: RendererEvents[Key]): void;
     },
     heroes: readonly Readonly<Hero>[],
+    layout: Readonly<RefugeLayoutSnapshot>,
   ) {
     this.scene = new THREE.Scene();
     this.combatScene = new THREE.Scene();
 
-    this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 100);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -52,7 +64,7 @@ export class Renderer {
     this.renderer.toneMappingExposure = 1.05;
     this.container.appendChild(this.renderer.domElement);
 
-    this.baseScene = new ProceduralBaseScene(this.scene, this.selectableRoots);
+    this.baseScene = new ProceduralBaseScene(this.scene, this.selectableRoots, layout);
     this.combatArena = new CombatArenaScene(this.combatScene);
     this.heroRenderer = new HeroRenderer(this.scene, heroes, this.selectableRoots);
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
@@ -62,6 +74,12 @@ export class Renderer {
       this.scene,
       this.selectableRoots,
       (selection) => events.emit("selectionChanged", selection),
+    );
+    this.buildInput = new RefugeBuildInput(
+      this.camera,
+      this.renderer.domElement,
+      (point) => events.emit("buildGroundHovered", point),
+      (point) => events.emit("buildGroundActivated", point),
     );
 
     this.onContextLost = (event) => {
@@ -83,6 +101,7 @@ export class Renderer {
     combatSnapshot: Readonly<CombatSnapshot>,
     heroes: readonly Readonly<Hero>[],
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
+    layout: Readonly<RefugeLayoutSnapshot>,
   ): void {
     this.cameraController.update(deltaSeconds);
     const combatMode = combatSnapshot.result !== "Idle";
@@ -93,7 +112,7 @@ export class Renderer {
         "aria-label",
         combatMode
           ? "ASCENT combat encounter. Camera input is paused during combat."
-          : "ASCENT refuge. Use W A S D or right-drag to pan, Q and E to rotate, and the mouse wheel to zoom.",
+          : this.cameraController.getInputDescription(),
       );
     }
     if (combatMode) {
@@ -102,6 +121,7 @@ export class Renderer {
       return;
     }
     this.baseScene.syncMemorials(fallenHeroes);
+    this.baseScene.syncLayout(layout);
     this.baseScene.update(timestampSeconds);
     this.heroRenderer.update(heroes, timestampSeconds, deltaSeconds);
     this.selectionRaycaster.update();
@@ -120,11 +140,33 @@ export class Renderer {
     this.syncInputState();
   }
 
+  setBuildMode(active: boolean): void {
+    if (this.buildMode === active) return;
+    this.buildMode = active;
+    this.baseScene.setBuildMode(active);
+    this.baseScene.setBuildPreview(null);
+    this.syncInputState();
+  }
+
+  setBuildPreview(preview: Readonly<RefugeBuildPreview> | null): void {
+    this.baseScene.setBuildPreview(preview);
+  }
+
+  panCamera(x: number, z: number): void {
+    this.cameraController.panBy(x, z);
+  }
+
+  setCameraControlScheme(scheme: CameraControlScheme): void {
+    this.cameraController.setControlScheme(scheme);
+    this.buildInput.setLeftDragReserved(scheme === "prototype");
+  }
+
   dispose(): void {
     this.resizeObserver.disconnect();
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.selectionRaycaster.dispose();
+    this.buildInput.dispose();
     this.cameraController.dispose();
     this.heroRenderer.dispose();
     this.baseScene.dispose();
@@ -142,8 +184,9 @@ export class Renderer {
   }
 
   private syncInputState(): void {
-    const enabled = !this.combatMode && !this.uiInteractionActive;
-    this.cameraController.setEnabled(enabled);
-    this.selectionRaycaster.setEnabled(enabled);
+    const worldInputEnabled = !this.combatMode && !this.uiInteractionActive;
+    this.cameraController.setEnabled(worldInputEnabled);
+    this.selectionRaycaster.setEnabled(worldInputEnabled);
+    this.buildInput.setEnabled(worldInputEnabled && this.buildMode);
   }
 }

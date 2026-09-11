@@ -20,6 +20,7 @@ import { MemorySystem } from "../memories/MemorySystem";
 import { TraitEvolutionSystem } from "./TraitEvolutionSystem";
 import { Random } from "../core/Random";
 import type { RestRecoveryModifiers } from "./NeedsSystem";
+import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -265,6 +266,7 @@ export class HeroManager {
     gameMinutes: number,
     day: number,
     minuteOfDay: number,
+    layout: Readonly<RefugeLayoutSnapshot>,
     restRecovery?: Readonly<RestRecoveryModifiers>,
   ): void {
     const heroes = [...this.heroes.values()];
@@ -276,6 +278,7 @@ export class HeroManager {
       minuteOfDay,
       this.needsSystem,
       this.trainingSystem,
+      layout,
     );
     this.trainingSystem.step(heroes, gameMinutes, this.needsSystem, day);
     this.injurySystem.step(heroes, gameMinutes);

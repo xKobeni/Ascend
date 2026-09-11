@@ -1,10 +1,10 @@
 import {
-  IDLE_NAVIGATION_POINTS,
-  INFIRMARY_NAVIGATION_POINTS,
-  NAVIGATION_POINTS,
+  createRefugeNavigationPoints,
   type NavigationPoint,
+  type RefugeNavigationPoints,
   type ScheduledActivity,
 } from "../base/NavigationPoints";
+import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
 import type { Hero, HeroActivity } from "./Hero";
 import type { NeedsSystem } from "./NeedsSystem";
 import type { TrainingSystem } from "./TrainingSystem";
@@ -12,13 +12,19 @@ import type { TrainingSystem } from "./TrainingSystem";
 export type DayPeriod = "Day" | "Evening" | "Morning" | "Night";
 
 export class HeroRoutineSystem {
+  private layoutRevision = -1;
+
   step(
     heroes: readonly Hero[],
     deltaSeconds: number,
     minuteOfDay: number,
     needsSystem: NeedsSystem,
     trainingSystem: TrainingSystem,
+    layout: Readonly<RefugeLayoutSnapshot>,
   ): void {
+    const navigation = createRefugeNavigationPoints(layout);
+    const layoutChanged = layout.revision !== this.layoutRevision;
+    this.layoutRevision = layout.revision;
     const scheduledActivity = this.getScheduledActivity(minuteOfDay);
     heroes.forEach((hero, index) => {
       const hasTrainingAssignment = trainingSystem.hasAssignment(hero);
@@ -37,8 +43,10 @@ export class HeroRoutineSystem {
         decisionSource,
         decisionReason,
         index,
+        navigation,
+        layoutChanged,
       );
-      this.moveHero(hero, deltaSeconds);
+      this.moveHero(hero, deltaSeconds, navigation);
     });
   }
 
@@ -75,8 +83,10 @@ export class HeroRoutineSystem {
     decisionSource: "Need" | "Schedule" | "Training",
     decisionReason: string | null,
     heroIndex: number,
+    navigation: Readonly<RefugeNavigationPoints>,
+    forceAssignment: boolean,
   ): void {
-    if (
+    if (!forceAssignment &&
       hero.movement.targetActivity === activity &&
       hero.movement.decisionSource === decisionSource &&
       hero.movement.decisionReason === decisionReason
@@ -86,8 +96,8 @@ export class HeroRoutineSystem {
 
     const recovering = decisionReason?.startsWith("Injury recovery") ?? false;
     const destination = recovering
-      ? INFIRMARY_NAVIGATION_POINTS[heroIndex]
-      : NAVIGATION_POINTS[activity][heroIndex];
+      ? navigation.infirmary[heroIndex]
+      : navigation.activities[activity][heroIndex];
     if (!destination) {
       throw new Error(`No ${activity} navigation point exists for hero index ${heroIndex}.`);
     }
@@ -99,12 +109,12 @@ export class HeroRoutineSystem {
     hero.movement.activity = "Walking";
   }
 
-  private moveHero(hero: Hero, deltaSeconds: number): void {
+  private moveHero(hero: Hero, deltaSeconds: number, navigation: Readonly<RefugeNavigationPoints>): void {
     if (!hero.movement.destinationId) {
       return;
     }
 
-    const destination = this.findDestination(hero.movement.destinationId);
+    const destination = this.findDestination(hero.movement.destinationId, navigation);
     const deltaX = destination.x - hero.movement.position.x;
     const deltaZ = destination.z - hero.movement.position.z;
     const distance = Math.hypot(deltaX, deltaZ);
@@ -116,7 +126,7 @@ export class HeroRoutineSystem {
       hero.movement.position.z = destination.z;
       hero.movement.destinationId = null;
       hero.movement.activity = hero.movement.targetActivity;
-      this.faceRoutineFocus(hero, hero.movement.activity);
+      this.faceRoutineFocus(hero, hero.movement.activity, navigation);
       return;
     }
 
@@ -126,14 +136,14 @@ export class HeroRoutineSystem {
     hero.movement.activity = "Walking";
   }
 
-  private findDestination(destinationId: string): NavigationPoint {
+  private findDestination(destinationId: string, navigation: Readonly<RefugeNavigationPoints>): NavigationPoint {
     const points = [
-      ...IDLE_NAVIGATION_POINTS,
-      ...INFIRMARY_NAVIGATION_POINTS,
-      ...NAVIGATION_POINTS.Eating,
-      ...NAVIGATION_POINTS.Resting,
-      ...NAVIGATION_POINTS.Socializing,
-      ...NAVIGATION_POINTS.Training,
+      ...navigation.idle,
+      ...navigation.infirmary,
+      ...navigation.activities.Eating,
+      ...navigation.activities.Resting,
+      ...navigation.activities.Socializing,
+      ...navigation.activities.Training,
     ];
     const destination = points.find(({ id }) => id === destinationId);
     if (!destination) {
@@ -142,24 +152,16 @@ export class HeroRoutineSystem {
     return destination;
   }
 
-  private faceRoutineFocus(hero: Hero, activity: Exclude<HeroActivity, "Walking">): void {
-    const focus = this.getRoutineFocus(activity);
+  private faceRoutineFocus(
+    hero: Hero,
+    activity: Exclude<HeroActivity, "Walking">,
+    navigation: Readonly<RefugeNavigationPoints>,
+  ): void {
+    const focus = navigation.focus[activity];
     hero.movement.facingRadians = Math.atan2(
       focus.x - hero.movement.position.x,
       focus.z - hero.movement.position.z,
     );
   }
 
-  private getRoutineFocus(activity: Exclude<HeroActivity, "Walking">): { x: number; z: number } {
-    if (activity === "Eating" || activity === "Socializing") {
-      return { x: 0, z: 0 };
-    }
-    if (activity === "Training") {
-      return { x: 16.2, z: -13.5 };
-    }
-    if (activity === "Resting") {
-      return { x: -17.1, z: -13.2 };
-    }
-    return { x: 0, z: 0 };
-  }
 }

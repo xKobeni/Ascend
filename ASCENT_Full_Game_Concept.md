@@ -114,15 +114,16 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–20 and the first persistent
+The implemented build currently covers Phases 0–21 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
 decisions, earned traits, bounded personality drift, Rift-funded procedural recruitment, hero
 capacity, dormitory upgrades, comfort-driven rest recovery, daily Food demand, provision shortages,
-Medicine replenishment, and the expedition-funded resource loop are active. Construction, equipment,
-classes, and campaign depth in this document describe future phases; they must remain absent from
-the playable interface until their authoritative systems are implemented.
+Medicine replenishment, the expedition-funded resource loop, movable Refuge facilities, editable
+trails, placement validation, and deterministic placeholder trees are active. Facility construction,
+equipment, classes, and campaign depth in this document describe future phases; they must remain
+absent from the playable interface until their authoritative systems are implemented.
 
 The standalone character-generator prototype now supplies the bounded human-generation core of the
 **Procedural Character Forge**. Recruitment is accessed through Heroes or the selectable Refuge Gate,
@@ -427,17 +428,20 @@ The player enters build mode.
 
 Future implementation is intentionally split across two development boundaries:
 
-- **Phase 21 — Refuge Layout System:** turns the Refuge floor into authoritative layout data,
-  supports reorganizing movable facilities, trail editing, placement validation, and deterministic
-  tree scattering. It stays inside Refuge rather than adding another main destination.
+- **Phase 21 — Refuge Layout System:** turns a broad, continuous Refuge plane into authoritative
+  layout data; supports reorganizing all starting structures, storing ordinary facilities, editing
+  smooth trails, validating placement, and moving deterministic trees and rocks. It stays inside
+  Refuge rather than adding another main destination.
 - **Phase 22 — Facility Construction:** adds recipes, resource spending, construction sites,
   assigned builders, progress, and activation of completed facilities.
 
-The layout model stores positions, rotations, footprints, trail data, fixed landmarks, and its
-environment seed independently from Three.js meshes. Random trees must avoid buildings, entrances,
-trails, the Gate, campfire, and memorials. A temporary procedural tree may establish the pipeline;
-the supplied tree model can later replace it through one asset adapter without changing simulation
-or layout state.
+The layout model stores positions, rotations, footprints, trail data, protected landmarks, and its
+environment seed independently from Three.js meshes. The initial 72×72 plane represents a generous
+3×3 planning area; a future 120×120 5×5 expansion is structurally anticipated but remains locked
+until real progression supports it. Placement subtly snaps to a hidden grid while the rendered land
+looks continuous and natural. Random trees and rocks avoid buildings, entrances, and trails and can
+be moved or removed in Build Mode. Temporary procedural models establish the pipeline; supplied
+models can later replace them through asset adapters without changing simulation or layout state.
 
 Buildings require:
 
@@ -1827,8 +1831,12 @@ When Food is empty, Eating cannot restore hunger and residents accumulate gradua
 pressure. Low and empty supplies are visible in the persistent HUD and notification feed.
 
 Metal is intentionally not part of the current stockpile because Phase 22 has not implemented a
-real construction recipe that consumes it. Phase 21 first establishes the editable Refuge floor,
-facility layout, trails, and deterministic environment placement without inventing material costs.
+real construction recipe that consumes it. Phase 21 establishes the editable 72×72 Refuge plane,
+eight movable starting structures, smooth trails, and deterministic editable environment placement
+without inventing material costs. Build Mode is contextual to Refuge rather than a fifth
+destination. Critical landmarks cannot be removed; ordinary facilities may be stored, which pauses
+their gameplay service until they are placed again. It does not create construction sites or new
+completed buildings, and layout changes remain session-only until Phase 38 persistence.
 
 ## 49.2 Future Resource Vocabulary
 
@@ -2065,15 +2073,16 @@ Recommended:
 
 **Elevated isometric / free orbital camera**
 
-Controls:
+Players choose one of two locally saved control presets:
 
 ```text
-WASD = Pan
-Mouse Wheel = Zoom
-Q/E = Rotate
-Left Click = Select
-Right Click = Context
+ASCENT Default: WASD pan, right-drag orbit, middle-drag pan, wheel zoom
+Prototype: left-drag orbit, right-drag pan, middle-drag/wheel zoom, WASD camera pan off
+Both: Q/E yaw rotation, short left click selection, damped movement
 ```
+
+Prototype left-drag uses a click-versus-drag threshold so Build Mode taps still place objects while
+camera drags never commit layout changes.
 
 ---
 

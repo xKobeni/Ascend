@@ -2,11 +2,40 @@ import * as THREE from "three";
 
 import { markSelectable, type SelectionDetails } from "./SelectionRaycaster";
 import type { FallenHeroRecord } from "../heroes/Hero";
+import {
+  RefugeLayoutSystem,
+  type RefugeLayoutSnapshot,
+  type RefugeStructureId,
+} from "../refuge/RefugeLayoutSystem";
+import { placeObjectOnRefugeGround, REFUGE_GROUND_Y } from "./RefugeGround";
 
-type FacilityColor = "#49758a" | "#926d3f" | "#56765e" | "#755b8c";
+interface FacilityRenderObject {
+  anchorRotation: number;
+  anchorX: number;
+  anchorZ: number;
+  baseRotation: number;
+  object: THREE.Object3D;
+  offsetX: number;
+  offsetZ: number;
+}
+
+export interface RefugeBuildPreview {
+  radius: number;
+  rotation: number;
+  valid: boolean;
+  x: number;
+  z: number;
+}
 
 export class ProceduralBaseScene {
+  private readonly environmentRoot = new THREE.Group();
+  private readonly environmentSelectionRoots = new Set<THREE.Object3D>();
+  private readonly facilityObjects = new Map<RefugeStructureId, FacilityRenderObject[]>();
+  private readonly grid: THREE.GridHelper;
+  private layoutRevision = -1;
+  private readonly memorialAnchor = new THREE.Group();
   private readonly memorialRoots = new Map<string, THREE.Group>();
+  private readonly previewRoot = new THREE.Group();
 
   private readonly fireGlow = new THREE.PointLight("#ff8a45", 54, 27, 2);
   private readonly flameCore: THREE.Mesh;
@@ -15,18 +44,15 @@ export class ProceduralBaseScene {
   constructor(
     private readonly scene: THREE.Scene,
     readonly selectableRoots: THREE.Object3D[] = [],
+    layout: Readonly<RefugeLayoutSnapshot> = new RefugeLayoutSystem().getSnapshot(),
   ) {
     this.root.name = "Procedural Refuge";
     this.scene.background = new THREE.Color("#111820");
     this.scene.fog = new THREE.Fog("#111820", 66, 144);
 
     this.addLighting();
-    this.addGround();
-    this.addFacilityZone("dormitory-zone", "Dormitory", "#49758a", -17.1, -13.2);
-    this.addFacilityZone("training-zone", "Training Zone", "#926d3f", 16.2, -13.5);
-    this.addFacilityZone("storage-zone", "Storage Zone", "#56765e", -16.2, 13.5);
-    this.addFacilityZone("gate-zone", "Gate Zone", "#755b8c", 16.8, 12.9);
-
+    this.grid = this.addGround();
+    this.addCommandHall();
     this.flameCore = this.addCampfire();
     this.addTent();
     this.addInfirmary();
@@ -34,7 +60,12 @@ export class ProceduralBaseScene {
     this.addCrates();
     this.addStoragePile();
     this.addDimensionalGate();
+    this.addMemorialGrounds();
+    this.createBuildPreview();
+    this.environmentRoot.name = "Refuge Layout Environment";
+    this.root.add(this.environmentRoot);
     this.scene.add(this.root);
+    this.syncLayout(layout);
   }
 
   update(timestampSeconds: number): void {
@@ -61,7 +92,56 @@ export class ProceduralBaseScene {
       }
       const column = index % 5;
       const row = Math.floor(index / 5);
-      root.position.set(-5.2 + column * 2.55, 0.34, 20.2 + row * 2.4);
+      root.position.set(-5.2 + column * 2.55, 0.06, -1.1 + row * 2.4);
+      if (root.parent !== this.memorialAnchor) this.memorialAnchor.add(root);
+    });
+  }
+
+  syncLayout(layout: Readonly<RefugeLayoutSnapshot>): void {
+    if (layout.revision === this.layoutRevision) {
+      return;
+    }
+    layout.facilities.forEach((facility) => {
+      const objects = this.facilityObjects.get(facility.id) ?? [];
+      objects.forEach((record) => {
+        record.object.visible = facility.placed;
+        if (!facility.placed) return;
+        const rotationDelta = facility.rotation - record.anchorRotation;
+        const cosine = Math.cos(rotationDelta);
+        const sine = Math.sin(rotationDelta);
+        record.object.position.x = facility.x + record.offsetX * cosine - record.offsetZ * sine;
+        record.object.position.z = facility.z + record.offsetX * sine + record.offsetZ * cosine;
+        record.object.rotation.y = record.baseRotation + rotationDelta;
+      });
+    });
+    this.rebuildEnvironment(layout);
+    this.layoutRevision = layout.revision;
+  }
+
+  setBuildMode(active: boolean): void {
+    this.grid.visible = false;
+    if (!active) {
+      this.previewRoot.visible = false;
+    }
+  }
+
+  setBuildPreview(preview: Readonly<RefugeBuildPreview> | null): void {
+    if (!preview) {
+      this.previewRoot.visible = false;
+      return;
+    }
+    this.previewRoot.visible = true;
+    this.previewRoot.position.set(preview.x, REFUGE_GROUND_Y + 0.05, preview.z);
+    this.previewRoot.rotation.y = preview.rotation;
+    this.previewRoot.scale.set(preview.radius, 1, preview.radius);
+    const color = preview.valid ? "#747b5d" : "#7a4545";
+    this.previewRoot.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+          if (material instanceof THREE.MeshBasicMaterial) material.color.set(color);
+        });
+      }
     });
   }
 
@@ -96,82 +176,76 @@ export class ProceduralBaseScene {
     this.root.add(sun);
   }
 
-  private addGround(): void {
+  private addGround(): THREE.GridHelper {
+    const surroundingGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(220, 220),
+      new THREE.MeshStandardMaterial({ color: "#182019", roughness: 1 }),
+    );
+    surroundingGround.rotation.x = -Math.PI / 2;
+    surroundingGround.position.y = -0.32;
+    surroundingGround.receiveShadow = true;
+    this.root.add(surroundingGround);
+
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(162, 162),
-      new THREE.MeshStandardMaterial({ color: "#1b211f", roughness: 1 }),
+      new THREE.PlaneGeometry(72, 72),
+      new THREE.MeshStandardMaterial({ color: "#4f5945", roughness: 1 }),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.24;
+    ground.position.y = REFUGE_GROUND_Y;
     ground.receiveShadow = true;
     this.root.add(ground);
 
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(34.5, 36, 1.26, 12),
-      new THREE.MeshStandardMaterial({ color: "#343c3c", roughness: 0.92 }),
-    );
-    platform.position.y = -0.02;
-    platform.receiveShadow = true;
-    this.root.add(platform);
+    const patchMaterial = new THREE.MeshStandardMaterial({ color: "#5e5b43", roughness: 1, transparent: true, opacity: 0.48 });
+    [
+      [-25, -2, 7, 4, 0.3], [26, 20, 8, 4, -0.4], [18, -25, 6, 3, 0.9],
+      [-17, 24, 5, 8, -0.7], [7, 16, 4, 7, 0.45], [-5, -22, 8, 3, 0.15],
+    ].forEach(([x, z, sx, sz, rotation]) => {
+      const patch = new THREE.Mesh(new THREE.CircleGeometry(1, 18), patchMaterial.clone());
+      patch.rotation.x = -Math.PI / 2;
+      patch.rotation.z = rotation ?? 0;
+      patch.position.set(x ?? 0, 0.292, z ?? 0);
+      patch.scale.set(sx ?? 1, sz ?? 1, 1);
+      this.root.add(patch);
+    });
 
-    const innerPlatform = new THREE.Mesh(
-      new THREE.CylinderGeometry(32.1, 32.1, 0.24, 12),
-      new THREE.MeshStandardMaterial({ color: "#404948", roughness: 0.96 }),
-    );
-    innerPlatform.position.y = 0.22;
-    innerPlatform.receiveShadow = true;
-    this.root.add(innerPlatform);
-
-    const grid = new THREE.GridHelper(63, 63, "#6f8583", "#53605f");
-    grid.position.y = 0.27;
+    const grid = new THREE.GridHelper(72, 36, "#a78652", "#77745f");
+    grid.position.y = 0.31;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
     gridMaterials.forEach((material) => {
       material.transparent = true;
-      material.opacity = 0.24;
+      material.opacity = 0.18;
     });
     this.root.add(grid);
+    grid.visible = false;
+    return grid;
   }
 
-  private addFacilityZone(
-    id: string,
-    label: string,
-    color: FacilityColor,
-    x: number,
-    z: number,
-  ): void {
-    const group = new THREE.Group();
-    group.name = label;
-    group.position.set(x, 0.28, z);
-
-    const pad = new THREE.Mesh(
-      new THREE.CylinderGeometry(7.05, 7.05, 0.21, 32),
-      new THREE.MeshStandardMaterial({
-        color,
-        transparent: true,
-        opacity: 0.38,
-        roughness: 0.8,
-        depthWrite: false,
-      }),
-    );
-    pad.receiveShadow = true;
-    group.add(pad);
-
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(6.3, 0.135, 6, 48),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.07;
-    group.add(ring);
-
-    markSelectable(group, { category: "facility", id, label });
-    this.selectableRoots.push(group);
-    this.root.add(group);
+  private addCommandHall(): void {
+    const group = this.createSelectableGroup({ category: "base", id: "command-hall", label: "Command Hall" });
+    group.position.set(0, 0.38, -10);
+    this.registerFacilityObject("command-hall", group, 0, -10, 0);
+    const wall = new THREE.MeshStandardMaterial({ color: "#b99d76", roughness: 0.94 });
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: "#57483a", roughness: 0.98 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(6.4, 4.4, 6.2), wall);
+    body.position.y = 2.2;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(5.2, 2.8, 4), roofMaterial);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 5.75;
+    roof.castShadow = true;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.7, 0.22), new THREE.MeshStandardMaterial({ color: "#35291f", roughness: 1 }));
+    door.position.set(0, 1.35, 3.18);
+    const step = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.28, 1.2), new THREE.MeshStandardMaterial({ color: "#777066", roughness: 1 }));
+    step.position.set(0, 0.14, 3.55);
+    group.add(body, roof, door, step);
+    placeObjectOnRefugeGround(group);
   }
 
   private addCampfire(): THREE.Mesh {
     const group = this.createSelectableGroup({ category: "prop", id: "campfire", label: "Campfire" });
-    group.position.set(0, 1.08, 0);
+    group.position.set(0, 1.08, 5);
+    this.registerFacilityObject("campfire", group, 0, 5, 0);
 
     const stoneMaterial = new THREE.MeshStandardMaterial({ color: "#55534d", roughness: 1 });
     for (let index = 0; index < 10; index += 1) {
@@ -210,6 +284,7 @@ export class ProceduralBaseScene {
     this.fireGlow.distance = 27;
     this.fireGlow.intensity = 54;
     group.add(this.fireGlow);
+    placeObjectOnRefugeGround(group);
     return flameCore;
   }
 
@@ -220,8 +295,9 @@ export class ProceduralBaseScene {
       id: "infirmary",
       label: "Refuge Infirmary",
     });
-    group.position.set(-10.4, 0.38, -16.8);
-    group.rotation.y = -0.16;
+    group.position.set(-21, 0.38, 11);
+    group.rotation.y = -0.12;
+    this.registerFacilityObject("infirmary", group, -21, 11, -0.12);
     const frameMaterial = new THREE.MeshStandardMaterial({ color: "#58463b", roughness: 0.96 });
     const clothMaterial = new THREE.MeshStandardMaterial({ color: "#747b5d", roughness: 1 });
     [-2.4, 0, 2.4].forEach((offset) => {
@@ -234,6 +310,7 @@ export class ProceduralBaseScene {
       cot.add(frame, bedding);
       group.add(cot);
     });
+    placeObjectOnRefugeGround(group);
     this.root.add(group);
   }
 
@@ -263,8 +340,10 @@ export class ProceduralBaseScene {
   }
 
   private addTent(): void {
-    const group = this.createSelectableGroup({ category: "prop", id: "basic-tent", label: "Basic Tent" });
-    group.position.set(-17.1, 1.08, -13.2);
+    const group = this.createSelectableGroup({ category: "facility", id: "dormitory", label: "Dormitory" });
+    group.position.set(-21, 1.08, -11);
+    group.rotation.y = 0.15;
+    this.registerFacilityObject("dormitory", group, -21, -11, 0.15);
 
     const fabric = new THREE.MeshStandardMaterial({ color: "#73878a", roughness: 0.95, side: THREE.DoubleSide });
     const shelter = new THREE.Mesh(new THREE.ConeGeometry(4.65, 7.35, 4), fabric);
@@ -281,11 +360,14 @@ export class ProceduralBaseScene {
     opening.position.set(0, 2.76, 3.72);
     opening.rotation.y = Math.PI;
     group.add(opening);
+    placeObjectOnRefugeGround(group);
   }
 
   private addTrainingDummy(): void {
-    const group = this.createSelectableGroup({ category: "prop", id: "training-dummy", label: "Training Dummy" });
-    group.position.set(16.2, 1.02, -13.5);
+    const group = this.createSelectableGroup({ category: "facility", id: "training", label: "Training Yard" });
+    group.position.set(21, 1.02, 11);
+    group.rotation.y = 0.1;
+    this.registerFacilityObject("training", group, 21, 11, 0.1);
     const wood = new THREE.MeshStandardMaterial({ color: "#8b6540", roughness: 0.9 });
     const bindings = new THREE.MeshStandardMaterial({ color: "#8d4f3f", roughness: 0.85 });
 
@@ -310,11 +392,14 @@ export class ProceduralBaseScene {
     head.position.y = 6.9;
     head.castShadow = true;
     group.add(head);
+    placeObjectOnRefugeGround(group);
   }
 
   private addCrates(): void {
-    const group = this.createSelectableGroup({ category: "prop", id: "supply-crates", label: "Supply Crates" });
-    group.position.set(-18.3, 0.99, 12.75);
+    const group = this.createSelectableGroup({ category: "facility", id: "storage", label: "Storage" });
+    group.position.set(18.9, 0.99, -10.75);
+    group.rotation.y = -0.08;
+    this.registerFacilityObject("storage", group, 21, -10, -0.08);
     const wood = new THREE.MeshStandardMaterial({ color: "#735638", roughness: 0.9 });
     const slat = new THREE.MeshStandardMaterial({ color: "#4e3a29", roughness: 1 });
     const layouts = [
@@ -334,11 +419,14 @@ export class ProceduralBaseScene {
       band.rotation.y = crate.rotation.y;
       group.add(band);
     });
+    placeObjectOnRefugeGround(group);
   }
 
   private addStoragePile(): void {
     const group = this.createSelectableGroup({ category: "prop", id: "storage-pile", label: "Storage Pile" });
-    group.position.set(-13.05, 1.14, 15.75);
+    group.position.set(24.15, 1.14, -7.75);
+    group.rotation.y = -0.08;
+    this.registerFacilityObject("storage", group, 21, -10, -0.08);
     const sackMaterial = new THREE.MeshStandardMaterial({ color: "#8a8068", roughness: 1 });
     for (let index = 0; index < 5; index += 1) {
       const sack = new THREE.Mesh(new THREE.IcosahedronGeometry(1.44, 1), sackMaterial);
@@ -347,11 +435,14 @@ export class ProceduralBaseScene {
       sack.castShadow = true;
       group.add(sack);
     }
+    placeObjectOnRefugeGround(group);
   }
 
   private addDimensionalGate(): void {
     const group = this.createSelectableGroup({ category: "base", id: "dimensional-gate", label: "Dimensional Gate" });
-    group.position.set(16.8, 1.08, 12.9);
+    group.position.set(0, 1.08, 29);
+    group.rotation.y = Math.PI;
+    this.registerFacilityObject("dimensional-gate", group, 0, 29, Math.PI);
     const stone = new THREE.MeshStandardMaterial({ color: "#555361", roughness: 0.72, metalness: 0.1 });
     for (const x of [-2.85, 2.85]) {
       const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.65, 8.4, 1.95), stone);
@@ -378,6 +469,24 @@ export class ProceduralBaseScene {
     threshold.position.set(0, 4.35, -0.06);
     threshold.scale.y = 1.28;
     group.add(threshold);
+    placeObjectOnRefugeGround(group);
+  }
+
+  private addMemorialGrounds(): void {
+    this.memorialAnchor.name = "Memorial Grounds";
+    this.memorialAnchor.position.set(0, 0.34, -29);
+    markSelectable(this.memorialAnchor, { category: "base", id: "memorial-grounds", label: "Memorial Grounds" });
+    this.selectableRoots.push(this.memorialAnchor);
+    const ground = new THREE.Mesh(
+      new THREE.CylinderGeometry(5.1, 5.35, 0.16, 18),
+      new THREE.MeshStandardMaterial({ color: "#54564c", roughness: 1 }),
+    );
+    ground.position.y = -0.02;
+    ground.receiveShadow = true;
+    this.memorialAnchor.add(ground);
+    placeObjectOnRefugeGround(this.memorialAnchor);
+    this.root.add(this.memorialAnchor);
+    this.registerFacilityObject("memorial-grounds", this.memorialAnchor, 0, -29, 0);
   }
 
   private createSelectableGroup(details: SelectionDetails): THREE.Group {
@@ -387,6 +496,116 @@ export class ProceduralBaseScene {
     this.selectableRoots.push(group);
     this.root.add(group);
     return group;
+  }
+
+  private registerFacilityObject(
+    facilityId: RefugeStructureId,
+    object: THREE.Object3D,
+    anchorX: number,
+    anchorZ: number,
+    anchorRotation: number,
+  ): void {
+    const records = this.facilityObjects.get(facilityId) ?? [];
+    records.push({
+      anchorRotation,
+      anchorX,
+      anchorZ,
+      baseRotation: object.rotation.y,
+      object,
+      offsetX: object.position.x - anchorX,
+      offsetZ: object.position.z - anchorZ,
+    });
+    this.facilityObjects.set(facilityId, records);
+  }
+
+  private createBuildPreview(): void {
+    const material = new THREE.MeshBasicMaterial({
+      color: "#747b5d",
+      depthWrite: false,
+      opacity: 0.32,
+      transparent: true,
+    });
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 32), material);
+    const direction = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 1.3), material.clone());
+    direction.position.z = -0.68;
+    this.previewRoot.add(disc, direction);
+    this.previewRoot.visible = false;
+    this.previewRoot.renderOrder = 9;
+    this.root.add(this.previewRoot);
+  }
+
+  private rebuildEnvironment(layout: Readonly<RefugeLayoutSnapshot>): void {
+    this.environmentSelectionRoots.forEach((root) => this.removeSelectableRoot(root));
+    this.environmentSelectionRoots.clear();
+    while (this.environmentRoot.children.length > 0) {
+      const child = this.environmentRoot.children[0];
+      if (!child) break;
+      this.disposeObject(child);
+    }
+    if (layout.trails.length > 0) {
+      const material = new THREE.MeshStandardMaterial({ color: "#756846", roughness: 1 });
+      const trailRoot = new THREE.Group();
+      const ids = new Set(layout.trails.map((cell) => cell.id));
+      layout.trails.forEach((cell) => {
+        const node = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.07, 16), material);
+        node.position.set(cell.x, REFUGE_GROUND_Y + 0.035, cell.z);
+        node.receiveShadow = true;
+        trailRoot.add(node);
+        [[2, 0], [0, 2]].forEach(([dx, dz]) => {
+          if (!ids.has(`trail:${cell.x + (dx ?? 0)}:${cell.z + (dz ?? 0)}`)) return;
+          const horizontal = dx !== 0;
+          const segment = new THREE.Mesh(new THREE.BoxGeometry(horizontal ? 2 : 1.85, 0.07, horizontal ? 1.85 : 2), material);
+          segment.position.set(cell.x + (dx ?? 0) / 2, REFUGE_GROUND_Y + 0.035, cell.z + (dz ?? 0) / 2);
+          segment.receiveShadow = true;
+          trailRoot.add(segment);
+        });
+      });
+      this.environmentRoot.add(trailRoot);
+    }
+    layout.trees.filter((tree) => tree.placed).forEach((tree) => this.addEnvironmentTree(tree));
+    layout.rocks.filter((rock) => rock.placed).forEach((rock) => this.addEnvironmentRock(rock));
+  }
+
+  private addEnvironmentTree(tree: Readonly<import("../refuge/RefugeLayoutSystem").RefugeEnvironmentPlacement>): void {
+    const group = new THREE.Group();
+    group.name = `Tree ${tree.id.split("-").at(-1) ?? ""}`;
+    group.position.set(tree.x, 0.32, tree.z);
+    group.rotation.y = tree.rotation;
+    group.scale.setScalar(tree.scale);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 3.5, 7), new THREE.MeshStandardMaterial({ color: "#493727", roughness: 1 }));
+    trunk.position.y = 1.75;
+    trunk.castShadow = true;
+    group.add(trunk);
+    [0, 1].forEach((tier) => {
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(1.75 - tier * 0.35, 3.9, 7), new THREE.MeshStandardMaterial({ color: tier ? "#3f5036" : "#34452f", roughness: 1 }));
+      crown.position.y = 4.3 + tier * 1.25;
+      crown.castShadow = true;
+      group.add(crown);
+    });
+    placeObjectOnRefugeGround(group);
+    markSelectable(group, { category: "prop", id: tree.id, label: group.name });
+    this.selectableRoots.push(group);
+    this.environmentSelectionRoots.add(group);
+    this.environmentRoot.add(group);
+  }
+
+  private addEnvironmentRock(rock: Readonly<import("../refuge/RefugeLayoutSystem").RefugeEnvironmentPlacement>): void {
+    const group = new THREE.Group();
+    group.name = `Rock ${rock.id.split("-").at(-1) ?? ""}`;
+    group.position.set(rock.x, 0.3, rock.z);
+    group.rotation.y = rock.rotation;
+    group.scale.setScalar(rock.scale);
+    const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(1.05, 0), new THREE.MeshStandardMaterial({ color: "#777469", roughness: 1 }));
+    mesh.position.y = 0.62;
+    mesh.scale.set(1.2, 0.72, 0.92);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    placeObjectOnRefugeGround(group);
+    markSelectable(group, { category: "prop", id: rock.id, label: group.name });
+    this.selectableRoots.push(group);
+    this.environmentSelectionRoots.add(group);
+    this.environmentRoot.add(group);
   }
 
   private removeSelectableRoot(root: THREE.Object3D): void {

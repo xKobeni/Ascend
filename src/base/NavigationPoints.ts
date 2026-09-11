@@ -1,4 +1,5 @@
 import type { HeroActivity, HeroMovement } from "../heroes/Hero";
+import type { RefugeLayoutSnapshot, RefugePoint, RefugeStructureId } from "../refuge/RefugeLayoutSystem";
 
 export interface NavigationPoint {
   id: string;
@@ -8,6 +9,13 @@ export interface NavigationPoint {
 }
 
 export type ScheduledActivity = Exclude<HeroActivity, "Idle" | "Walking">;
+
+export interface RefugeNavigationPoints {
+  activities: Readonly<Record<ScheduledActivity, readonly NavigationPoint[]>>;
+  focus: Readonly<Record<Exclude<HeroActivity, "Walking">, RefugePoint>>;
+  idle: readonly NavigationPoint[];
+  infirmary: readonly NavigationPoint[];
+}
 
 const createRing = (
   id: string,
@@ -39,21 +47,47 @@ export const INITIAL_HERO_SPAWN_POINTS: readonly NavigationPoint[] = [
   { id: "arrival-5", label: "Arrival Area", x: 7.95, z: 7.05 },
 ] as const;
 
-export const NAVIGATION_POINTS: Readonly<Record<ScheduledActivity, readonly NavigationPoint[]>> = {
-  Eating: createRing("campfire-seat", "Campfire", 0, 0, 5.1),
-  Resting: createRing("dorm-bed", "Dormitory", -17.1, -13.2, 4.65),
-  Socializing: createRing("social-spot", "Campfire Commons", 0, 0, 7.95),
-  Training: createRing("training-spot", "Training Area", 16.2, -13.5, 5.1),
-};
-
-export const INFIRMARY_NAVIGATION_POINTS: readonly NavigationPoint[] =
-  createRing("infirmary-cot", "Infirmary", -10.4, -16.8, 2.15);
-
-export const IDLE_NAVIGATION_POINTS: readonly NavigationPoint[] = [
-  ...createRing("storage-work", "Storage", -16.2, 13.5, 4.95, 6),
-  { id: "idle-lookout-1", label: "Idle Area", x: -7.2, z: 17.4 },
-  { id: "idle-lookout-2", label: "Idle Area", x: 6.6, z: 17.1 },
-] as const;
+export function createRefugeNavigationPoints(layout: Readonly<RefugeLayoutSnapshot>): RefugeNavigationPoints {
+  const facility = (id: RefugeStructureId): Readonly<RefugePoint> => {
+    const placement = layout.facilities.find((candidate) => candidate.id === id);
+    if (!placement) {
+      throw new Error(`Refuge layout is missing ${id}.`);
+    }
+    return placement;
+  };
+  const dormitory = facility("dormitory");
+  const infirmary = facility("infirmary");
+  const storage = facility("storage");
+  const training = facility("training");
+  const campfire = facility("campfire");
+  const commandHall = facility("command-hall");
+  const active = (id: RefugeStructureId, point: Readonly<RefugePoint>): Readonly<RefugePoint> =>
+    layout.facilities.find((candidate) => candidate.id === id)?.placed ? point : commandHall;
+  const rest = active("dormitory", dormitory);
+  const care = active("infirmary", infirmary);
+  const supplies = active("storage", storage);
+  const drills = active("training", training);
+  return {
+    activities: {
+      Eating: createRing("campfire-seat", "Campfire", campfire.x, campfire.z, 5.1),
+      Resting: createRing("dorm-bed", "Dormitory", rest.x, rest.z, 4.65),
+      Socializing: createRing("social-spot", "Campfire Commons", campfire.x, campfire.z, 7.2),
+      Training: createRing("training-spot", "Training Area", drills.x, drills.z, 5.1),
+    },
+    focus: {
+      Eating: campfire,
+      Idle: commandHall,
+      Resting: rest,
+      Socializing: campfire,
+      Training: drills,
+    },
+    idle: [
+      ...createRing("storage-work", "Storage", supplies.x, supplies.z, 4.95, 6),
+      ...createRing("command-idle", "Command Hall", commandHall.x, commandHall.z, 7.2, 4),
+    ],
+    infirmary: createRing("infirmary-cot", "Infirmary", care.x, care.z, 2.15),
+  };
+}
 
 export function createInitialMovement(index: number): HeroMovement {
   const base = INITIAL_HERO_SPAWN_POINTS[index % INITIAL_HERO_SPAWN_POINTS.length];

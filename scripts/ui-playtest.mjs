@@ -112,6 +112,77 @@ try {
   await command("Page.enable");
   await command("Runtime.enable");
   await setViewport(1440, 900);
+  const layoutValidation = await evaluate(`(async () => {
+    const [{ RefugeLayoutSystem }, { createRefugeNavigationPoints }] = await Promise.all([
+      import('/src/refuge/RefugeLayoutSystem.ts'),
+      import('/src/base/NavigationPoints.ts'),
+    ]);
+    const first = new RefugeLayoutSystem();
+    const second = new RefugeLayoutSystem();
+    const initial = first.getSnapshot();
+    const deterministic = JSON.stringify(initial.trees) === JSON.stringify(second.getSnapshot().trees);
+    const invalidCenter = !first.validateFacility('dormitory', 0, 0).valid;
+    let candidate = null;
+    for (let x = -24; x <= 24 && !candidate; x += 2) {
+      for (let z = -24; z <= 24; z += 2) {
+        const validation = first.validateFacility('dormitory', x, z);
+        if (validation.valid && (validation.x !== -18 || validation.z !== -14)) {
+          candidate = validation;
+          break;
+        }
+      }
+    }
+    const moved = candidate ? first.moveFacility('dormitory', candidate.x, candidate.z, Math.PI / 2) : false;
+    const movedLayout = first.getSnapshot();
+    const navigation = createRefugeNavigationPoints(movedLayout);
+    const dormitory = movedLayout.facilities.find((facility) => facility.id === 'dormitory');
+    const destinationsFollow = Boolean(dormitory) && navigation.focus.Resting.x === dormitory.x && navigation.focus.Resting.z === dormitory.z;
+    let trailPoint = null;
+    for (let x = -20; x <= 20 && !trailPoint; x += 2) {
+      for (let z = -20; z <= 20; z += 2) {
+        const validation = first.validateTrail(x, z);
+        if (validation.valid) { trailPoint = validation; break; }
+      }
+    }
+    const trailAdded = trailPoint ? first.addTrail(trailPoint.x, trailPoint.z) : false;
+    const disconnectedRejected = !first.validateTrail(20, -20).valid;
+    const trailCount = first.getSnapshot().trails.length;
+    const undo = first.undo();
+    const environment = second.getSnapshot().trees.find((entry) => entry.placed);
+    const environmentRemoved = environment ? second.removeEnvironment(environment.id) : false;
+    const environmentUndo = second.undo();
+    const criticalProtected = !second.storeFacility('command-hall');
+    const facilityStored = second.storeFacility('storage') && second.getSnapshot().facilities.find((entry) => entry.id === 'storage')?.placed === false;
+    const facilityStoreUndo = second.undo();
+    return {
+      deterministic,
+      destinationsFollow,
+      disconnectedRejected,
+      facilityCount: initial.facilities.length,
+      invalidCenter,
+      moved,
+      revision: movedLayout.revision,
+      trailAdded,
+      trailCount,
+      treeCount: initial.trees.length,
+      rockCount: initial.rocks.length,
+      planeSize: initial.planeSize,
+      environmentRemoved,
+      environmentUndo,
+      criticalProtected,
+      facilityStored,
+      facilityStoreUndo,
+      undo,
+    };
+  })()`);
+  assert(
+    layoutValidation.deterministic && layoutValidation.destinationsFollow && layoutValidation.disconnectedRejected && layoutValidation.facilityCount === 8 &&
+      layoutValidation.invalidCenter && layoutValidation.moved && layoutValidation.revision === 1 &&
+      layoutValidation.trailAdded && layoutValidation.trailCount === 1 && layoutValidation.treeCount === 28 && layoutValidation.rockCount === 16 &&
+      layoutValidation.planeSize === 72 && layoutValidation.environmentRemoved && layoutValidation.environmentUndo && layoutValidation.criticalProtected &&
+      layoutValidation.facilityStored && layoutValidation.facilityStoreUndo && layoutValidation.undo,
+    `Phase 21 layout validation failed (${JSON.stringify(layoutValidation)}).`,
+  );
   const recoveryValidation = await evaluate(`(async () => {
     const [{ Simulation }, { InjurySystem, getInjuryModifiers }, { HeroManager }] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
@@ -707,6 +778,79 @@ try {
   assert(await evaluate("[...document.querySelectorAll('.system-panel')].every((panel) => panel.hidden || panel.querySelector('.expedition-overlay__panel')?.hidden)"), "Player panels must begin collapsed.");
   await screenshot("desktop-1440x900.png");
 
+  await click('[data-build-action="enter"]');
+  await waitFor("document.querySelector('.refuge-build')?.dataset.active === 'true'", "Refuge Build Mode");
+  assert(await evaluate("document.querySelectorAll('[data-build-tool]').length") === 10, "Build Mode must expose eight starting structures plus trail paint and erase.");
+  await click('[data-build-tool="dormitory"]');
+  assert(await evaluate(`!document.querySelector('[data-build-action="rotate"]').disabled`), "A selected facility must expose accessible movement controls.");
+  const rotationBefore = await evaluate("document.querySelector('.refuge-build__inspector > small').textContent");
+  await click('[data-build-action="rotate"]');
+  const rotationAfter = await evaluate("document.querySelector('.refuge-build__inspector > small').textContent");
+  assert(rotationAfter !== rotationBefore, "Facility rotation control did not update the draft.");
+  await screenshot("phase21-build-mode-1440x900.png");
+  await click('[data-build-action="cancel"]');
+  await click('[data-build-tool="trail"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 450, button: "left", buttons: 1, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 720, y: 450, button: "left", buttons: 0, clickCount: 1 });
+  await waitFor("document.querySelector('.refuge-build__inspector > small').textContent.includes('1 trail segments')", "trail placement");
+  assert(await evaluate(`!document.querySelector('[data-build-action="undo"]').disabled`), "Committed layout changes must expose Undo.");
+  await click('[data-build-action="undo"]');
+  await waitFor("document.querySelector('.refuge-build__inspector > small').textContent.includes('0 trail segments')", "trail undo");
+  await click('[data-build-action="exit"]');
+  await waitFor("document.querySelector('.refuge-build')?.dataset.active === 'false'", "Build Mode exit");
+
+  await click('[data-hud-action="camera-settings"]');
+  await waitFor("!document.querySelector('.camera-settings').hidden", "camera settings open");
+  assert(await evaluate(`document.querySelector('[data-camera-scheme="ascent"]').getAttribute('aria-checked') === 'true'`), "ASCENT camera preset should be selected initially.");
+  await click('[data-camera-scheme="prototype"]');
+  assert(await evaluate(`document.querySelector('[data-camera-scheme="prototype"]').getAttribute('aria-checked') === 'true'`), "Prototype camera preset did not become selected.");
+  assert(await evaluate(`localStorage.getItem('ascent.camera-control-scheme') === 'prototype'`), "Prototype camera preset was not saved.");
+  await screenshot("camera-settings-1440x900.png");
+  await click('[data-camera-action="close"]');
+  await waitFor("document.querySelector('.camera-settings').hidden", "camera settings close");
+
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "prototype camera baseline");
+  const prototypeInitial = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  await click('[data-debug-action="close"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "left", buttons: 1, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 830, y: 485, button: "left", buttons: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 830, y: 485, button: "left", buttons: 0, clickCount: 1 });
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "prototype left orbit");
+  const prototypeAfterOrbit = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  assert(prototypeAfterOrbit !== prototypeInitial && prototypeAfterOrbit.split(' · ')[0] === prototypeInitial.split(' · ')[0], `Prototype left-drag did not orbit (${prototypeInitial} -> ${prototypeAfterOrbit}).`);
+  await click('[data-debug-action="close"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "right", buttons: 2, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 720, y: 490, button: "right", buttons: 2 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 720, y: 490, button: "right", buttons: 0, clickCount: 1 });
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "prototype right pan");
+  const prototypeAfterPan = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  assert(prototypeAfterPan.split(' · ')[0] !== prototypeAfterOrbit.split(' · ')[0], `Prototype right-drag did not pan (${prototypeAfterOrbit} -> ${prototypeAfterPan}).`);
+  await click('[data-debug-action="close"]');
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'KeyW', bubbles:true}))");
+  await pause(180);
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keyup', {code:'KeyW', bubbles:true}))");
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "prototype WASD check");
+  const prototypeAfterWasd = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  assert(prototypeAfterWasd === prototypeAfterPan, `WASD moved the Prototype camera (${prototypeAfterPan} -> ${prototypeAfterWasd}).`);
+  await click('[data-debug-action="close"]');
+
+  await click('[data-build-action="enter"]');
+  await click('[data-build-tool="trail"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 700, y: 440, button: "left", buttons: 1, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 790, y: 500, button: "left", buttons: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 790, y: 500, button: "left", buttons: 0, clickCount: 1 });
+  assert(await evaluate(`document.querySelector('.refuge-build__inspector > small').textContent.includes('0 trail segments')`), "Prototype left-drag painted a trail instead of orbiting in Build Mode.");
+  await click('[data-build-action="exit"]');
+
+  await click('[data-hud-action="camera-settings"]');
+  await click('[data-camera-scheme="ascent"]');
+  await click('[data-camera-action="close"]');
+  assert(await evaluate(`localStorage.getItem('ascent.camera-control-scheme') === 'ascent'`), "ASCENT camera preset was not restored.");
+
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
   await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer camera baseline");
   const cameraInitial = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
@@ -715,9 +859,27 @@ try {
   await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 840, y: 500, button: "right", buttons: 2 });
   await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 840, y: 500, button: "right", buttons: 0, clickCount: 1 });
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer after pointer orbit");
+  const cameraAfterOrbit = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  assert(cameraAfterOrbit !== cameraInitial && cameraAfterOrbit.split(' · ')[0] === cameraInitial.split(' · ')[0], `Right-drag did not orbit around a stable target (${cameraInitial} -> ${cameraAfterOrbit}).`);
+  await click('[data-debug-action="close"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "middle", buttons: 4, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 720, y: 490, button: "middle", buttons: 4 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 720, y: 490, button: "middle", buttons: 0, clickCount: 1 });
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
   await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer after pointer pan");
   const cameraBeforePanel = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
-  assert(cameraBeforePanel !== cameraInitial, `Right-drag did not pan the camera (${cameraInitial} -> ${cameraBeforePanel}).`);
+  assert(cameraBeforePanel.split(' · ')[0] !== cameraAfterOrbit.split(' · ')[0], `Middle-drag did not pan the camera (${cameraAfterOrbit} -> ${cameraBeforePanel}).`);
+  const parseCamera = (value) => {
+    const match = value.match(/^(-?\d+(?:\.\d+)?), (-?\d+(?:\.\d+)?) · (-?\d+)°/);
+    if (!match) throw new Error(`Could not parse camera diagnostics: ${value}`);
+    return { x: Number(match[1]), z: Number(match[2]), yaw: Number(match[3]) * Math.PI / 180 };
+  };
+  const beforePan = parseCamera(cameraAfterOrbit);
+  const afterPan = parseCamera(cameraBeforePanel);
+  const forwardDot = (afterPan.x - beforePan.x) * -Math.sin(beforePan.yaw)
+    + (afterPan.z - beforePan.z) * -Math.cos(beforePan.yaw);
+  assert(forwardDot < 0, `Middle-drag vertical pan was not inverted (${cameraAfterOrbit} -> ${cameraBeforePanel}).`);
   await click('[data-debug-action="close"]');
   await click('[data-hud-section="Heroes"]');
   await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "right", buttons: 2, clickCount: 1 });
@@ -852,9 +1014,40 @@ try {
   assert(await evaluate("getComputedStyle(document.querySelector('.hero-roster-card')).animationName === 'none'"), "Reduced motion preference must disable animations.");
   await screenshot("mobile-390x844.png");
 
+  await click('[data-hud-section="Refuge"]');
+  await click('[data-build-action="enter"]');
+  await waitFor("document.querySelector('.refuge-build')?.dataset.active === 'true'", "mobile Refuge Build Mode");
+  const mobileBuild = await evaluate(`(() => {
+    const panel = document.querySelector('.refuge-build');
+    const bounds = panel.getBoundingClientRect();
+    const buttons = [...panel.querySelectorAll('button')];
+    return {
+      fits: bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight,
+      navHidden: getComputedStyle(document.querySelector('.hud-navigation')).display === 'none',
+      touchTargets: buttons.filter((button) => !button.closest('header')).every((button) => button.getBoundingClientRect().height >= 42),
+    };
+  })()`);
+  assert(mobileBuild.fits && mobileBuild.navHidden && mobileBuild.touchTargets, `Mobile Build Mode failed (${JSON.stringify(mobileBuild)}).`);
+  await screenshot("phase21-build-mode-mobile-390x844.png");
+  await click('[data-build-action="exit"]');
+
+  await click('[data-hud-action="camera-settings"]');
+  await waitFor("!document.querySelector('.camera-settings').hidden", "mobile camera settings");
+  const mobileCameraSettings = await evaluate(`(() => {
+    const panel = document.querySelector('.camera-settings__panel').getBoundingClientRect();
+    const choices = [...document.querySelectorAll('[data-camera-scheme]')];
+    return {
+      fits: panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight,
+      touchTargets: choices.every((choice) => choice.getBoundingClientRect().height >= 44),
+    };
+  })()`);
+  assert(mobileCameraSettings.fits && mobileCameraSettings.touchTargets, `Mobile camera settings failed (${JSON.stringify(mobileCameraSettings)}).`);
+  await screenshot("camera-settings-mobile-390x844.png");
+  await click('[data-camera-action="close"]');
+
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

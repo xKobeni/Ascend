@@ -1,6 +1,6 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 20. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 21. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
@@ -9,9 +9,9 @@ Last verified against the repository: September 11, 2026.
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–20
+Implemented gameplay phases: 0–21
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 21 — Refuge Layout System
+Next gameplay phase: 22 — Facility Construction
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 
@@ -108,17 +108,25 @@ directory yet.
 
 ### Current player controls
 
-- `W`, `A`, `S`, `D`: pan the Refuge camera
-- Right-drag or middle-drag: pan the Refuge camera relative to its current angle
+- **ASCENT Default:** `WASD` pans, right-drag orbits, middle-drag pans.
+- **Prototype:** left-drag orbits, right-drag pans, middle-drag zooms, and `WASD` camera movement is off.
+- Pan uses the accepted inverted forward/backward pointer direction in both presets.
 - `Q`, `E`: rotate the Refuge camera
 - Mouse wheel: zoom
-- Click a selectable world object: inspect it
+- Short-click a selectable world object: inspect it
 - `Escape`: close the active player panel or return to Refuge
 - `F3`: open or close developer diagnostics
 
-Mouse panning is captured by the canvas, so the drag continues cleanly if the pointer leaves its
-bounds. Left click remains dedicated to world selection. Camera and world selection intentionally pause while a player panel or developer drawer is being
-operated.
+Mouse gestures are captured by the canvas, so a drag continues cleanly if the pointer leaves its
+bounds. Under Prototype controls, a left movement beyond six pixels becomes orbit; a shorter action
+remains selection or Build Mode placement. Camera and world selection intentionally pause while a
+player panel, settings panel, or developer drawer is being operated.
+
+The current camera follows the approved base prototype's 42-degree perspective, approximately
+`(38, 40, 46)` opening position, 14–130 zoom range, broad pitch range, and damped OrbitControls-like
+response. `CameraController.update()` applies exponential, frame-rate-independent damping; do not
+replace it with a fixed per-frame `lerp` factor. `CameraSettingsOverlay` owns the UI-only saved
+preference, while `Renderer.setCameraControlScheme()` keeps camera and Build Mode mappings aligned.
 
 ---
 
@@ -167,6 +175,7 @@ Ascent/
 | Change the first mission | `src/expeditions/ExpeditionSystem.ts` |
 | Change a 3D hero | `src/rendering/heroes/HeroMeshGenerator.ts` |
 | Change Refuge scenery | `src/rendering/ProceduralBaseScene.ts` |
+| Fix a floating structure, prop, or hero | `src/rendering/RefugeGround.ts`, then its render factory |
 | Change camera controls | `src/rendering/CameraController.ts` |
 | Change primary navigation | `src/ui/HudShell.ts` and `src/core/Game.ts` |
 | Change hero details | `src/ui/SelectionOverlay.ts` |
@@ -1085,6 +1094,9 @@ whether a panel has intentionally gated input before editing camera math.
 | 16 | Typed memories, decay, relationship and Utility AI influence | `memories/`, `UtilityAI` |
 | 17 | Earned traits, provenance, and bounded personality drift | `TraitEvolutionSystem`, hero Overview |
 | 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, recruitment reveal |
+| 19 | Hero capacity, Dormitory upgrades, and comfort recovery | `DormitorySystem`, Heroes surface |
+| 20 | Daily Food use, shortages, and expedition-funded stockpile | `ResourceEconomySystem`, `ExpeditionSystem` |
+| 21 | Editable Refuge layout, validation, trails, routing, and seeded trees | `RefugeLayoutSystem`, Build Mode |
 
 Anything beyond this table is future scope unless code and validation are added under an approved
 phase.
@@ -1449,9 +1461,9 @@ resting, and infirmary navigation rings contain ten positions to match the Phase
 6. Extend browser coverage for no-spend rejection, upgrades, maximum level, recovery, and layout.
 7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
 
-Phase 20 now implements the bounded resource loop described in the next section. Phase 21 Refuge
-layout and Phase 22 construction placement, timers, builders, facility recipes, and new facility
-meshes remain outside Phase 19.
+Phase 20 implements the bounded resource loop described in the next section. Phase 21 now owns
+layout editing separately. Phase 22 construction placement, timers, builders, recipes, and new
+facility meshes remain outside Phase 19.
 
 ---
 
@@ -1518,13 +1530,113 @@ Stocked without producing a startup message.
 6. Do not add Metal until a real Phase 22 construction recipe consumes it.
 7. Test consumption, shortfall, needs effects, notifications, top-bar values, victory, and withdrawal.
 
-Phase 21 Build Mode, movable facilities, trails, and seeded environment placement are not
-implemented by this economy layer. Phase 22 construction sites, builders, progress timers, and
-completed facility models are also absent.
+Phase 21 Build Mode, movable facilities, trails, and seeded environment placement are implemented
+by a separate layout layer, not by the economy. Phase 22 construction sites, builders, progress
+timers, material recipes, and completed new facility models remain absent.
 
 ---
 
-## 31. Debugging Method
+## 31. Phase 21 Reference: Refuge Layout System
+
+Phase 21 turns the fixed Refuge floor into a broad, continuous, authoritative layout while keeping
+the living scene running. It reorganizes eight starting structures and deterministic environment
+props; it does not purchase or construct new facilities.
+
+### Ownership map
+
+```text
+Simulation
+  └─ RefugeLayoutSystem
+       ├─ structures: id, kind, label, transform, footprint, placed, removable
+       ├─ trails: snapped cell records
+       ├─ seed + generated tree and rock records
+       ├─ plane size + prepared expansion metadata
+       ├─ version + revision
+       └─ one committed-state undo snapshot
+
+Game
+  ├─ selected tool + unconfirmed draft
+  ├─ RefugeBuildOverlay actions
+  └─ Renderer Build Mode/input gating
+
+Renderer
+  ├─ RefugeBuildInput ground raycast
+  └─ ProceduralBaseScene snapshot rendering
+```
+
+The authoritative instance lives in `Simulation`; renderer and UI code receive read-only snapshots.
+A facility mesh position is never treated as saved gameplay state.
+
+### Placement transaction
+
+1. `RefugeBuildInput` converts a left-pointer position into Refuge ground coordinates.
+2. `Game` asks the matching structure, environment, or trail validator for a snapped draft.
+3. The renderer displays the draft with geometry plus olive/bronze or burgundy state.
+4. Confirm calls one narrow `Simulation` mutation method.
+5. `RefugeLayoutSystem` validates again, captures the previous committed state, mutates once,
+   increments `revision`, and publishes a new frozen snapshot.
+6. `ProceduralBaseScene.syncLayout()` updates the affected render data on the new revision.
+
+Cancel clears only the draft. Undo restores the immediately previous committed layout state.
+Rejected placements never increment the revision. Layout mutations are blocked during active combat
+or debrief states.
+
+### Validation rules
+
+Structure and environment moves subtly snap to a hidden two-world-unit grid and must stay inside the
+72×72 starting plane. They cannot overlap structures, environment footprints, or blocked entrance
+space. A bounded grid flood fill checks that structure entrances remain reachable from the movable
+campfire commons. The snapshot also carries a prepared 120×120 expansion size, but Phase 21 exposes
+no unlock action for it.
+
+Trail cells use the same hidden grid. They must remain inside the floor and avoid structure and
+environment footprints. Every cell must remain cardinally connected to a cell rooted in the current
+campfire position; erasing a cell is rejected if it would split the network. Rendering joins these
+cells into smooth continuous strips so the floor does not look tiled. Movement-cost and path
+preference remain future behavior.
+
+### Dynamic hero destinations
+
+`createRefugeNavigationPoints(layout)` derives Command Hall, campfire, Resting, Training, Infirmary,
+and Storage points from current structure transforms. `HeroRoutineSystem` caches the last layout
+revision and reassigns the destination of heroes whose activity already matches their schedule when
+the layout changes. A stored ordinary facility routes its related activity to Command Hall, while
+its gameplay service stays paused until the facility is placed again.
+
+### Environment props and future model replacement
+
+Environment records are regenerated from the owned seed with a capped 520-attempt loop targeting 28
+trees and 16 rocks, biased toward the perimeter. They avoid structure footprints, trail cells, and
+one another. Each low-poly prop is individually selectable, movable, and removable in Build Mode.
+When supplied models arrive, replace only the visual factories or adapters; preserve the seeded
+placement records and do not put GLTF objects in simulation.
+
+### Controls and responsive behavior
+
+- Enter through **Build Refuge** while Refuge is the active HUD section.
+- Use the horizontal bottom rail to choose any starting structure or the trail tools; use the right
+  inspector to edit the current selection.
+- Left click/tap selects a structure, tree, or rock or positions its draft; trail tools paint/erase.
+- Right-drag orbits and middle-drag pans without placing.
+- `R` rotates a structure; `Enter` confirms a valid draft; `Escape` cancels, then exits.
+- Arrow buttons nudge a selection or pan the camera for keyboard/touch-accessible operation.
+- On mobile, the tool rail scrolls horizontally, the inspector becomes a full-width drawer, and
+  normal navigation hides until Build Mode exits.
+
+### Safe recipe: add another movable existing structure
+
+1. Add its stable ID, kind, removal policy, and initial plain-data footprint to `RefugeLayoutSystem`.
+2. Register all related render objects against one structure anchor in `ProceduralBaseScene`.
+3. Add the tool to `RefugeBuildOverlay`.
+4. Map any hero activity destination in `createRefugeNavigationPoints(layout)`.
+5. Test valid/invalid placement, selection alignment, hero rerouting, undo, and mobile controls.
+6. Keep cost, site, timer, builder, and material logic out; those require Phase 22 approval.
+
+Disk persistence remains Phase 38. The current session layout resets on a reload by design.
+
+---
+
+## 32. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1603,7 +1715,7 @@ git diff --check
 
 ---
 
-## 32. Safe Git Workflow
+## 33. Safe Git Workflow
 
 Before editing:
 
@@ -1631,7 +1743,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 33. Definition of Done for a Change
+## 34. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1655,7 +1767,7 @@ Use this checklist:
 
 ---
 
-## 34. Final Rule of Thumb
+## 35. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 

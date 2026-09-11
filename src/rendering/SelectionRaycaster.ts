@@ -29,7 +29,7 @@ export class SelectionRaycaster {
     private readonly selectableRoots: THREE.Object3D[],
     private readonly onSelection: (details: SelectionDetails | null) => void,
   ) {
-    this.highlight = new THREE.Box3Helper(this.bounds, "#a9f1ff");
+    this.highlight = new THREE.Box3Helper(this.bounds, "#a78652");
     this.highlight.visible = false;
     this.highlight.renderOrder = 10;
     scene.add(this.highlight);

@@ -75,7 +75,7 @@ export class DebugOverlay {
     this.timeValue.textContent = this.formatTime(snapshot.day, snapshot.minuteOfDay);
     this.routineValue.textContent = snapshot.period.toUpperCase();
     this.heroValue.textContent = String(snapshot.heroCount);
-    this.cameraValue.textContent = `${camera.targetX.toFixed(1)}, ${camera.targetZ.toFixed(1)} · ${Math.round(camera.yawDegrees)}° · ${camera.distance.toFixed(0)}m`;
+    this.cameraValue.textContent = `${camera.targetX.toFixed(1)}, ${camera.targetZ.toFixed(1)} · ${Math.round(camera.yawDegrees)}°/${Math.round(camera.pitchDegrees)}° · ${camera.distance.toFixed(0)}m`;
     this.arenaButton.disabled = !this.actions.canStartArena();
   }
 

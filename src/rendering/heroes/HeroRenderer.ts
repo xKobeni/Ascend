@@ -3,6 +3,7 @@ import * as THREE from "three";
 import type { Hero } from "../../heroes/Hero";
 import { markSelectable } from "../SelectionRaycaster";
 import { HeroMeshGenerator, type HeroRig } from "./HeroMeshGenerator";
+import { placeObjectOnRefugeGround } from "../RefugeGround";
 
 interface AnimationState {
   breathingPhase: number;
@@ -16,6 +17,7 @@ interface AnimationState {
 
 interface RenderedHero {
   anim: AnimationState;
+  groundY: number;
   phaseOffset: number;
   rig: HeroRig;
 }
@@ -86,7 +88,8 @@ export class HeroRenderer {
 
   private addHero(hero: Readonly<Hero>, index: number): void {
     const rig = this.meshGenerator.create(hero);
-    rig.root.position.set(hero.movement.position.x, 0.31, hero.movement.position.z);
+    rig.root.position.set(hero.movement.position.x, 0, hero.movement.position.z);
+    const groundY = placeObjectOnRefugeGround(rig.root);
     rig.root.rotation.y = hero.movement.facingRadians;
     markSelectable(rig.root, {
       category: "hero",
@@ -106,6 +109,7 @@ export class HeroRenderer {
         transitionAlpha: 0,
         walkCycle: index * 2.1,
       },
+      groundY,
       phaseOffset: index * 1.37,
       rig,
     });
@@ -190,7 +194,8 @@ export class HeroRenderer {
     let targetLegRightX = 0;
     let targetBodyY = 0;
     let targetBodyZ = 0;
-    let targetRootY = 0.31;
+    const groundY = this.renderedHeroes.get(hero.id)?.groundY ?? rig.root.position.y;
+    let targetRootY = groundY;
     let targetRootZ = 0;
     let targetHeadX = 0;
     let targetHeadY = 0;
@@ -205,7 +210,7 @@ export class HeroRenderer {
       targetLegLeftX = -swing * 0.8;
       targetLegRightX = swing * 0.8;
       targetBodyY = Math.sin(anim.walkCycle) * 0.03;
-      targetRootY = 0.31 + Math.abs(Math.sin(anim.walkCycle)) * 0.05;
+      targetRootY = groundY + Math.abs(Math.sin(anim.walkCycle)) * 0.05;
       targetHeadX = Math.sin(anim.walkCycle * 0.5) * 0.05;
     } else if (activity === "Training") {
       const trainSpeed = 5.5 * movementSpeedMult;
@@ -218,7 +223,7 @@ export class HeroRenderer {
       targetLegRightX = 0.15;
       targetBodyY = twist * 0.1;
       targetBodyZ = postureLean;
-      targetRootY = 0.31 + Math.abs(Math.sin(cycle * trainSpeed)) * 0.02;
+      targetRootY = groundY + Math.abs(Math.sin(cycle * trainSpeed)) * 0.02;
       targetHeadX = -0.1 + Math.sin(cycle * trainSpeed * 0.7) * 0.08;
     } else if (activity === "Eating") {
       const eatCycle = cycle * 2.6;
@@ -228,7 +233,7 @@ export class HeroRenderer {
       targetArmRightX = -0.7 + Math.abs(Math.sin(eatCycle + 0.8)) * 0.35;
       targetLegLeftX = 0;
       targetLegRightX = 0;
-      targetRootY = 0.31;
+      targetRootY = groundY;
       targetHeadX = -0.12 + Math.sin(eatCycle * 0.5) * 0.06;
       targetHeadY = Math.sin(eatCycle + 1.2) * 0.04;
     } else if (activity === "Socializing") {
@@ -241,7 +246,7 @@ export class HeroRenderer {
       targetLegLeftX = 0;
       targetLegRightX = 0;
       targetBodyY = Math.sin(socialCycle * 0.6) * 0.04;
-      targetRootY = 0.31;
+      targetRootY = groundY;
       targetHeadX = nod;
       targetHeadY = Math.sin(socialCycle * 0.4) * 0.05;
     } else if (activity === "Resting") {
@@ -254,7 +259,7 @@ export class HeroRenderer {
       targetArmRightX = 0.12 - restWiggle;
       targetLegLeftX = 0.08;
       targetLegRightX = -0.04;
-      targetRootY = 0.48 + restBreath;
+      targetRootY = groundY + 0.17 + restBreath;
       targetRootZ = 1.1;
       targetHeadX = 0.25 + restWiggle * 0.4;
     } else {
@@ -275,7 +280,7 @@ export class HeroRenderer {
       targetLegRightX = 0.02 - breathe;
       targetBodyY = weightShift * 0.4;
       targetBodyZ = postureLean;
-      targetRootY = 0.31 + breathe;
+      targetRootY = groundY + breathe;
       targetHeadX = lerpAngle(0, anim.idleLookTarget, Math.min(1, deltaSeconds * 2));
       targetHeadY = Math.sin(idleCycle * 1.3) * 0.03;
     }

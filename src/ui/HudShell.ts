@@ -16,12 +16,16 @@ export class HudShell {
   constructor(
     container: HTMLElement,
     private readonly onSectionChange: (section: HudSection) => void,
+    private readonly onCameraSettings: () => void,
   ) {
     this.element = document.createElement("div");
     this.element.className = "hud-shell";
     this.element.innerHTML = `
       <header class="hud-topbar">
-        <div class="hud-brand"><strong>ASCENT</strong><span>Refuge command</span></div>
+        <div class="hud-brand">
+          <div><strong>ASCENT</strong><span>Refuge command</span></div>
+          <button type="button" class="hud-camera-settings" data-hud-action="camera-settings" aria-label="Open camera settings">CAMERA</button>
+        </div>
         <div class="hud-time" data-hud="time">DAY 1 · 07:00</div>
         <div class="hud-resources" aria-label="Refuge resources">
           <span><i>SCRAP</i><b data-resource="scrap">0</b></span>
@@ -94,12 +98,21 @@ export class HudShell {
     this.element.querySelector<HTMLButtonElement>(`[data-hud-section="${section}"]`)?.focus();
   }
 
+  focusCameraSettings(): void {
+    this.element.querySelector<HTMLButtonElement>("[data-hud-action='camera-settings']")?.focus();
+  }
+
   dispose(): void {
     this.element.removeEventListener("click", this.handleClick);
     this.element.remove();
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
+    const action = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-hud-action]")?.dataset.hudAction;
+    if (action === "camera-settings") {
+      this.onCameraSettings();
+      return;
+    }
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-hud-section]");
     const section = button?.dataset.hudSection;
     if (!this.isSection(section) || section === this.activeSection) {
