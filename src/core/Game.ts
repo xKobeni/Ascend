@@ -222,6 +222,7 @@ export class Game {
       simulationSnapshot,
       expeditionSnapshot.resources,
       this.simulation.getDormitorySnapshot(),
+      this.simulation.getResourceEconomySnapshot(),
     );
     this.debugOverlay.update(timestampMs, simulationSnapshot, this.renderer.getCameraDiagnostics());
     this.notificationCenter.update(
@@ -229,6 +230,7 @@ export class Game {
       this.simulation.getSocialEvents(),
       expeditionSnapshot,
       fallenHeroes,
+      this.simulation.getResourceEconomySnapshot(),
     );
     this.heroRosterOverlay.update();
     this.squadOverlay.updateEvaluation();

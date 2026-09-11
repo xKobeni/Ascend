@@ -449,6 +449,71 @@ try {
       recruitmentValidation.shardsPreservedAtCapacity && recruitmentValidation.upgrade && recruitmentValidation.validImport,
     `Phase 18-19 recruitment and capacity validation failed (${JSON.stringify(recruitmentValidation)}).`,
   );
+  const economyValidation = await evaluate(`(async () => {
+    const [{ ResourceEconomySystem }, { NeedsSystem }, { HeroGenerator }, { Random }, { createInitialMovement }, { NotificationCenter }] = await Promise.all([
+      import('/src/economy/ResourceEconomySystem.ts'),
+      import('/src/heroes/NeedsSystem.ts'),
+      import('/src/heroes/HeroGenerator.ts'),
+      import('/src/core/Random.ts'),
+      import('/src/base/NavigationPoints.ts'),
+      import('/src/ui/NotificationCenter.ts'),
+    ]);
+    let food = 2;
+    const economy = new ResourceEconomySystem();
+    const consumeFood = (amount) => {
+      if (amount <= 0 || food < amount) return false;
+      food -= amount;
+      return true;
+    };
+    economy.step(5, 288, food, consumeFood);
+    const firstConsumption = food === 1 && economy.getSnapshot(5, food).foodConsumed === 1;
+    economy.step(5, 576, food, consumeFood);
+    const emptySnapshot = economy.getSnapshot(5, food);
+    const shortageTracked = food === 0 && emptySnapshot.foodConsumed === 2 && emptySnapshot.foodShortfall === 1 && emptySnapshot.provisionStatus === 'Empty';
+
+    const generator = new HeroGenerator(new Random(404));
+    const fed = generator.generate(createInitialMovement(0), 0, new Set());
+    const empty = structuredClone(fed);
+    [fed, empty].forEach((hero) => {
+      hero.movement.activity = 'Eating';
+      Object.assign(hero.needs, { fatigue: 20, health: 100, hunger: 40, morale: 60, social: 60, stress: 20 });
+    });
+    const needs = new NeedsSystem();
+    needs.step([fed], 60, { fatigueRecoveryMultiplier: 1, foodSupply: 'Stocked', moraleRecoveryBonus: 0 });
+    needs.step([empty], 60, { fatigueRecoveryMultiplier: 1, foodSupply: 'Empty', moraleRecoveryBonus: 0 });
+    const emptyMealsMatter = fed.needs.hunger > empty.needs.hunger && empty.needs.morale < fed.needs.morale && empty.needs.stress > fed.needs.stress;
+
+    const notificationHost = document.createElement('div');
+    document.querySelector('#app').appendChild(notificationHost);
+    const notifications = new NotificationCenter(notificationHost, () => undefined);
+    const expedition = {
+      attempt: 0, deployedSquadName: null,
+      mission: { description: '', difficulty: 'Moderate', id: 'test', name: 'Test', objective: 'Eliminate Enemies', rewards: {food:8,medicine:2,riftShards:3,scrap:18}, threats: [] },
+      phase: 'Briefing', report: null, resources: {food:12,medicine:6,riftShards:0,scrap:0},
+    };
+    const stocked = { dailyFoodDemand: 5, foodConsumed: 0, foodShortfall: 0, provisionDays: 2.4, provisionStatus: 'Stocked' };
+    const low = { ...stocked, provisionDays: 1, provisionStatus: 'Low' };
+    const emptyState = { ...stocked, provisionDays: 0, provisionStatus: 'Empty' };
+    notifications.update([fed], [], expedition, [], stocked);
+    notifications.update([fed], [], expedition, [], low);
+    notifications.update([fed], [], expedition, [], emptyState);
+    const noticeText = notificationHost.textContent ?? '';
+    notifications.dispose();
+    notificationHost.remove();
+
+    return {
+      emptyMealsMatter,
+      firstConsumption,
+      notifications: noticeText.includes('Food stores are low') && noticeText.includes('Food stores are empty'),
+      shortageTracked,
+      stockedDays: new ResourceEconomySystem().getSnapshot(5, 12).provisionDays,
+    };
+  })()`);
+  assert(
+    economyValidation.emptyMealsMatter && economyValidation.firstConsumption &&
+      economyValidation.notifications && economyValidation.shortageTracked && economyValidation.stockedDays === 2.4,
+    `Phase 20 resource economy validation failed (${JSON.stringify(economyValidation)}).`,
+  );
   const legacyValidation = await evaluate(`(async () => {
     const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
       import('/src/heroes/HeroManager.ts'),
@@ -611,7 +676,7 @@ try {
   })()`);
   assert(
     victoryValidation.outcome === 'Victory' &&
-      JSON.stringify(victoryValidation.resources) === JSON.stringify({ food: 10, medicine: 6, riftShards: 3, scrap: 18 }),
+      JSON.stringify(victoryValidation.resources) === JSON.stringify({ food: 20, medicine: 8, riftShards: 3, scrap: 18 }),
     `Expedition victory rewards failed (${JSON.stringify(victoryValidation)}).`,
   );
   const withdrawalResults = await evaluate(`(async () => {
@@ -669,6 +734,8 @@ try {
   assert(await evaluate("document.querySelector('[data-dormitory=\"occupancy\"]')?.textContent") === "5 / 5 beds", "Dormitory occupancy must be visible in Heroes.");
   assert(await evaluate("document.querySelector('[data-roster-action=\"upgrade-dormitory\"]')?.disabled") === true, "Dormitory upgrade must be blocked without Scrap.");
   assert(await evaluate("document.querySelector('[data-hud=\"heroes\"]')?.textContent") === "5/5", "Top status must show hero capacity.");
+  assert(await evaluate("(() => { const food=Number(document.querySelector('[data-resource=\"food\"]')?.textContent); return food > 0 && food <= 12; })()") === true, "The Refuge must expose and consume the real Phase 20 Food stockpile.");
+  assert(await evaluate("document.querySelector('[data-economy=\"demand\"]')?.textContent") === "5", "Provision status must show the five-hero daily Food demand.");
   await waitFor("document.querySelectorAll('.hero-roster-card img').length === 5", "procedural portraits", 20_000);
   const portraits = await evaluate("[...document.querySelectorAll('.hero-roster-card img')].map((image) => image.src)");
   assert(new Set(portraits).size === 5 && portraits.every((src) => src.startsWith("blob:")), "Each hero must receive a distinct cached procedural portrait.");
@@ -752,7 +819,7 @@ try {
   const report = await evaluate("document.querySelector('.expedition-overlay__outcome strong')?.textContent");
   const resources = await evaluate("[...document.querySelectorAll('[data-resource]')].map((node) => Number(node.textContent))");
   assert(report, "Expedition did not produce a mission result.");
-  assert(report !== "ROUTE SECURED" || resources.join(',') === "18,10,6,3", "Victory rewards and Medicine must reach the persistent top status bar.");
+  assert(report !== "ROUTE SECURED" || (resources[0] === 18 && resources[1] >= 8 && resources[2] === 8 && resources[3] === 3), "Victory rewards and Medicine must reach the persistent top status bar.");
   await screenshot(report === "ROUTE SECURED" ? "rift-debrief-victory-1440x900.png" : "rift-debrief-setback-1440x900.png");
   await click('[data-expedition-action="return"]');
   await waitFor("document.querySelector('[data-hud-section=\"Refuge\"]').getAttribute('aria-pressed') === 'true'", "refuge return");
@@ -770,7 +837,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

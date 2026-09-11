@@ -5,10 +5,10 @@
 Current implementation boundary (verified September 11, 2026):
 
 ```text
-Gameplay phases implemented: 0–19
+Gameplay phases implemented: 0–20
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 20 — Resource Economy
+Next gameplay phase: Phase 21 — Facility Construction
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -57,6 +57,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 9. Fallen heroes get memorial graves in the refuge
 10. A victory's Scrap can expand the Dormitory when the 5-bed refuge is full
 11. Available beds and Rift Shards allow a seeded 1–3★ recruit through the Gate
+12. Active residents consume Food and shortages weaken meal recovery and morale
 
 Before and after a meaningful change, run:
 
@@ -89,9 +90,10 @@ static build alone does not prove those runtime paths.
 | 17 | Earned traits, provenance, notifications and bounded personality drift | `TraitEvolutionSystem` |
 | 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, `RecruitmentOverlay` |
 | 19 | Authoritative hero capacity, Dormitory upgrades and rest comfort | `refuge/DormitorySystem`, `NeedsSystem` |
+| 20 | Daily Food demand, provision shortages and balanced mission resources | `economy/ResourceEconomySystem` |
 
-Phase 20 is the next boundary. Do not add recurring food consumption, shortages, new materials,
-upkeep, or broader economy balancing before that phase is implemented.
+Phase 21 is the next boundary. Do not add placement mode, construction sites, builders, timers,
+facility recipes, or Metal before that phase is implemented.
 
 ---
 
@@ -535,6 +537,32 @@ The starting five heroes fill the Basic Dormitory, so the first successful exped
 6 Scrap stays in the stockpile. Phase 19 does not add construction time, builders, placement,
 maintenance, food upkeep, shortages, or new resources.
 
+### 4.14 Resource Economy (`src/economy/ResourceEconomySystem.ts`)
+
+The current stockpile and uses are:
+
+| Resource | Start | Victory reward | Use |
+|----------|------:|---------------:|-----|
+| Food | 12 | 8 | 1 per active hero per game day |
+| Medicine | 6 | 2 | Injury treatment |
+| Scrap | 0 | 18 | Dormitory upgrades |
+| Rift Shards | 0 | 3 | Recruitment |
+
+`ResourceEconomySystem` accumulates fractional Food demand using game minutes and consumes whole
+units through `ExpeditionSystem.consumeFood()`. It derives `provisionDays` and a status:
+
+- `Stocked` — more than one day remains
+- `Low` — one day or less remains
+- `Empty` — no Food remains
+
+When Empty, Eating stops restoring hunger, stress gains 2.5/hour, and morale loses an additional
+3/hour. These effects are passed into `NeedsSystem`; they are not permanently written into hero
+definitions. Combat and Debrief do not advance refuge consumption.
+
+The Refuge provisioning strip displays status, days, and Food/day. Low, Empty, and restored
+transitions produce notifications. Metal is absent because Phase 21 does not yet provide a real
+construction recipe or consumer.
+
 ---
 
 ## 5. Skill Forge
@@ -910,6 +938,7 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 | NotificationCenter | `NotificationCenter.ts` | Event feed |
 | RecruitmentOverlay | `RecruitmentOverlay.ts` | Seeded Dimensional Gate arrival reveal |
 | Dormitory status | inside `HeroRosterOverlay.ts` | Beds, comfort effects, Scrap upgrade action |
+| Provision status | inside `HudShell.ts` | Food runway, daily demand, and shortage state |
 | ControlsHint | `ControlsHint.ts` | Camera controls hint |
 | SocialLogOverlay | `SocialLogOverlay.ts` | Social event log |
 
@@ -1278,7 +1307,17 @@ assuming a passing typecheck proves layout quality.
 - Pass comfort through `DormitorySnapshot`; do not permanently rewrite hero needs or base recovery rates.
 - Keep capacity at or below the available navigation-point count unless you expand every activity ring.
 - Test full-capacity rejection, no-spend behavior, every upgrade, maximum-tier blocking, and resting recovery.
-- Do not add Phase 20 upkeep or Phase 21 placement/construction while changing Phase 19 balance.
+- Keep Phase 20 consumption in `ResourceEconomySystem`; do not mix Phase 21 placement/construction into Dormitory balance.
+
+### 10.13 Modify the Resource Economy Safely
+
+- Change daily consumption through `FOOD_PER_HERO_PER_DAY` in `ResourceEconomySystem.ts`.
+- Keep Food, Medicine, Scrap, and Rift Shard mutation inside `ExpeditionSystem`.
+- Update `FIRST_MISSION.rewards` and the direct victory regression together.
+- Pass shortage state into `NeedsSystem`; do not edit every hero to apply temporary penalties.
+- Keep consequences gradual and scaled by game minutes.
+- Test Stocked, Low, Empty, restored supplies, partial availability, and zero-resource rejection.
+- Do not introduce Metal until Phase 21 implements a real material-consuming recipe.
 
 ---
 
@@ -1293,6 +1332,9 @@ assuming a passing typecheck proves layout quality.
 | Dormitory upgrade costs | 12 / 24 Scrap | `src/refuge/DormitorySystem.ts` |
 | Dormitory fatigue recovery | ×1.00 / ×1.15 / ×1.30 while Resting | `src/refuge/DormitorySystem.ts` |
 | Dormitory morale recovery | +0.0 / +0.5 / +1.0 per game hour while Resting | `src/refuge/DormitorySystem.ts` |
+| Starting Food | 12 | `src/expeditions/ExpeditionSystem.ts` |
+| Food consumption | 1 per active hero per game day | `src/economy/ResourceEconomySystem.ts` |
+| First mission reward | 8 Food, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
 | Max training slots | 3 | `src/heroes/TrainingSystem.ts` |
 | Active skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
 | Passive skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
@@ -1388,6 +1430,11 @@ assuming a passing typecheck proves layout quality.
 |------|---------|
 | `src/refuge/DormitorySystem.ts` | Hero capacity tiers, Scrap upgrade costs, and rest comfort modifiers. |
 
+### Economy
+| File | Purpose |
+|------|---------|
+| `src/economy/ResourceEconomySystem.ts` | Time-scaled Food demand, consumption history, shortfall, and provision status. |
+
 ### Combat
 | File | Purpose |
 |------|---------|
@@ -1427,7 +1474,7 @@ assuming a passing typecheck proves layout quality.
 ### UI
 | File | Purpose |
 |------|---------|
-| `src/ui/HudShell.ts` | Top status bar + bottom navigation. |
+| `src/ui/HudShell.ts` | Top status bar, Refuge provisioning record, and bottom navigation. |
 | `src/ui/SelectionOverlay.ts` | Hero detail panel (4 tabs). |
 | `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |

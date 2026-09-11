@@ -1,5 +1,6 @@
 import type { Hero, HeroNeeds } from "./Hero";
 import type { ScheduledActivity } from "../base/NavigationPoints";
+import type { ProvisionStatus } from "../economy/ResourceEconomySystem";
 
 export interface HeroDecision {
   activity: ScheduledActivity;
@@ -9,6 +10,7 @@ export interface HeroDecision {
 
 export interface RestRecoveryModifiers {
   fatigueRecoveryMultiplier: number;
+  foodSupply?: ProvisionStatus;
   moraleRecoveryBonus: number;
 }
 
@@ -121,9 +123,10 @@ export class NeedsSystem {
   ): void {
     const { needs } = hero;
     const activity = hero.movement.activity;
+    const provisionsEmpty = restRecovery.foodSupply === "Empty";
 
     needs.hunger = clampNeed(
-      needs.hunger + (activity === "Eating" ? 24 : -4.5) * gameHours,
+      needs.hunger + (activity === "Eating" && !provisionsEmpty ? 24 : -4.5) * gameHours,
     );
     needs.fatigue = clampNeed(
       needs.fatigue +
@@ -141,7 +144,8 @@ export class NeedsSystem {
     );
     needs.stress = clampNeed(
       needs.stress +
-        (activity === "Resting" ? -5 : activity === "Socializing" ? -3 : -0.5) * gameHours,
+        ((activity === "Resting" ? -5 : activity === "Socializing" ? -3 : -0.5) +
+          (provisionsEmpty ? 2.5 : 0)) * gameHours,
     );
 
     const moraleRate =
@@ -149,7 +153,8 @@ export class NeedsSystem {
       (activity === "Socializing" ? 2.5 : 0) +
       (needs.hunger < 35 ? -4 : 0) +
       (needs.health < 70 ? -3 : 0) +
-      (needs.stress > 60 ? -2 : 0);
+      (needs.stress > 60 ? -2 : 0) +
+      (provisionsEmpty ? -3 : 0);
     needs.morale = clampNeed(needs.morale + moraleRate * gameHours);
 
     if (activity === "Resting" && needs.health < 100) {

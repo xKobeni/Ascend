@@ -114,12 +114,13 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–19 and the first persistent
+The implemented build currently covers Phases 0–20 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
 decisions, earned traits, bounded personality drift, Rift-funded procedural recruitment, hero
-capacity, dormitory upgrades, and comfort-driven rest recovery are active. Construction, equipment,
+capacity, dormitory upgrades, comfort-driven rest recovery, daily Food demand, provision shortages,
+Medicine replenishment, and the expedition-funded resource loop are active. Construction, equipment,
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
@@ -1795,6 +1796,27 @@ Not every event requires player input.
 
 # 49. Resources
 
+## 49.1 Current Implemented Stockpile
+
+The Phase 20 client owns four active resources:
+
+- Food — each active hero consumes 1 per game day
+- Medicine — consumed by injury treatment
+- Scrap — consumed by Dormitory upgrades
+- Rift Shards — consumed by recruitment
+
+The refuge begins with 12 Food and 6 Medicine. The first Rift mission awards 8 Food, 2 Medicine,
+18 Scrap, and 3 Rift Shards on victory. At five residents, the initial Food supply lasts 2.4 game
+days and the victory reward adds 1.6 days before roster growth changes demand.
+
+When Food is empty, Eating cannot restore hunger and residents accumulate gradual stress and morale
+pressure. Low and empty supplies are visible in the persistent HUD and notification feed.
+
+Metal is intentionally not part of the current stockpile because Phase 21 has not implemented a
+real construction recipe that consumes it.
+
+## 49.2 Future Resource Vocabulary
+
 Core resources:
 
 - Food
@@ -2086,9 +2108,10 @@ The four destinations grow with the game instead of multiplying into a dashboard
 | --- | --- | --- |
 | Injury and recovery | Heroes details, Recovering filter, contextual Refuge infirmary | Implemented |
 | Permanent death and memorial records | Heroes ledger and contextual Refuge graves | Implemented |
-| Broad memories | Hero Relations or History context once behavior effects exist | Future |
-| Recruitment and capacity | Recruit Gate or dormitory interactions inside Refuge | Future |
-| Economy, facilities, and crafting | Refuge world locations and contextual work panels | Future |
+| Broad memories | Hero Relations and behavior influence | Implemented |
+| Recruitment and capacity | Recruit Gate and Dormitory record inside Heroes/Refuge | Implemented |
+| Current resource economy | Persistent HUD plus compact Refuge provisioning record | Implemented |
+| Facility construction and crafting | Refuge world locations and contextual work panels | Future |
 | Equipment and classes | Hero details; Party shows only resulting squad impact | Future |
 | Expedition variety and Rift depth | Rift mission selection and regional progression | Future |
 | Doctrine and advanced relationships | Party planning and hero Relations details | Future |

@@ -8,6 +8,7 @@ import { CombatSimulation } from "../combat/CombatSimulation";
 import { ExpeditionSystem } from "../expeditions/ExpeditionSystem";
 import { RECRUITMENT_COST, RecruitmentSystem, type RecruitmentRoll } from "../recruitment/RecruitmentSystem";
 import { DormitorySystem, type DormitorySnapshot } from "../refuge/DormitorySystem";
+import { ResourceEconomySystem, type ResourceEconomySnapshot } from "../economy/ResourceEconomySystem";
 
 export interface RecruitmentResult extends RecruitmentRoll {
   cost: number;
@@ -46,6 +47,7 @@ export class Simulation {
   private readonly squadSystem = new SquadSystem();
   private readonly recruitmentSystem = new RecruitmentSystem();
   private readonly dormitorySystem = new DormitorySystem();
+  private readonly resourceEconomySystem = new ResourceEconomySystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
     elapsedSeconds: 0,
@@ -79,12 +81,21 @@ export class Simulation {
     this.state.day = Math.floor(totalGameMinutes / (24 * 60)) + 1;
     this.state.minuteOfDay = totalGameMinutes % (24 * 60);
     this.state.period = this.heroManager.getDayPeriod(this.state.minuteOfDay);
+    const gameMinutes = deltaSeconds * GAME_MINUTES_PER_REAL_SECOND;
+    const resources = this.getExpeditionSnapshot().resources;
+    this.resourceEconomySystem.step(
+      this.heroManager.getAll().length,
+      gameMinutes,
+      resources.food,
+      (amount) => this.expeditionSystem.consumeFood(amount),
+    );
+    const economy = this.getResourceEconomySnapshot();
     this.heroManager.step(
       deltaSeconds,
-      deltaSeconds * GAME_MINUTES_PER_REAL_SECOND,
+      gameMinutes,
       this.state.day,
       this.state.minuteOfDay,
-      this.getDormitorySnapshot(),
+      { ...this.getDormitorySnapshot(), foodSupply: economy.provisionStatus },
     );
   }
 
@@ -175,6 +186,13 @@ export class Simulation {
 
   getDormitorySnapshot(): Readonly<DormitorySnapshot> {
     return this.dormitorySystem.getSnapshot(this.heroManager.getAll().length);
+  }
+
+  getResourceEconomySnapshot(): Readonly<ResourceEconomySnapshot> {
+    return this.resourceEconomySystem.getSnapshot(
+      this.heroManager.getAll().length,
+      this.getExpeditionSnapshot().resources.food,
+    );
   }
 
   upgradeDormitory(): boolean {

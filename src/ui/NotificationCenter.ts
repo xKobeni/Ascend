@@ -2,6 +2,7 @@ import type { ExpeditionSnapshot } from "../expeditions/Expedition";
 import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { SocialEvent } from "../heroes/RelationshipSystem";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
+import type { ProvisionStatus, ResourceEconomySnapshot } from "../economy/ResourceEconomySystem";
 
 interface NotificationEntry {
   expiresAt: number;
@@ -16,6 +17,7 @@ export class NotificationCenter {
   private readonly element: HTMLElement;
   private initialized = false;
   private lastExpeditionPhase: ExpeditionSnapshot["phase"] = "Briefing";
+  private lastProvisionStatus: ProvisionStatus = "Stocked";
   private latestSocialEventId = 0;
   private readonly list: HTMLOListElement;
   private nextId = 1;
@@ -55,14 +57,18 @@ export class NotificationCenter {
     socialEvents: readonly Readonly<SocialEvent>[],
     expedition: Readonly<ExpeditionSnapshot>,
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
+    economy?: Readonly<ResourceEconomySnapshot>,
   ): void {
     if (!this.initialized) {
-      this.initialize(heroes, socialEvents, expedition, fallenHeroes);
+      this.initialize(heroes, socialEvents, expedition, fallenHeroes, economy);
       return;
     }
     this.captureSocialEvents(socialEvents);
     this.captureHeroChanges(heroes);
     this.captureExpeditionChange(expedition);
+    if (economy) {
+      this.captureProvisionChange(economy);
+    }
     this.captureMemorialChanges(fallenHeroes);
     const now = performance.now();
     const before = this.notifications.length;
@@ -84,6 +90,7 @@ export class NotificationCenter {
     socialEvents: readonly Readonly<SocialEvent>[],
     expedition: Readonly<ExpeditionSnapshot>,
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
+    economy?: Readonly<ResourceEconomySnapshot>,
   ): void {
     heroes.forEach((hero) => {
       this.knownHeroIds.add(hero.id);
@@ -97,6 +104,7 @@ export class NotificationCenter {
     });
     this.latestSocialEventId = socialEvents[0]?.id ?? 0;
     this.lastExpeditionPhase = expedition.phase;
+    this.lastProvisionStatus = economy?.provisionStatus ?? "Stocked";
     fallenHeroes.forEach((record) => this.knownMemorialIds.add(record.heroId));
     this.initialized = true;
   }
@@ -188,6 +196,20 @@ export class NotificationCenter {
       this.push("The party has returned to the refuge.", "neutral");
     }
     this.lastExpeditionPhase = expedition.phase;
+  }
+
+  private captureProvisionChange(economy: Readonly<ResourceEconomySnapshot>): void {
+    if (economy.provisionStatus === this.lastProvisionStatus) {
+      return;
+    }
+    if (economy.provisionStatus === "Empty") {
+      this.push("Food stores are empty · Meals no longer restore hunger.", "danger", 30_000);
+    } else if (economy.provisionStatus === "Low") {
+      this.push("Food stores are low · One day or less remains.", "danger", 20_000);
+    } else {
+      this.push("Refuge provisions are stocked again.", "success");
+    }
+    this.lastProvisionStatus = economy.provisionStatus;
   }
 
   private showDiscovery(hero: Readonly<Hero>, definitionId: string): void {

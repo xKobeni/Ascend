@@ -19,7 +19,7 @@ const FIRST_MISSION: Readonly<ExpeditionMission> = Object.freeze({
   id: "transit-yard-suppression",
   name: "Transit Yard Suppression",
   objective: "Eliminate Enemies",
-  rewards: Object.freeze({ food: 10, medicine: 0, riftShards: 3, scrap: 18 }),
+  rewards: Object.freeze({ food: 8, medicine: 2, riftShards: 3, scrap: 18 }),
   threats: Object.freeze(["3 Rift Stalkers", "Close-range pressure", "Retreat risk"]),
 });
 
@@ -28,7 +28,7 @@ export class ExpeditionSystem {
   private deployedSquad: Readonly<Squad> | null = null;
   private phase: ExpeditionSnapshot["phase"] = "Briefing";
   private report: ExpeditionReport | null = null;
-  private readonly resources: ExpeditionResources = { food: 0, medicine: 6, riftShards: 0, scrap: 0 };
+  private readonly resources: ExpeditionResources = { food: 12, medicine: 6, riftShards: 0, scrap: 0 };
 
   constructor(
     private readonly combat: CombatSimulation,
@@ -103,6 +103,15 @@ export class ExpeditionSystem {
       return false;
     }
     this.resources.medicine -= normalized;
+    return true;
+  }
+
+  consumeFood(amount: number): boolean {
+    const normalized = Math.max(0, Math.floor(amount));
+    if (normalized === 0 || this.resources.food < normalized) {
+      return false;
+    }
+    this.resources.food -= normalized;
     return true;
   }
 

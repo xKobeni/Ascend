@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 11, 2026
 
 ```text
-Gameplay phases implemented: 0–19
-Current playable milestone: Dormitory-gated recruitment and comfort-driven rest recovery
+Gameplay phases implemented: 0–20
+Current playable milestone: Refuge provisioning and expedition-funded resource decisions
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 20 — Resource Economy
+Next gameplay phase: Phase 21 — Facility Construction
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,7 +47,7 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 19 is complete. Phase 20 and later remain design context and require a new implementation
+Phase 20 is complete. Phase 21 and later remain design context and require a new implementation
 approval boundary.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
@@ -1600,7 +1600,7 @@ combat/expedition/hero regressions.
 
 ---
 
-# Phase 20 — Resource Economy
+# Phase 20 — Resource Economy — Complete
 
 ## Goal
 
@@ -1608,35 +1608,72 @@ Turn expeditions and facilities into an economy.
 
 ## Tasks
 
-Core resources:
+The current economy uses only resources with real implemented consumers:
 
 ```text
 Food
 Medicine
 Scrap
-Metal
 Rift Shards
 ```
 
-### 20.1 Consumption
+Metal remains deferred until Phase 21 provides a real construction recipe and material consumer. It
+does not appear as an inert HUD counter or mocked stockpile.
 
-Heroes consume food.
+### 20.1 Consumption — Implemented
 
-### 20.2 Construction Cost
+Each active hero consumes 1 Food per game day. `ResourceEconomySystem` accumulates fractional demand
+using elapsed game minutes, consumes only whole units through `ExpeditionSystem`, and records both
+lifetime consumption and unmet demand. The initial five-hero roster therefore requires 5 Food/day.
 
-Facilities consume materials.
+The refuge starts with 12 Food, or 2.4 days at the initial population. Provision state is derived:
 
-### 20.3 Healing Cost
+```text
+Stocked: more than one day remains
+Low:     one day or less remains
+Empty:   no Food remains
+```
 
-Medicine is consumed.
+An empty stockpile prevents Eating from restoring hunger and adds gradual stress/morale pressure.
+There is no instant damage or retroactive food debt.
 
-### 20.4 Expedition Rewards
+### 20.2 Construction Cost — Implemented Boundary
 
-Balance expected rewards.
+The implemented Dormitory upgrades remain the current construction-like resource choice: 12 and 24
+Scrap. Phase 20 keeps that real cost in the shared stockpile. Physical construction recipes,
+placement, timers, Metal, and worker assignment remain Phase 21.
+
+### 20.3 Healing Cost — Implemented
+
+Injury treatment continues to consume actual Medicine atomically through `ExpeditionSystem`. The UI
+reads the same balance and never owns a duplicate resource value.
+
+### 20.4 Expedition Rewards — Implemented
+
+The first mission now rewards:
+
+```text
+8 Food
+2 Medicine
+18 Scrap
+3 Rift Shards
+```
+
+At the initial roster size, Food supports 1.6 refuge days, Scrap pays the first Dormitory upgrade
+with 6 remaining, Shards pay one recruit, and Medicine replenishes treatment capacity. Withdrawal or
+defeat still grants no resources.
 
 ## Exit Criteria
 
-Player must decide where resources are spent.
+Food demand advances only while refuge simulation time advances; combat and frozen debrief do not
+silently drain supplies. The persistent top bar displays the real stockpile. A compact Refuge
+provisioning record shows status, days remaining, and daily demand, while notifications announce Low,
+Empty, and restored states without relying on glow.
+
+Automated validation confirms time-scaled consumption, integer/atomic spending, shortage tracking,
+empty-meal consequences, status notifications, revised rewards, HUD updates, and all earlier phase
+regressions. The player now balances food runway, Medicine treatment, Scrap expansion, and Shard
+recruitment using one authoritative stockpile.
 
 ---
 

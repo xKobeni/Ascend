@@ -1,6 +1,6 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 19. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 20. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
@@ -9,9 +9,9 @@ Last verified against the repository: September 11, 2026.
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–19
+Implemented gameplay phases: 0–20
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 20 — Resource Economy
+Next gameplay phase: 21 — Facility Construction
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 
@@ -1442,13 +1442,81 @@ resting, and infirmary navigation rings contain ten positions to match the Phase
 6. Extend browser coverage for no-spend rejection, upgrades, maximum level, recovery, and layout.
 7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
 
-Phase 20 recurring consumption, broader economy balancing, new resources, upkeep, and shortages are
-not implemented. Phase 21 construction placement, timers, builders, and facility meshes also remain
-outside this phase.
+Phase 20 now implements the bounded resource loop described in the next section. Phase 21
+construction placement, timers, builders, facility recipes, and new facility meshes remain outside
+Phase 19.
 
 ---
 
-## 30. Debugging Method
+## 30. Phase 20 Reference: Resource Economy
+
+`src/economy/ResourceEconomySystem.ts` owns time-scaled Food demand and provision status. It does not
+own the stockpile. `ExpeditionSystem` remains the sole resource owner and exposes narrow consumers
+for Food, Medicine, Scrap, and Rift Shards.
+
+### Current resource loop
+
+| Resource | Starting amount | Current source | Current consumer |
+|----------|----------------:|----------------|------------------|
+| Food | 12 | 8 from mission victory | 1 per active hero per game day |
+| Medicine | 6 | 2 from mission victory | Injury treatment |
+| Scrap | 0 | 18 from mission victory | Dormitory upgrades |
+| Rift Shards | 0 | 3 from mission victory | Recruitment |
+
+Metal remains absent because no Phase 21 recipe consumes it. Never add a resource to the HUD only
+because it appears in the future concept vocabulary.
+
+### Food consumption
+
+`ResourceEconomySystem.step()` converts hero count and elapsed game minutes into fractional demand:
+
+```text
+hero count × 1 Food × elapsed minutes / 1440
+```
+
+Only whole units are consumed. The fractional remainder stays in `foodDemandProgress`; unmet whole
+units increase `foodShortfall` but do not become debt that consumes future rewards. Active roster
+deaths reduce future demand automatically because each step uses the current hero count.
+
+Provision status is derived from current Food divided by daily demand:
+
+- Stocked: more than one day remains
+- Low: one day or less remains
+- Empty: zero Food
+
+### Needs consequences
+
+`Simulation.step()` consumes due Food first, reads the new economy snapshot, and passes
+`foodSupply` with Dormitory comfort to `NeedsSystem`. When Empty, Eating uses normal hunger decay
+instead of meal recovery, stress gains 2.5 per game hour, and morale loses an additional 3 per game
+hour. There is no instant starvation death.
+
+Combat and Debrief return before refuge time/economy stepping, so frozen gameplay states do not
+drain Food.
+
+### UI and notifications
+
+`HudShell` keeps exact resource amounts in the top bar. While Refuge is active, the compact
+provisioning record shows Stocked/Low/Empty, days remaining, and current Food/day. State uses text,
+border, and color rather than glow. `NotificationCenter` announces transitions to Low, Empty, or
+Stocked without producing a startup message.
+
+### Safe recipe: modify the economy
+
+1. Change `FOOD_PER_HERO_PER_DAY` in `ResourceEconomySystem`, not in UI text.
+2. Keep stockpile mutations inside `ExpeditionSystem`.
+3. Validate availability before every spend; never partially mutate on rejection.
+4. Update mission reward data and its direct victory regression together.
+5. Keep shortage effects gradual and driven by game minutes.
+6. Do not add Metal until a real Phase 21 construction recipe consumes it.
+7. Test consumption, shortfall, needs effects, notifications, top-bar values, victory, and withdrawal.
+
+Phase 21 placement, construction sites, builders, progress timers, and completed facility models are
+not implemented by this economy layer.
+
+---
+
+## 31. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1527,7 +1595,7 @@ git diff --check
 
 ---
 
-## 31. Safe Git Workflow
+## 32. Safe Git Workflow
 
 Before editing:
 
@@ -1555,7 +1623,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 32. Definition of Done for a Change
+## 33. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1579,7 +1647,7 @@ Use this checklist:
 
 ---
 
-## 33. Final Rule of Thumb
+## 34. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 
