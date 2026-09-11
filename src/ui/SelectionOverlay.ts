@@ -13,6 +13,7 @@ import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import { ACTIVE_SKILL_SLOTS, PASSIVE_SKILL_SLOTS } from "../skills/SkillLoadoutSystem";
 import { getSkillXpToNextLevel } from "../skills/SkillProgressionSystem";
 import { getInjuryDefinition, hasRecoveringInjury } from "../heroes/InjurySystem";
+import type { EquipmentSlot, EquipmentSnapshot } from "../equipment/EquipmentSystem";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
   ["strength", "Strength"],
@@ -67,7 +68,8 @@ export class SelectionOverlay {
   private readonly heroContent: HTMLElement;
   private readonly memorialContent: HTMLElement;
   private selectedHeroId: string | null = null;
-  private selectedTab: "Overview" | "Relations" | "Skills" | "Training" = "Overview";
+  private selectedTab: "Equipment" | "Overview" | "Relations" | "Skills" | "Training" = "Overview";
+  private equipmentRenderSignature: string | null = null;
   private skillForgeRenderSignature: string | null = null;
 
   constructor(
@@ -77,6 +79,11 @@ export class SelectionOverlay {
     private readonly onTreatInjury: (heroId: string, injuryId: string) => void,
     private readonly getMedicine: () => number,
     private readonly onClose: () => void,
+    private readonly equipment?: {
+      equip(heroId: string, itemId: string): void;
+      getSnapshot(): Readonly<EquipmentSnapshot>;
+      unequip(heroId: string, slot: EquipmentSlot): void;
+    },
   ) {
     this.element = document.createElement("aside");
     this.element.className = "system-panel hero-detail-panel selection-overlay";
@@ -92,6 +99,7 @@ export class SelectionOverlay {
         <button type="button" data-hero-tab="Overview" aria-pressed="true">Overview</button>
         <button type="button" data-hero-tab="Skills" aria-pressed="false">Skills</button>
         <button type="button" data-hero-tab="Training" aria-pressed="false">Training</button>
+        <button type="button" data-hero-tab="Equipment" aria-pressed="false">Equipment</button>
         <button type="button" data-hero-tab="Relations" aria-pressed="false">Relations</button>
       </nav>
       <div class="hero-panel" data-selection="hero" hidden>
@@ -118,6 +126,10 @@ export class SelectionOverlay {
           </section>
           <section class="hero-panel__training"><span class="hero-panel__heading">Training queue</span><div data-hero="training-active"></div><div class="hero-panel__training-progress"><i data-hero="training-progress"></i></div><div class="hero-panel__training-queue" data-hero="training-queue"></div><div class="hero-panel__training-actions"><button type="button" data-training-type="Strength Training">Strength</button><button type="button" data-training-type="Weapon Training">Weapon</button><button type="button" data-training-type="Defense Training">Defense</button></div><div class="hero-panel__training-outcome" data-hero="training-outcome"></div></section>
         </div>
+        <div data-hero-view="Equipment" hidden>
+          <section class="hero-equipment"><span class="hero-panel__heading">Equipped</span><div data-hero="equipment-slots"></div></section>
+          <section class="hero-inventory"><span class="hero-panel__heading">Refuge inventory</span><div data-hero="equipment-inventory"></div></section>
+        </div>
         <div data-hero-view="Relations" hidden>
           <section><span class="hero-panel__heading">Relationships</span><div class="hero-panel__relationships" data-hero="relationships"></div></section>
           <section><span class="hero-panel__heading">Memories</span><div class="hero-panel__memories" data-hero="memories"></div></section>
@@ -143,6 +155,7 @@ export class SelectionOverlay {
     const nextHeroId = selection?.category === "hero" ? selection.id : null;
     if (nextHeroId !== this.selectedHeroId) {
       this.skillForgeRenderSignature = null;
+      this.equipmentRenderSignature = null;
     }
     this.selectedHeroId = nextHeroId;
     if (!selection) {
@@ -235,6 +248,7 @@ export class SelectionOverlay {
     this.renderValueGrid(this.requireHeroElement("attributes"), ATTRIBUTE_LABELS, hero.attributes);
     this.renderValueGrid(this.requireHeroElement("skills"), SKILL_LABELS, hero.skills);
     this.renderSkillForge(hero);
+    this.renderEquipment(hero);
   }
 
   private renderTraining(hero: Readonly<Hero>): void {
@@ -284,6 +298,18 @@ export class SelectionOverlay {
       this.onTreatInjury(this.selectedHeroId, treatmentButton.dataset.injuryId);
       return;
     }
+    const equipmentButton = target?.closest<HTMLButtonElement>("[data-equipment-id]");
+    if (equipmentButton && this.selectedHeroId && equipmentButton.dataset.equipmentId && this.equipment) {
+      this.equipment.equip(this.selectedHeroId, equipmentButton.dataset.equipmentId);
+      this.equipmentRenderSignature = null;
+      return;
+    }
+    const unequipButton = target?.closest<HTMLButtonElement>("[data-unequip-slot]");
+    if (unequipButton && this.selectedHeroId && this.isEquipmentSlot(unequipButton.dataset.unequipSlot) && this.equipment) {
+      this.equipment.unequip(this.selectedHeroId, unequipButton.dataset.unequipSlot);
+      this.equipmentRenderSignature = null;
+      return;
+    }
     const button = target?.closest<HTMLButtonElement>("[data-training-type]");
     const type = button?.dataset.trainingType;
     if (button && this.selectedHeroId && this.isTrainingType(type)) {
@@ -301,7 +327,54 @@ export class SelectionOverlay {
   }
 
   private isHeroTab(value: string | undefined): value is typeof this.selectedTab {
-    return value !== undefined && ["Overview", "Skills", "Training", "Relations"].includes(value);
+    return value !== undefined && ["Overview", "Skills", "Training", "Equipment", "Relations"].includes(value);
+  }
+
+  private isEquipmentSlot(value: string | undefined): value is EquipmentSlot {
+    return value === "mainHand" || value === "offHand";
+  }
+
+  private renderEquipment(hero: Readonly<Hero>): void {
+    const slots = this.requireHeroElement("equipment-slots");
+    const inventory = this.requireHeroElement("equipment-inventory");
+    const snapshot = this.equipment?.getSnapshot();
+    if (!snapshot) {
+      slots.textContent = "Equipment unavailable.";
+      inventory.replaceChildren();
+      return;
+    }
+    const loadout = snapshot.loadouts.find((entry) => entry.heroId === hero.id);
+    const signature = JSON.stringify({ heroId: hero.id, revision: snapshot.revision });
+    if (signature === this.equipmentRenderSignature) return;
+    this.equipmentRenderSignature = signature;
+    const equippedByItem = new Map<string, string>();
+    snapshot.loadouts.forEach((entry) => {
+      [entry.mainHand, entry.offHand].forEach((itemId) => {
+        if (itemId) equippedByItem.set(itemId, entry.heroId);
+      });
+    });
+    slots.replaceChildren(...(["mainHand", "offHand"] as const).map((slot) => {
+      const itemId = loadout?.[slot] ?? null;
+      const item = snapshot.items.find((entry) => entry.id === itemId);
+      const row = document.createElement("article");
+      row.className = "hero-equipment__slot";
+      row.innerHTML = `<span>${slot === "mainHand" ? "MAIN HAND" : "OFF HAND"}</span><strong>${this.escape(item?.name ?? "Empty")}</strong>${item ? `<small>${this.formatEquipmentStats(item.stats)} · ${item.durability}% condition</small><button type="button" data-unequip-slot="${slot}">Unequip</button>` : ""}`;
+      return row;
+    }));
+    inventory.replaceChildren(...snapshot.items.map((item) => {
+      const ownerId = equippedByItem.get(item.id);
+      const owner = ownerId ? (ownerId === hero.id ? "Equipped" : `With ${this.escape("another hero")}`) : "Available";
+      const card = document.createElement("article");
+      card.className = "hero-inventory__item";
+      card.dataset.rarity = item.rarity;
+      card.innerHTML = `<div><span>${item.type} · ${item.rarity}</span><strong>${this.escape(item.name)}</strong><small>${this.escape(item.description)}</small></div><div><b>${this.formatEquipmentStats(item.stats)}</b><small>${item.durability}% condition · ${owner}</small><button type="button" data-equipment-id="${item.id}" ${ownerId === hero.id ? "disabled" : ""}>${ownerId ? "Transfer" : "Equip"}</button></div>`;
+      return card;
+    }));
+  }
+
+  private formatEquipmentStats(stats: Readonly<{ damage: number; defense: number; range: number }>): string {
+    return [stats.damage ? `Damage +${stats.damage}` : "", stats.defense ? `Defense +${stats.defense}` : "", stats.range ? `Range +${stats.range.toFixed(1)}` : ""]
+      .filter(Boolean).join(" · ");
   }
 
   private renderSkillForge(hero: Readonly<Hero>): void {

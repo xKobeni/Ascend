@@ -20,6 +20,7 @@ import type { SkillUsageEvent } from "../skills/Skill";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import { getInjuryModifiers } from "../heroes/InjurySystem";
 import type { CombatMemoryEvent } from "../memories/HeroMemory";
+import type { EquipmentModifiers } from "../equipment/EquipmentSystem";
 
 interface Combatant extends CombatantSnapshot {
   attackCooldown: number;
@@ -66,6 +67,9 @@ export class CombatSimulation {
   constructor(
     private readonly onSkillUsage: (event: Readonly<SkillUsageEvent>) => void = () => undefined,
     private readonly onMemoryEvent: (event: Readonly<CombatMemoryEvent>) => void = () => undefined,
+    private readonly getEquipmentModifiers: (heroId: string) => Readonly<EquipmentModifiers> = () => ({
+      damage: 0, defense: 0, mainHandType: null, offHandType: null, range: 0,
+    }),
   ) {}
 
   start(
@@ -146,9 +150,11 @@ export class CombatSimulation {
         tacticalRole,
         team: "Hero",
         traits: entry.hero.traits,
-        weaponSkillId: entry.hero.skills.spear >= entry.hero.skills.sword
-          ? "spear_mastery"
-          : "sword_mastery",
+        weaponSkillId: this.getEquipmentModifiers(entry.hero.id).mainHandType === "Bow"
+          ? null
+          : this.getEquipmentModifiers(entry.hero.id).mainHandType === "Spear"
+            ? "spear_mastery"
+            : "sword_mastery",
       });
     });
 
@@ -1117,16 +1123,17 @@ export class CombatSimulation {
 
   private getHeroStats(hero: Readonly<Hero>, role: string): CombatStats {
     const injury = getInjuryModifiers(hero);
+    const equipment = this.getEquipmentModifiers(hero.id);
     const weaponSkill = Math.max(hero.skills.sword, hero.skills.spear);
     const roleHp = role === "Vanguard" ? 16 : 0;
     const roleAttack = role === "Damage" ? 4 : 0;
     const roleDefense = role === "Vanguard" ? 3 : 0;
     const roleRange = role === "Support" ? 2.2 : 1.8;
     return {
-      attack: (10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack) * injury.attack,
-      defense: (4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense) * injury.defense,
+      attack: (10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack + equipment.damage) * injury.attack,
+      defense: (4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense + equipment.defense) * injury.defense,
       maxHp: 58 + hero.attributes.endurance * 7 + hero.level * 5 + roleHp,
-      range: roleRange,
+      range: roleRange + equipment.range,
       speed: 1.45 + hero.attributes.agility * 0.08,
     };
   }

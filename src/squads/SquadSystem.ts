@@ -7,6 +7,7 @@ import type {
   SquadRole,
 } from "./Squad";
 import { getInjuryModifiers, hasRecoveringInjury } from "../heroes/InjurySystem";
+import type { EquipmentModifiers } from "../equipment/EquipmentSystem";
 
 export const SQUAD_SIZE = 3;
 
@@ -107,7 +108,12 @@ export class SquadSystem {
     return true;
   }
 
-  evaluate(heroes: readonly Readonly<Hero>[]): SquadEvaluation {
+  evaluate(
+    heroes: readonly Readonly<Hero>[],
+    getEquipment: (heroId: string) => Readonly<EquipmentModifiers> = () => ({
+      damage: 0, defense: 0, mainHandType: null, offHandType: null, range: 0,
+    }),
+  ): SquadEvaluation {
     const members = this.squad.members
       .map(({ heroId }) => heroes.find((hero) => hero.id === heroId))
       .filter((hero): hero is Readonly<Hero> => hero !== undefined);
@@ -129,14 +135,15 @@ export class SquadSystem {
     const totals = members.reduce(
       (result, hero) => {
         const injury = getInjuryModifiers(hero);
+        const equipment = getEquipment(hero.id);
         result.level += hero.level;
         result.combatPower += (
           hero.attributes.strength * 4 +
           hero.attributes.agility * 2 +
           Math.max(hero.skills.sword, hero.skills.spear) * 5 +
-          hero.level * 10) * injury.attack;
+          hero.level * 10 + equipment.damage * 8 + equipment.range * 3) * injury.attack;
         result.healing += hero.skills.medicine * 10 + hero.attributes.intelligence * 2;
-        result.defense += (hero.skills.defense * 8 + hero.attributes.endurance * 3) * injury.defense;
+        result.defense += (hero.skills.defense * 8 + hero.attributes.endurance * 3 + equipment.defense * 8) * injury.defense;
         result.recoveringMembers += Number(hasRecoveringInjury(hero));
         return result;
       },

@@ -28,7 +28,7 @@ import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
 
 type GameEvents = RendererEvents;
-type HeroDetailTab = "Overview" | "Relations" | "Skills" | "Training";
+type HeroDetailTab = "Equipment" | "Overview" | "Relations" | "Skills" | "Training";
 
 interface RefugeBuildDraft {
   facilityId: RefugeStructureId;
@@ -83,6 +83,7 @@ export class Game {
     const heroes = this.simulation.getHeroes();
     this.renderer = new Renderer(
       container, this.events, heroes, this.simulation.getRefugeLayout(), this.simulation.getConstructionSnapshot(),
+      this.simulation.getEquipmentSnapshot(),
     );
     this.cameraControlScheme = loadCameraControlScheme();
     this.renderer.setCameraControlScheme(this.cameraControlScheme);
@@ -98,6 +99,11 @@ export class Game {
       (heroId, injuryId) => this.simulation.treatHeroInjury(heroId, injuryId),
       () => this.simulation.getExpeditionSnapshot().resources.medicine,
       () => this.closeHeroDetail(),
+      {
+        equip: (heroId, itemId) => { this.simulation.equipItem(heroId, itemId); },
+        getSnapshot: () => this.simulation.getEquipmentSnapshot(),
+        unequip: (heroId, slot) => { this.simulation.unequipItem(heroId, slot); },
+      },
     );
     this.recruitmentOverlay = new RecruitmentOverlay(
       container,
@@ -317,6 +323,7 @@ export class Game {
       fallenHeroes,
       this.simulation.getRefugeLayout(),
       this.simulation.getConstructionSnapshot(),
+      this.simulation.getEquipmentSnapshot(),
     );
     const simulationSnapshot = this.simulation.getSnapshot();
     this.hudShell.update(

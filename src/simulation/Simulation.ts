@@ -21,6 +21,7 @@ import {
   type RefugeLayoutSnapshot,
   type RefugeStructureId,
 } from "../refuge/RefugeLayoutSystem";
+import { EquipmentSystem, type EquipmentSlot } from "../equipment/EquipmentSystem";
 
 export interface RecruitmentResult extends RecruitmentRoll {
   cost: number;
@@ -41,19 +42,21 @@ export interface SimulationSnapshot {
 
 export class Simulation {
   private readonly heroManager = new HeroManager();
+  private readonly equipmentSystem = new EquipmentSystem();
   private readonly combatSimulation = new CombatSimulation((event) => {
     this.heroManager.recordSkillUsage(event);
   }, (event) => {
     this.heroManager.recordCombatMemory(event, this.state.day, this.state.minuteOfDay);
-  });
+  }, (heroId) => this.equipmentSystem.getModifiers(heroId));
   private readonly expeditionSystem = new ExpeditionSystem(
     this.combatSimulation,
-    (squad, combat, outcome) => this.heroManager.applyExpeditionConsequences(
-      squad,
-      combat,
-      outcome,
-      this.state.day,
-    ),
+    (squad, combat, outcome) => {
+      const consequences = this.heroManager.applyExpeditionConsequences(
+        squad, combat, outcome, this.state.day,
+      );
+      this.equipmentSystem.applyExpeditionWear(squad.members.map((member) => member.heroId), outcome);
+      return consequences;
+    },
     (squad, successful) => this.heroManager.recordExpeditionExperience(squad, successful),
   );
   private readonly squadSystem = new SquadSystem();
@@ -164,7 +167,17 @@ export class Simulation {
   }
 
   getSquadEvaluation() {
-    return this.squadSystem.evaluate(this.getHeroes());
+    return this.squadSystem.evaluate(this.getHeroes(), (heroId) => this.equipmentSystem.getModifiers(heroId));
+  }
+
+  getEquipmentSnapshot() { return this.equipmentSystem.getSnapshot(); }
+
+  equipItem(heroId: string, itemId: string): boolean {
+    return this.canManageEquipment() && this.equipmentSystem.equip(heroId, itemId, this.getHeroes());
+  }
+
+  unequipItem(heroId: string, slot: EquipmentSlot): boolean {
+    return this.canManageEquipment() && this.equipmentSystem.unequip(heroId, slot);
   }
 
   renameSquad(name: string): void {
@@ -369,6 +382,10 @@ export class Simulation {
     return this.getExpeditionSnapshot().phase === "Briefing" && this.getCombatSnapshot().result === "Idle";
   }
 
+  private canManageEquipment(): boolean {
+    return this.getExpeditionSnapshot().phase === "Briefing" && this.getCombatSnapshot().result === "Idle";
+  }
+
   private getConstructionFootprints() {
     return this.getConstructionSnapshot().sites.map((site) => ({
       footprintRadius: this.constructionSystem.getRecipe(site.recipeId).footprintRadius,
@@ -385,6 +402,7 @@ export class Simulation {
   private syncActiveRoster(): void {
     const heroes = this.getHeroes();
     this.squadSystem.removeMissingHeroes(heroes);
+    this.equipmentSystem.removeMissingHeroes(heroes);
     this.state.heroCount = heroes.length;
   }
 }

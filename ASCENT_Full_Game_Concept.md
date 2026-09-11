@@ -114,7 +114,7 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–22 and the first persistent
+The implemented build currently covers Phases 0–23 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
@@ -122,8 +122,9 @@ decisions, earned traits, bounded personality drift, Rift-funded procedural recr
 capacity, dormitory upgrades, comfort-driven rest recovery, daily Food demand, provision shortages,
 Medicine replenishment, the expedition-funded resource loop, movable Refuge facilities, editable
 trails, placement validation, deterministic placeholder trees, Scrap-funded construction sites,
-builder assignments, build timers, and completed facility services are active. Equipment, classes,
-crafting, and campaign depth in this document describe future phases; they must remain
+builder assignments, build timers, completed facility services, shared equipment inventory,
+hero loadouts, condition wear, combat modifiers, and visible weapon attachments are active. Classes,
+crafting, repair, and campaign depth in this document describe future phases; they must remain
 absent from the playable interface until their authoritative systems are implemented.
 
 The standalone character-generator prototype now supplies the bounded human-generation core of the
@@ -590,8 +591,8 @@ history.
 prototype's persistent editor, unrestricted sliders, and localStorage presets were not imported.
 
 Prototype concepts activate only when the game supports them. Human appearance generation now joins
-recruitment; visual weapons and armor join equipment later; class-linked silhouettes join the
-class system later. Additional fantasy races, magical glow treatments, and enemy tiers remain
+recruitment; Phase 23 adds bounded visual weapons and shields, while armor remains later work;
+class-linked silhouettes join the class system later. Additional fantasy races, magical glow treatments, and enemy tiers remain
 future proposals rather than current canon.
 
 ---
@@ -2137,8 +2138,9 @@ The four destinations grow with the game instead of multiplying into a dashboard
 | Recruitment and capacity | Recruit Gate and Dormitory record inside Heroes/Refuge | Implemented |
 | Current resource economy | Persistent HUD plus compact Refuge provisioning record | Implemented |
 | Facility construction | Refuge Build Mode and contextual world locations | Implemented |
-| Equipment and crafting | Hero details and contextual Smithy work panels | Future |
-| Equipment and classes | Hero details; Party shows only resulting squad impact | Future |
+| Equipment | Hero details; Party shows resulting squad impact | Implemented |
+| Crafting and repair | Contextual Smithy work panels | Future |
+| Classes | Hero details and Party composition | Future |
 | Expedition variety and Rift depth | Rift mission selection and regional progression | Future |
 | Doctrine and advanced relationships | Party planning and hero Relations details | Future |
 | Chronicle-scale history | Refuge context when event volume warrants it | Future |
@@ -2177,12 +2179,12 @@ The hero panel is one shared surface opened from a roster card or the hero's 3D 
 with only currently implemented sections:
 
 ```text
-Overview | Skills | Training | Relations
+Overview | Skills | Training | Equipment | Relations
 ```
 
 Future phases extend these sections or add a section only when the underlying state exists. Injury
-belongs in Overview and recovery context; equipment and class development belong in Skills or a
-later implemented progression section; memories and history remain hidden until their phases.
+belongs in Overview and recovery context; equipment now has an implemented section, while class
+development remains later work; memories and history remain contextual to Relations.
 
 Mature-game example:
 

@@ -4,6 +4,7 @@ import type { Hero } from "../../heroes/Hero";
 import { markSelectable } from "../SelectionRaycaster";
 import { HeroMeshGenerator, type HeroRig } from "./HeroMeshGenerator";
 import { placeObjectOnRefugeGround } from "../RefugeGround";
+import { getEquippedItems, type EquipmentSnapshot } from "../../equipment/EquipmentSystem";
 
 interface AnimationState {
   breathingPhase: number;
@@ -23,6 +24,9 @@ interface RenderedHero {
 }
 
 const TRANSITION_SPEED = 4;
+const EMPTY_EQUIPMENT: Readonly<EquipmentSnapshot> = Object.freeze({
+  items: Object.freeze([]), loadouts: Object.freeze([]), revision: 0,
+});
 
 function lerpAngle(current: number, target: number, t: number): number {
   const diff = target - current;
@@ -30,6 +34,7 @@ function lerpAngle(current: number, target: number, t: number): number {
 }
 
 export class HeroRenderer {
+  private equipmentRevision = -1;
   private readonly meshGenerator = new HeroMeshGenerator();
   private readonly renderedHeroes = new Map<string, RenderedHero>();
   private readonly root = new THREE.Group();
@@ -38,13 +43,28 @@ export class HeroRenderer {
     scene: THREE.Scene,
     heroes: readonly Readonly<Hero>[],
     private readonly selectableRoots: THREE.Object3D[],
+    equipment: Readonly<EquipmentSnapshot> = EMPTY_EQUIPMENT,
   ) {
     this.root.name = "Heroes";
-    heroes.forEach((hero, index) => this.addHero(hero, index));
+    heroes.forEach((hero, index) => this.addHero(hero, index, equipment));
+    this.equipmentRevision = equipment.revision;
     scene.add(this.root);
   }
 
-  update(heroes: readonly Readonly<Hero>[], timestampSeconds: number, deltaSeconds: number): void {
+  update(
+    heroes: readonly Readonly<Hero>[],
+    timestampSeconds: number,
+    deltaSeconds: number,
+    equipment: Readonly<EquipmentSnapshot> = EMPTY_EQUIPMENT,
+  ): void {
+    if (equipment.revision !== this.equipmentRevision) {
+      this.renderedHeroes.forEach((rendered) => {
+        this.removeSelectableRoot(rendered.rig.root);
+        this.disposeRig(rendered.rig.root);
+      });
+      this.renderedHeroes.clear();
+      this.equipmentRevision = equipment.revision;
+    }
     const activeIds = new Set(heroes.map((hero) => hero.id));
     this.renderedHeroes.forEach((rendered, heroId) => {
       if (activeIds.has(heroId)) {
@@ -56,7 +76,7 @@ export class HeroRenderer {
     });
     heroes.forEach((hero, index) => {
       if (!this.renderedHeroes.has(hero.id)) {
-        this.addHero(hero, index);
+        this.addHero(hero, index, equipment);
       }
     });
     const positionBlend = 1 - Math.exp(-12 * deltaSeconds);
@@ -86,8 +106,8 @@ export class HeroRenderer {
     this.root.removeFromParent();
   }
 
-  private addHero(hero: Readonly<Hero>, index: number): void {
-    const rig = this.meshGenerator.create(hero);
+  private addHero(hero: Readonly<Hero>, index: number, equipment: Readonly<EquipmentSnapshot>): void {
+    const rig = this.meshGenerator.create(hero, getEquippedItems(equipment, hero.id));
     rig.root.position.set(hero.movement.position.x, 0, hero.movement.position.z);
     const groundY = placeObjectOnRefugeGround(rig.root);
     rig.root.rotation.y = hero.movement.facingRadians;

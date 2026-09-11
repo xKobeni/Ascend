@@ -26,15 +26,15 @@ export function applyFormationStats(
   tacticalRole: TacticalRole,
 ): CombatStats {
   if (tacticalRole === "Ranged") {
-    return { ...stats, attack: stats.attack - 1, range: 5.8 };
+    return { ...stats, attack: stats.attack - 1, range: Math.max(5.8, stats.range) };
   }
   if (tacticalRole === "Medic") {
-    return { ...stats, range: 4.4, speed: stats.speed + 0.08 };
+    return { ...stats, range: Math.max(4.4, stats.range), speed: stats.speed + 0.08 };
   }
   if (tacticalRole === "Defender") {
-    return { ...stats, defense: stats.defense + 2, range: 2 };
+    return { ...stats, defense: stats.defense + 2, range: Math.max(2, stats.range) };
   }
-  return { ...stats, attack: stats.attack + 2, range: 1.8 };
+  return { ...stats, attack: stats.attack + 2, range: Math.max(1.8, stats.range) };
 }
 
 export function getPreferredRange(tacticalRole: TacticalRole): number {

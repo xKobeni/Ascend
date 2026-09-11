@@ -447,7 +447,7 @@ canvas {
 .memorial-record dd { margin: 0; color: var(--ink); font: 9px/1.2 var(--numbers); }
 .memorial-record section { margin-top: 20px; padding: 13px; border-left: 2px solid var(--burgundy); background: rgb(122 69 69 / 7%); }
 .memorial-record section strong { color: #c58a8a; font: 500 14px/1.3 var(--display); }
-.hero-detail-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 12px 20px 0; border-bottom: 1px solid var(--line); }
+.hero-detail-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 20px 0; border-bottom: 1px solid var(--line); }
 .hero-panel { position: relative; z-index: 1; padding: 16px 20px 22px; }
 .hero-panel section { margin-top: 19px; }
 .hero-panel__identity { color: var(--ink); font: 15px/1.3 var(--display); }
@@ -520,6 +520,21 @@ canvas {
 .hero-injury button:disabled,
 .hero-panel__training-actions button:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
 .hero-panel__recovery-outcome { margin-top: 9px; }
+.hero-equipment > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hero-equipment__slot { position: relative; min-height: 82px; padding: 11px; border: 1px solid var(--line); background: rgb(231 225 212 / 2%); }
+.hero-equipment__slot span,
+.hero-inventory__item span { color: var(--bronze); font: 7px/1.2 var(--numbers); letter-spacing: .1em; }
+.hero-equipment__slot strong,
+.hero-inventory__item strong { display: block; margin-top: 5px; font: 500 12px/1.2 var(--display); }
+.hero-equipment__slot small,
+.hero-inventory__item small { display: block; margin-top: 4px; color: var(--faint); font-size: 8px; line-height: 1.35; }
+.hero-equipment__slot button,
+.hero-inventory__item button { margin-top: 8px; padding: 4px 0; border: 0; border-bottom: 1px solid var(--bronze); background: transparent; color: var(--ink); cursor: pointer; font-size: 8px; }
+.hero-inventory > div { display: grid; gap: 0; }
+.hero-inventory__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.hero-inventory__item > div:last-child { min-width: 128px; text-align: right; }
+.hero-inventory__item[data-rarity="Uncommon"] { border-left: 2px solid var(--olive); padding-left: 10px; }
+.hero-inventory__item button:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
 .hero-panel__relationships { display: grid; gap: 0; }
 .hero-panel__relationships > div { display: flex; justify-content: space-between; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .hero-panel__relationships strong { display: block; color: var(--ink); font: 500 14px/1.2 var(--display); text-align: right; }
@@ -783,6 +798,12 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .memorial-ledger { margin: 0 14px 18px; }
   .memorial-ledger__list { grid-template-columns: 1fr; }
   .hero-detail-tabs { gap: 7px; margin: 10px 14px 0; }
+  .hero-detail-tabs button { min-height: 44px; font-size: 7px; }
+  .hero-equipment > div { grid-template-columns: 1fr; }
+  .hero-inventory__item { grid-template-columns: 1fr; }
+  .hero-inventory__item > div:last-child { text-align: left; }
+  .hero-equipment__slot button,
+  .hero-inventory__item button { min-height: 44px; }
   .hero-panel { padding: 13px 14px 18px; }
   .hero-panel__grid { grid-template-columns: 1fr 1fr; }
   .hero-panel__meters { grid-template-columns: 1fr; }

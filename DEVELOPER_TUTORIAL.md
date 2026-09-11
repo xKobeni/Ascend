@@ -5,10 +5,10 @@
 Current implementation boundary (verified September 11, 2026):
 
 ```text
-Gameplay phases implemented: 0–22
+Gameplay phases implemented: 0–23
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 23 — Equipment
+Next gameplay phase: Phase 24 — Smithy and Crafting
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -60,6 +60,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 12. Active residents consume Food and shortages weaken meal recovery and morale
 13. Refuge Build Mode can reorganize all starting structures, store ordinary facilities, edit smooth trails, and move or remove seeded trees and rocks
 14. Victory Scrap can fund new facilities; assigned builders deliver materials and complete them over game time
+15. Heroes can equip shared Refuge weapons and shields that change real squad/combat stats and live models
 
 Before and after a meaningful change, run:
 
@@ -95,9 +96,10 @@ and the Refuge layout editor. A successful static build alone does not prove tho
 | 20 | Daily Food demand, provision shortages and balanced mission resources | `economy/ResourceEconomySystem` |
 | 21 | Broad editable Refuge plane, Build Mode, movable structures, trails, routing, trees and rocks | `refuge/RefugeLayoutSystem`, `RefugeBuildOverlay` |
 | 22 | Scrap recipes, construction sites, builder assignment, timed completion, and operational facility effects | `refuge/ConstructionSystem`, `RefugeBuildOverlay`, `ProceduralBaseScene` |
+| 23 | Shared inventory, reversible equipment loadouts, condition wear, derived combat stats, and visible attachments | `equipment/EquipmentSystem`, `SelectionOverlay`, `HeroMeshGenerator` |
 
 Phase 22 is the next boundary. Construction sites, builders, progress timers, build recipes, new
-Metal, equipment, inventory, and crafting outputs are not implemented by the Phase 22 construction system.
+Metal, crafting outputs, item repair, armor, accessories, and classes remain outside Phase 23.
 
 ---
 
@@ -986,7 +988,7 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 | Panel | File | Purpose |
 |-------|------|---------|
 | HudShell | `HudShell.ts` | Top bar + bottom nav |
-| SelectionOverlay | `SelectionOverlay.ts` | Hero detail (4 tabs) |
+| SelectionOverlay | `SelectionOverlay.ts` | Hero detail (5 tabs) |
 | HeroRosterOverlay | `HeroRosterOverlay.ts` | Hero card grid |
 | SquadOverlay | `SquadOverlay.ts` | Formation editor |
 | ExpeditionOverlay | `ExpeditionOverlay.ts` | Mission briefing/combat/debrief |
@@ -1002,10 +1004,11 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 
 ### 9.4 SelectionOverlay (Hero Detail)
 
-The most complex panel. 4 tabs:
+The most complex panel. 5 tabs:
 - **Overview:** Identity, status, needs meters, starting/earned trait provenance, attributes, personality
 - **Skills:** Skill forge list with loadout toggles
 - **Training:** Injury cards with treat buttons, training queue
+- **Equipment:** Main Hand, Off Hand, shared Refuge inventory, stats, rarity, and condition
 - **Relations:** All relationships sorted by affinity plus typed general memories
 
 Also shows memorial records for fallen heroes.
@@ -1432,12 +1435,49 @@ Completed services are derived in `Simulation`:
 - Smithy: 10% lower later facility Scrap costs, rounded up.
 
 When adding another service, pass a temporary modifier into the owning system. Do not permanently
-rewrite hero attributes, resource totals, or recipe definitions. Keep Smithy equipment and crafting
-out until Phases 23–24, and keep Metal absent until its acquisition loop exists.
+rewrite hero attributes, resource totals, or recipe definitions. Phase 23 equipment is independent
+from Smithy crafting; keep recipes, repair actions, and Metal absent until Phase 24.
 
 Test every construction change for unaffordable no-spend behavior, invalid placement, overlap with
 existing sites, builder eligibility, delivery transition, completion, service activation, mobile
 touch targets, and renderer teardown. Construction remains session-only until Phase 38 save/load.
+
+### 10.16 Modify Equipment Safely
+
+`src/equipment/EquipmentSystem.ts` owns the shared Refuge inventory and hero loadouts. Every item is a
+unique plain-data instance with a slot, weapon type, rarity, condition, and Damage/Defense/Range
+modifiers. Add or rebalance the starting cache in `STARTING_ITEMS`; never place authoritative item
+state in `HeroMeshGenerator`, the Equipment tab, or a Three.js object.
+
+Equipment uses two current slots:
+
+```text
+Main Hand → Sword, Spear, or Bow
+Off Hand  → Shield
+```
+
+`EquipmentSystem.equip()` validates the hero and item, removes the unique item from any previous
+owner, then commits the new slot assignment once. `unequip()` returns the item to the shared pool by
+clearing the slot. Broken items cannot be newly equipped and contribute no modifiers.
+
+Stats are derived, not stored:
+
+- `CombatSimulation.getHeroStats()` adds equipment before applying injury multipliers.
+- `SquadSystem.evaluate()` includes equipment in the displayed power and defense totals.
+- `Simulation` supplies the same `getModifiers(heroId)` callback to both consumers.
+
+This is important: equipping a sword must not increment `hero.attributes.strength` or
+`hero.skills.sword`. If you mutate a base value, repeatedly equipping and unequipping will corrupt the
+hero. Always change the item modifier and let consumers recompute.
+
+`HeroMeshGenerator.create(hero, equipment)` attaches primitive meshes to the correct hands.
+`HeroRenderer` watches the equipment revision, disposes old rigs, and recreates their visual form.
+The equipment snapshot remains the truth; mesh presence is only a rendered consequence.
+
+Expedition completion applies condition wear through `EquipmentSystem.applyExpeditionWear()`:
+2 points for victory, 3 for withdrawal, and 5 for defeat. Repair is deliberately unavailable until
+Phase 24. Test item uniqueness, atomic transfer, equip/unequip reversibility, derived Party and combat
+stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and the four weapon shapes.
 
 ---
 
@@ -1459,6 +1499,9 @@ touch targets, and renderer teardown. Construction remains session-only until Ph
 | Construction builders | 2 per site | `src/refuge/ConstructionSystem.ts` |
 | Material delivery | 45 builder-minutes | `src/refuge/ConstructionSystem.ts` |
 | Facility recipes | 10–16 Scrap, 300–480 game minutes | `src/refuge/ConstructionSystem.ts` |
+| Starting equipment cache | 6 unique items across 4 weapon types | `src/equipment/EquipmentSystem.ts` |
+| Equipment slots | Main Hand and Off Hand | `src/equipment/EquipmentSystem.ts` |
+| Expedition equipment wear | 2 victory / 3 withdrawal / 5 defeat | `src/equipment/EquipmentSystem.ts` |
 | Starting Food | 12 | `src/expeditions/ExpeditionSystem.ts` |
 | Food consumption | 1 per active hero per game day | `src/economy/ResourceEconomySystem.ts` |
 | First mission reward | 8 Food, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
@@ -1513,6 +1556,7 @@ touch targets, and renderer teardown. Construction remains session-only until Ph
 |------|---------|
 | `src/simulation/Simulation.ts` | Top-level simulation coordinator. Time system. |
 | `src/refuge/ConstructionSystem.ts` | Facility catalog, site state, builders, progress, and completed services. |
+| `src/equipment/EquipmentSystem.ts` | Shared item inventory, hero loadouts, modifiers, transfer, and condition wear. |
 
 ### Heroes
 | File | Purpose |
@@ -1608,7 +1652,7 @@ touch targets, and renderer teardown. Construction remains session-only until Ph
 |------|---------|
 | `src/ui/HudShell.ts` | Top status bar, Refuge provisioning record, and bottom navigation. |
 | `src/ui/RefugeBuildOverlay.ts` | Contextual layout tools, construction catalog, projects, and builder controls. |
-| `src/ui/SelectionOverlay.ts` | Hero detail panel (4 tabs). |
+| `src/ui/SelectionOverlay.ts` | Hero detail panel (5 tabs, including Equipment). |
 | `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |
 | `src/ui/ExpeditionOverlay.ts` | Mission briefing/combat/debrief. |

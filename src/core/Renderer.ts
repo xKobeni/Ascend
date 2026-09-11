@@ -15,6 +15,7 @@ import { RefugeBuildInput, type RefugeGroundPoint } from "../rendering/RefugeBui
 import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
 import type { RefugeBuildPreview } from "../rendering/ProceduralBaseScene";
 import type { ConstructionSnapshot } from "../refuge/ConstructionSystem";
+import type { EquipmentSnapshot } from "../equipment/EquipmentSystem";
 
 export interface RendererEvents {
   buildGroundActivated: RefugeGroundPoint;
@@ -51,6 +52,7 @@ export class Renderer {
     heroes: readonly Readonly<Hero>[],
     layout: Readonly<RefugeLayoutSnapshot>,
     construction: Readonly<ConstructionSnapshot>,
+    equipment: Readonly<EquipmentSnapshot>,
   ) {
     this.scene = new THREE.Scene();
     this.combatScene = new THREE.Scene();
@@ -69,7 +71,7 @@ export class Renderer {
     this.baseScene = new ProceduralBaseScene(this.scene, this.selectableRoots, layout);
     this.baseScene.syncConstructions(construction);
     this.combatArena = new CombatArenaScene(this.combatScene);
-    this.heroRenderer = new HeroRenderer(this.scene, heroes, this.selectableRoots);
+    this.heroRenderer = new HeroRenderer(this.scene, heroes, this.selectableRoots, equipment);
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
     this.selectionRaycaster = new SelectionRaycaster(
       this.camera,
@@ -106,6 +108,7 @@ export class Renderer {
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
     layout: Readonly<RefugeLayoutSnapshot>,
     construction: Readonly<ConstructionSnapshot>,
+    equipment: Readonly<EquipmentSnapshot>,
   ): void {
     this.cameraController.update(deltaSeconds);
     const combatMode = combatSnapshot.result !== "Idle";
@@ -128,7 +131,7 @@ export class Renderer {
     this.baseScene.syncLayout(layout);
     this.baseScene.syncConstructions(construction);
     this.baseScene.update(timestampSeconds);
-    this.heroRenderer.update(heroes, timestampSeconds, deltaSeconds);
+    this.heroRenderer.update(heroes, timestampSeconds, deltaSeconds, equipment);
     this.selectionRaycaster.update();
     this.renderer.render(this.scene, this.camera);
   }

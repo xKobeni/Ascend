@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 11, 2026
 
 ```text
-Gameplay phases implemented: 0–22
-Current playable milestone: Resource-funded facility construction with assigned builders
+Gameplay phases implemented: 0–23
+Current playable milestone: Reversible hero equipment affecting combat and appearance
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 23 — Equipment
+Next gameplay phase: Phase 24 — Smithy and Crafting
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,13 +47,15 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 22 is complete. Phase 23 and later remain design context and require a new implementation
-approval boundary. Equipment, inventory, crafting outputs, and Metal are not part of the current build.
+Phase 23 is complete. Phase 24 and later remain design context and require a new implementation
+approval boundary. Crafting outputs, item repair, equipment recipes, and Metal are not part of the
+current build.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
 adapted into ASCENT as the **Procedural Character Forge**. Its human hero-generation core is now
-active through Phase 18 recruitment inside Heroes. It does not add a fifth destination or expose
-prototype races, classes, equipment, enemies, sliders, or localStorage authoring controls.
+active through Phase 18 recruitment inside Heroes, while Phase 23 reuses bounded primitive weapon
+attachments. It does not add a fifth destination or expose prototype races, classes, enemies,
+unrestricted equipment authoring, sliders, or localStorage authoring controls.
 
 ---
 
@@ -328,7 +330,7 @@ The integration must preserve these boundaries:
 - The project uses its installed Three.js package and local typography; the prototype's CDN script,
   external fonts, editor shell, and glow-heavy presentation are not carried into the game client.
 
-Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 23 may activate
+Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 23 activates
 visual equipment modules, and Phase 25 may activate class-linked presentation. Additional fantasy
 races, magical effects, and enemy tiers remain unapproved future content until their own gameplay
 and lore phases define them.
@@ -1889,7 +1891,7 @@ session-only until the save-system phase.
 
 ---
 
-# Phase 23 — Equipment
+# Phase 23 — Equipment — Implemented
 
 ## Goal
 
@@ -1897,7 +1899,7 @@ Add another meaningful hero-progression layer.
 
 ## Tasks
 
-### 23.1 Weapon Types
+### 23.1 Weapon Types — Implemented
 
 Start with:
 
@@ -1908,7 +1910,10 @@ Bow
 Shield
 ```
 
-### 23.2 Equipment Stats
+The Refuge begins with a limited six-item equipment cache: two swords, one spear, one bow, and two
+shields. These are starting inventory, not Smithy crafting results or expedition loot.
+
+### 23.2 Equipment Stats — Implemented
 
 Add:
 
@@ -1916,24 +1921,43 @@ Add:
 - Defense
 - Range
 
-### 23.3 Inventory
+Equipment applies a reversible modifier layer. It never rewrites hero attributes or skills. Combat
+and Party evaluation derive Damage, Defense, and Range from the current loadout. Victory, withdrawal,
+and defeat apply small condition loss; broken items stop granting modifiers.
+
+### 23.3 Inventory — Implemented
 
 Base inventory.
 
-### 23.4 Hero Equipment
+`EquipmentSystem` owns unique item instances, rarity, condition, assignment, and the shared Refuge
+inventory snapshot. Main-hand and off-hand assignments transfer atomically between heroes.
+
+### 23.4 Hero Equipment — Implemented
 
 Equip items through hero panel.
 
-### 23.5 Visual Equipment
+The shared hero detail panel now includes Equipment without adding another HUD destination. It shows
+Main Hand, Off Hand, the shared inventory, concise modifiers, rarity, condition, equip/transfer, and
+unequip actions. Equipment changes are blocked during expeditions and combat.
+
+### 23.5 Visual Equipment — Implemented
 
 Attach primitive weapon meshes to heroes.
 
 Reuse validated weapon, shield, armor, and attachment techniques from the Procedural Character
 Forge prototype. Equipment data remains authoritative; the Forge only renders the equipped state.
 
+`HeroMeshGenerator` derives small sword, spear, bow, and shield attachments from equipped item data.
+`HeroRenderer` rebuilds visual rigs when the equipment revision changes and disposes the old geometry
+and materials. Equipment state remains authoritative outside Three.js.
+
 ## Exit Criteria
 
 Equipment changes both stats and appearance.
+
+**Met.** Automated coverage verifies the four weapon types, limited inventory, reversible Party stat
+changes, atomic transfers, expedition condition wear, unequip behavior, primitive mesh differences,
+and the real Equipment-tab interaction. Repair and crafting remain Phase 24.
 
 ---
 

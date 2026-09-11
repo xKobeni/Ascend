@@ -226,6 +226,67 @@ try {
       constructionValidation.materialsDelivered && constructionValidation.overlapRejected && constructionValidation.smithyDiscount,
     `Phase 22 construction validation failed (${JSON.stringify(constructionValidation)}).`,
   );
+  const equipmentValidation = await evaluate(`(async () => {
+    const [{ EquipmentSystem, getEquippedItems }, { HeroManager }, { SquadSystem }, { HeroMeshGenerator }, { CombatSimulation }] = await Promise.all([
+      import('/src/equipment/EquipmentSystem.ts'),
+      import('/src/heroes/HeroManager.ts'),
+      import('/src/squads/SquadSystem.ts'),
+      import('/src/rendering/heroes/HeroMeshGenerator.ts'),
+      import('/src/combat/CombatSimulation.ts'),
+    ]);
+    const equipment = new EquipmentSystem();
+    const manager = new HeroManager();
+    const heroes = manager.generateInitialRoster(3);
+    const squad = new SquadSystem();
+    heroes.forEach((hero) => squad.addHero(hero.id, heroes));
+    const before = squad.evaluate(heroes, (id) => equipment.getModifiers(id));
+    const sword = equipment.getSnapshot().items.find((item) => item.type === 'Sword');
+    const shield = equipment.getSnapshot().items.find((item) => item.type === 'Shield');
+    const bow = equipment.getSnapshot().items.find((item) => item.type === 'Bow');
+    const equippedSword = sword && equipment.equip(heroes[0].id, sword.id, heroes);
+    const equippedShield = shield && equipment.equip(heroes[0].id, shield.id, heroes);
+    const equippedBow = bow && equipment.equip(heroes[1].id, bow.id, heroes);
+    const after = squad.evaluate(heroes, (id) => equipment.getModifiers(id));
+    const baseCombat = new CombatSimulation();
+    baseCombat.start(squad.getSquad(), heroes);
+    const equippedCombat = new CombatSimulation(undefined, undefined, (id) => equipment.getModifiers(id));
+    equippedCombat.start(squad.getSquad(), heroes);
+    const baseHeroStats = baseCombat.getSnapshot().combatants.find((entry) => entry.id === heroes[0].id)?.stats;
+    const equippedHeroStats = equippedCombat.getSnapshot().combatants.find((entry) => entry.id === heroes[0].id)?.stats;
+    const durabilityBefore = equipment.getSnapshot().items.find((item) => item.id === sword.id)?.durability;
+    equipment.applyExpeditionWear([heroes[0].id], 'Victory');
+    const durabilityAfter = equipment.getSnapshot().items.find((item) => item.id === sword.id)?.durability;
+    const generator = new HeroMeshGenerator();
+    const bare = generator.create(heroes[0]);
+    const dressed = generator.create(heroes[0], getEquippedItems(equipment.getSnapshot(), heroes[0].id));
+    let bareMeshes = 0; let dressedMeshes = 0;
+    bare.root.traverse((node) => { if (node.isMesh) bareMeshes += 1; });
+    dressed.root.traverse((node) => { if (node.isMesh) dressedMeshes += 1; });
+    const transferred = sword && equipment.equip(heroes[1].id, sword.id, heroes);
+    const transferSnapshot = equipment.getSnapshot();
+    const firstLoadout = transferSnapshot.loadouts.find((entry) => entry.heroId === heroes[0].id);
+    const secondLoadout = transferSnapshot.loadouts.find((entry) => entry.heroId === heroes[1].id);
+    const unequipped = equipment.unequip(heroes[1].id, 'mainHand');
+    return {
+      bowRange: equipment.getModifiers(heroes[1].id).range === 0,
+      combatPowerChanged: after.combatPower > before.combatPower,
+      combatStatsChanged: equippedHeroStats.attack > baseHeroStats.attack && equippedHeroStats.defense > baseHeroStats.defense,
+      defenseChanged: after.defense > before.defense,
+      durabilityWear: durabilityBefore === 100 && durabilityAfter === 98,
+      equippedBow, equippedShield, equippedSword,
+      inventoryCount: equipment.getSnapshot().items.length,
+      transferAtomic: transferred && firstLoadout?.mainHand === null && secondLoadout?.mainHand === sword.id,
+      types: new Set(equipment.getSnapshot().items.map((item) => item.type)).size,
+      unequipped,
+      visualChanged: dressedMeshes > bareMeshes,
+    };
+  })()`);
+  assert(
+    equipmentValidation.combatPowerChanged && equipmentValidation.combatStatsChanged && equipmentValidation.defenseChanged && equipmentValidation.durabilityWear && equipmentValidation.equippedBow &&
+      equipmentValidation.equippedShield && equipmentValidation.equippedSword && equipmentValidation.inventoryCount === 6 &&
+      equipmentValidation.transferAtomic && equipmentValidation.types === 4 && equipmentValidation.unequipped && equipmentValidation.visualChanged,
+    `Phase 23 equipment validation failed (${JSON.stringify(equipmentValidation)}).`,
+  );
   const recoveryValidation = await evaluate(`(async () => {
     const [{ Simulation }, { InjurySystem, getInjuryModifiers }, { HeroManager }] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
@@ -959,7 +1020,12 @@ try {
   await screenshot("heroes-1440x900.png");
   await click('.hero-roster-card');
   await waitFor("!document.querySelector('.hero-detail-panel').hidden", "hero detail");
-  assert(await evaluate("document.querySelectorAll('.hero-detail-tabs button').length") === 4, "Hero detail must expose four implemented tabs.");
+  assert(await evaluate("document.querySelectorAll('.hero-detail-tabs button').length") === 5, "Hero detail must expose the Phase 23 Equipment tab.");
+  await click('[data-hero-tab="Equipment"]');
+  assert(await evaluate("document.querySelectorAll('.hero-inventory__item').length") === 6, "Equipment inventory must expose the six-item starting cache.");
+  await click('.hero-inventory__item [data-equipment-id]:not(:disabled)');
+  await waitFor("[...document.querySelectorAll('.hero-equipment__slot strong')].some((entry) => entry.textContent !== 'Empty')", "equipped hero item");
+  await screenshot("phase23-equipment-1440x900.png");
   await click('[data-hero-tab="Training"]');
   assert(await evaluate("!document.querySelector('[data-hero-view=\"Training\"]').hidden"), "Training tab did not activate.");
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'Escape', bubbles:true}))");
@@ -1057,6 +1123,21 @@ try {
   assert(await evaluate("getComputedStyle(document.querySelector('.hero-roster-card')).animationName === 'none'"), "Reduced motion preference must disable animations.");
   await screenshot("mobile-390x844.png");
 
+  await click('.hero-roster-card');
+  await click('[data-hero-tab="Equipment"]');
+  const mobileEquipment = await evaluate(`(() => {
+    const panel = document.querySelector('.hero-detail-panel').getBoundingClientRect();
+    const actions = [...document.querySelectorAll('[data-hero-tab], [data-equipment-id], [data-unequip-slot]')];
+    return {
+      fits: panel.left >= 0 && panel.right <= innerWidth,
+      inventoryVisible: document.querySelectorAll('.hero-inventory__item').length === 6,
+      touchTargets: actions.every((button) => button.getBoundingClientRect().height >= 44),
+    };
+  })()`);
+  assert(mobileEquipment.fits && mobileEquipment.inventoryVisible && mobileEquipment.touchTargets, `Mobile Equipment UI failed (${JSON.stringify(mobileEquipment)}).`);
+  await screenshot("phase23-equipment-mobile-390x844.png");
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'Escape', bubbles:true}))");
+
   await click('[data-hud-section="Refuge"]');
   await click('[data-build-action="enter"]');
   await waitFor("document.querySelector('.refuge-build')?.dataset.active === 'true'", "mobile Refuge Build Mode");
@@ -1090,7 +1171,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, construction: constructionValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, construction: constructionValidation, equipment: equipmentValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();
