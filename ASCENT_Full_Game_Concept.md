@@ -425,6 +425,20 @@ Later facilities:
 
 The player enters build mode.
 
+Future implementation is intentionally split across two development boundaries:
+
+- **Phase 21 — Refuge Layout System:** turns the Refuge floor into authoritative layout data,
+  supports reorganizing movable facilities, trail editing, placement validation, and deterministic
+  tree scattering. It stays inside Refuge rather than adding another main destination.
+- **Phase 22 — Facility Construction:** adds recipes, resource spending, construction sites,
+  assigned builders, progress, and activation of completed facilities.
+
+The layout model stores positions, rotations, footprints, trail data, fixed landmarks, and its
+environment seed independently from Three.js meshes. Random trees must avoid buildings, entrances,
+trails, the Gate, campfire, and memorials. A temporary procedural tree may establish the pipeline;
+the supplied tree model can later replace it through one asset adapter without changing simulation
+or layout state.
+
 Buildings require:
 
 - Scrap
@@ -1812,8 +1826,9 @@ days and the victory reward adds 1.6 days before roster growth changes demand.
 When Food is empty, Eating cannot restore hunger and residents accumulate gradual stress and morale
 pressure. Low and empty supplies are visible in the persistent HUD and notification feed.
 
-Metal is intentionally not part of the current stockpile because Phase 21 has not implemented a
-real construction recipe that consumes it.
+Metal is intentionally not part of the current stockpile because Phase 22 has not implemented a
+real construction recipe that consumes it. Phase 21 first establishes the editable Refuge floor,
+facility layout, trails, and deterministic environment placement without inventing material costs.
 
 ## 49.2 Future Resource Vocabulary
 

@@ -8,7 +8,7 @@ Current implementation boundary (verified September 11, 2026):
 Gameplay phases implemented: 0–20
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 21 — Facility Construction
+Next gameplay phase: Phase 21 — Refuge Layout System
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -92,8 +92,9 @@ static build alone does not prove those runtime paths.
 | 19 | Authoritative hero capacity, Dormitory upgrades and rest comfort | `refuge/DormitorySystem`, `NeedsSystem` |
 | 20 | Daily Food demand, provision shortages and balanced mission resources | `economy/ResourceEconomySystem` |
 
-Phase 21 is the next boundary. Do not add placement mode, construction sites, builders, timers,
-facility recipes, or Metal before that phase is implemented.
+Phase 21 is the next boundary. Do not add Build Mode, movable facilities, trail editing, or seeded
+environment placement before that phase is implemented. Construction sites, builders, timers,
+facility recipes, and Metal remain Phase 22.
 
 ---
 
@@ -560,7 +561,7 @@ When Empty, Eating stops restoring hunger, stress gains 2.5/hour, and morale los
 definitions. Combat and Debrief do not advance refuge consumption.
 
 The Refuge provisioning strip displays status, days, and Food/day. Low, Empty, and restored
-transitions produce notifications. Metal is absent because Phase 21 does not yet provide a real
+transitions produce notifications. Metal is absent because Phase 22 does not yet provide a real
 construction recipe or consumer.
 
 ---
@@ -1312,7 +1313,7 @@ assuming a passing typecheck proves layout quality.
 - Pass comfort through `DormitorySnapshot`; do not permanently rewrite hero needs or base recovery rates.
 - Keep capacity at or below the available navigation-point count unless you expand every activity ring.
 - Test full-capacity rejection, no-spend behavior, every upgrade, maximum-tier blocking, and resting recovery.
-- Keep Phase 20 consumption in `ResourceEconomySystem`; do not mix Phase 21 placement/construction into Dormitory balance.
+- Keep Phase 20 consumption in `ResourceEconomySystem`; do not mix Phase 21 layout or Phase 22 construction into Dormitory balance.
 
 ### 10.13 Modify the Resource Economy Safely
 
@@ -1322,7 +1323,7 @@ assuming a passing typecheck proves layout quality.
 - Pass shortage state into `NeedsSystem`; do not edit every hero to apply temporary penalties.
 - Keep consequences gradual and scaled by game minutes.
 - Test Stocked, Low, Empty, restored supplies, partial availability, and zero-resource rejection.
-- Do not introduce Metal until Phase 21 implements a real material-consuming recipe.
+- Do not introduce Metal until Phase 22 implements a real material-consuming recipe.
 
 ---
 
@@ -1534,7 +1535,7 @@ fixed step reduces that drift. It does not by itself make a full session determi
 default generator uses entropy and object IDs use UUIDs.
 
 **Q: How do I add sound/audio?**
-A: Not yet implemented (planned for Phase 39). When you do, the `EventBus` is the right place to emit audio triggers. Create an `AudioManager` class that subscribes to game events and plays sounds.
+A: Not yet implemented (planned for Phase 40). When you do, the `EventBus` is the right place to emit audio triggers. Create an `AudioManager` class that subscribes to game events and plays sounds.
 
 **Q: How do I add a save system?**
 A: Not yet implemented (planned). The `storage/` directory is a placeholder. The design doc specifies IndexedDB. Serialize `Simulation` state (heroes, squads, time, resources) to JSON, store in IndexedDB, restore on load.

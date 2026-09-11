@@ -33,7 +33,7 @@ Hero
 Gameplay phases implemented: 0–20
 Current playable milestone: Refuge provisioning and expedition-funded resource decisions
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 21 — Facility Construction
+Next gameplay phase: Phase 21 — Refuge Layout System
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -328,8 +328,8 @@ The integration must preserve these boundaries:
 - The project uses its installed Three.js package and local typography; the prototype's CDN script,
   external fonts, editor shell, and glow-heavy presentation are not carried into the game client.
 
-Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 22 may activate
-visual equipment modules, and Phase 24 may activate class-linked presentation. Additional fantasy
+Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 23 may activate
+visual equipment modules, and Phase 25 may activate class-linked presentation. Additional fantasy
 races, magical effects, and enemy tiers remain unapproved future content until their own gameplay
 and lore phases define them.
 
@@ -998,11 +998,11 @@ moved to the new APIs.
 - Phase 15 permanent death: emit legacy events, but do not copy skills directly.
 - Phase 16 memories: let memories satisfy discovery and awakening context.
 - Phase 17 trait evolution: unlock Mental and instinct skills from repeated behavior.
-- Phase 24 classes: provide easier access to specialized skills without erasing old skills.
-- Phase 25 branching classes: connect class paths to skill branches and mastery options.
-- Phase 26 mentorship: enable XP bonuses, technique transfer, and personalized variants.
-- Phase 35 hero history: record usage, breakthroughs, awakenings, and mastered skills.
-- Phase 42 balance: tune proficiency decay; skill level never decays.
+- Phase 25 classes: provide easier access to specialized skills without erasing old skills.
+- Phase 26 branching classes: connect class paths to skill branches and mastery options.
+- Phase 27 mentorship: enable XP bonuses, technique transfer, and personalized variants.
+- Phase 36 hero history: record usage, breakthroughs, awakenings, and mastered skills.
+- Phase 43 balance: tune proficiency decay; skill level never decays.
 
 ## Exit Criteria
 
@@ -1118,12 +1118,12 @@ This is a cross-phase presentation milestone; it does not replace or renumber Ph
 - **Phase 14:** deepen Heroes with injury, treatment, and recovery feedback.
 - **Phases 15–17:** add loss, memory, and trait evolution to hero history without crowding the
   default roster card.
-- **Phases 18–23:** make recruitment, capacity, facilities, equipment, and crafting physical Refuge
+- **Phases 18–24:** make recruitment, capacity, layout, facilities, equipment, and crafting physical Refuge
   activities with focused work panels.
-- **Phases 24–26:** grow hero progression and mentorship inside the shared hero details.
-- **Phases 27–35:** turn Rift and Party into the campaign-planning layer for mission variety,
+- **Phases 25–27:** grow hero progression and mentorship inside the shared hero details.
+- **Phases 28–36:** turn Rift and Party into the campaign-planning layer for mission variety,
   regions, bosses, doctrine, loyalty, and long-term squad stories.
-- **Phases 36–40:** add memorial, persistence, audio, and visual polish while retaining the same
+- **Phases 37–41:** add memorial, persistence, audio, and visual polish while retaining the same
   navigation hierarchy and playfield-first layout.
 
 ## Exit Criteria — Met
@@ -1251,7 +1251,7 @@ Record:
 
 Combat now attributes kills and the final attacker. A serializable memorial record captures joined
 day, death day, days alive, missions, victories, kills, level, rank, occupation, final party, and
-cause of death before the active hero is removed. Disk persistence remains Phase 37.
+cause of death before the active hero is removed. Disk persistence remains Phase 38.
 
 ### 15.5 Death Notifications
 
@@ -1313,7 +1313,7 @@ WON_BOSS
 ```
 
 Current combat and expedition events create `ALLY_DIED`, `WAS_SAVED`, `SAVED_ALLY`, and
-`CRITICAL_INJURY`. `WON_BOSS` is typed for compatibility but remains dormant until Phase 30 provides
+`CRITICAL_INJURY`. `WON_BOSS` is typed for compatibility but remains dormant until Phase 31 provides
 a real boss victory event.
 
 ### 16.3 Behavior Effects
@@ -1510,8 +1510,8 @@ Extract and adapt the approved parts of the standalone prototype:
 Keep prototype-only concepts dormant:
 
 - Fantasy races beyond the currently established recruit population
-- Player-selected classes before Phase 24
-- Weapons and armor progression before Phase 22
+- Player-selected classes before Phase 25
+- Weapons and armor progression before Phase 23
 - Enemy tiers, magical glow effects, and enemy-authoring controls
 - The prototype's standalone sidebar, persistent editor layout, and localStorage save behavior
 
@@ -1617,7 +1617,7 @@ Scrap
 Rift Shards
 ```
 
-Metal remains deferred until Phase 21 provides a real construction recipe and material consumer. It
+Metal remains deferred until Phase 22 provides a real construction recipe and material consumer. It
 does not appear as an inert HUD counter or mocked stockpile.
 
 ### 20.1 Consumption — Implemented
@@ -1641,7 +1641,8 @@ There is no instant damage or retroactive food debt.
 
 The implemented Dormitory upgrades remain the current construction-like resource choice: 12 and 24
 Scrap. Phase 20 keeps that real cost in the shared stockpile. Physical construction recipes,
-placement, timers, Metal, and worker assignment remain Phase 21.
+layout editing and placement remain Phase 21; recipes, timers, Metal, and worker assignment remain
+Phase 22.
 
 ### 20.3 Healing Cost — Implemented
 
@@ -1677,11 +1678,118 @@ recruitment using one authoritative stockpile.
 
 ---
 
-# Phase 21 — Facility Construction
+# Phase 21 — Refuge Layout System
 
 ## Goal
 
-Allow the base to physically grow.
+Turn the fixed Refuge scene into an editable, data-driven settlement layout before construction
+costs and timers are introduced.
+
+This phase treats the floor as the usable ground plane of the Refuge. It does not add multi-storey
+building interiors.
+
+## Tasks
+
+### 21.1 Authoritative Layout Model
+
+Create a plain-data `RefugeLayout` that owns:
+
+```text
+Layout version
+World seed
+Placed facility transforms
+Trail cells or segments
+Fixed-landmark records
+Environment-generation settings
+```
+
+Three.js objects only render this data. Position, rotation, footprint, and identity must not live
+only inside meshes. Keep the format serialization-ready, but disk persistence remains Phase 38.
+
+### 21.2 Refuge Build Mode
+
+Open Build Mode contextually from Refuge rather than adding a fifth navigation destination.
+
+Support:
+
+```text
+Select
+Move
+Rotate
+Confirm
+Cancel
+Undo the current unconfirmed placement
+```
+
+Use a ground raycast and a restrained grid or snap increment. Right or middle mouse drag continues
+to pan the camera; left click operates the build cursor; `R` rotates; `Escape` cancels or exits.
+
+### 21.3 Placement Validation
+
+Validate before changing authoritative layout data:
+
+- Refuge boundary containment
+- Facility-footprint overlap
+- Entrance clearance
+- Reserved Gate, campfire, and memorial space
+- A usable walking route between critical Refuge destinations
+
+Show valid placement with olive or bronze geometry and invalid placement with burgundy geometry.
+Do not communicate validity through glow alone.
+
+### 21.4 Reorganize Existing Facilities
+
+Convert existing movable Refuge facilities into individually positioned layout records. When a
+facility moves, its selectable root, activity destination, and hero movement target must resolve
+from the new layout position.
+
+Keep critical landmarks explicitly fixed when moving them would break spawning, expedition access,
+or memorial behavior. The renderer must not silently decide which structures are movable.
+
+### 21.5 Trail Editing
+
+Allow the player to paint and erase connected trails on the Refuge floor. Trails are real layout
+data, not a decorative texture baked into the scene.
+
+The first implementation may use simple connected segments. It must avoid facilities and reserved
+zones and remain compatible with later movement-cost or path-preference logic.
+
+### 21.6 Deterministic Trees
+
+Scatter trees from an owned Refuge seed so the same seed and layout reproduce the same result.
+
+Trees must:
+
+- Avoid buildings, entrances, trails, the Gate, campfire, and memorials
+- Use capped placement attempts rather than an unbounded retry loop
+- Share geometry and materials, or use instancing when the model supports it
+- Be generated separately from authored facility layout data
+
+Use a temporary procedural tree factory until the supplied tree model is available. The later model
+must enter through one asset adapter so replacing the temporary tree does not change layout or
+simulation state.
+
+### 21.7 Responsive and Accessible Controls
+
+Provide keyboard-accessible move and rotate actions in addition to pointer placement. On mobile,
+use a compact bottom build toolbar, large confirm/cancel targets, tap-to-place, and an explicit
+camera-pan gesture that cannot accidentally place an object.
+
+## Exit Criteria
+
+During one running session, the player can enter Refuge Build Mode, reorganize supported existing
+facilities, rotate and validate placements, paint or erase trails, and exit without disrupting hero
+simulation. Trees reproduce from a fixed seed and never overlap protected layout regions. World
+selection, hero destinations, camera controls, desktop layout, and mobile layout remain usable.
+
+---
+
+# Phase 22 — Facility Construction
+
+## Goal
+
+Use the Phase 21 layout foundation to make settlement expansion cost resources, take time, and
+produce usable facilities.
 
 ## Tasks
 
@@ -1695,29 +1803,32 @@ Storage
 Smithy
 ```
 
-### 21.1 Placement Mode
+### 22.1 Facility Catalog and Recipes
 
-Ghost building follows cursor.
+Define buildable footprints, entrances, prerequisites, and real resource costs. Start with Scrap;
+introduce Metal only when an implemented source and recipe consume it.
 
-### 21.2 Validation
+### 22.2 Construction Sites
 
-Check overlap.
+Confirmed placements create construction sites through the authoritative layout system rather than
+immediately spawning completed buildings.
 
-### 21.3 Construction Progress
+### 22.3 Construction Progress
 
-Builders complete facility.
+Assigned builders deliver materials and advance time-based progress.
 
-### 21.4 Facility Renderer
+### 22.4 Facility Completion and Renderer
 
-Procedurally generate visuals.
+Procedurally generate site and completed visuals. A facility becomes usable only after completion.
 
 ## Exit Criteria
 
-The player can visibly expand the settlement.
+The player can spend real resources, place a valid construction site, watch assigned builders
+complete it, and use the finished facility without duplicating Phase 21 placement logic.
 
 ---
 
-# Phase 22 — Equipment
+# Phase 23 — Equipment
 
 ## Goal
 
@@ -1725,7 +1836,7 @@ Add another meaningful hero-progression layer.
 
 ## Tasks
 
-### 22.1 Weapon Types
+### 23.1 Weapon Types
 
 Start with:
 
@@ -1736,7 +1847,7 @@ Bow
 Shield
 ```
 
-### 22.2 Equipment Stats
+### 23.2 Equipment Stats
 
 Add:
 
@@ -1744,15 +1855,15 @@ Add:
 - Defense
 - Range
 
-### 22.3 Inventory
+### 23.3 Inventory
 
 Base inventory.
 
-### 22.4 Hero Equipment
+### 23.4 Hero Equipment
 
 Equip items through hero panel.
 
-### 22.5 Visual Equipment
+### 23.5 Visual Equipment
 
 Attach primitive weapon meshes to heroes.
 
@@ -1765,7 +1876,7 @@ Equipment changes both stats and appearance.
 
 ---
 
-# Phase 23 — Smithy and Crafting
+# Phase 24 — Smithy and Crafting
 
 ## Goal
 
@@ -1773,7 +1884,7 @@ Connect resources to equipment progression.
 
 ## Tasks
 
-### 23.1 Recipes
+### 24.1 Recipes
 
 Example:
 
@@ -1783,15 +1894,15 @@ Iron Sword
 5 Scrap
 ```
 
-### 23.2 Crafting Time
+### 24.2 Crafting Time
 
 Items take time.
 
-### 23.3 Smith Skill
+### 24.3 Smith Skill
 
 Later allow hero crafting skill to affect quality.
 
-### 23.4 Quality Levels
+### 24.4 Quality Levels
 
 Keep simple:
 
@@ -1807,7 +1918,7 @@ Player can turn expedition resources into better equipment.
 
 ---
 
-# Phase 24 — Class System
+# Phase 25 — Class System
 
 ## Goal
 
@@ -1815,11 +1926,11 @@ Allow heroes to specialize organically.
 
 ## Tasks
 
-### 24.1 Unclassified State
+### 25.1 Unclassified State
 
 All new heroes begin unclassified.
 
-### 24.2 Basic Classes
+### 25.2 Basic Classes
 
 Add:
 
@@ -1831,7 +1942,7 @@ Medic
 Scout
 ```
 
-### 24.3 Requirements
+### 25.3 Requirements
 
 Example:
 
@@ -1847,11 +1958,11 @@ experience, achievements, and discovered compatibility. Origin occupation may he
 requirement but never selects a class automatically. Magical potential remains mostly hidden and
 rare.
 
-### 24.4 Class Selection
+### 25.4 Class Selection
 
 Only unlocked classes can be chosen.
 
-### 24.5 Class Bonuses
+### 25.5 Class Bonuses
 
 Add modest bonuses.
 
@@ -1864,7 +1975,7 @@ Hero development produces meaningful specialization.
 
 ---
 
-# Phase 25 — Branching Classes
+# Phase 26 — Branching Classes
 
 ## Goal
 
@@ -1886,11 +1997,11 @@ Guardian
 └── Commander
 ```
 
-### 25.1 Personality Requirements
+### 26.1 Personality Requirements
 
 Some paths depend on personality.
 
-### 25.2 Achievement Requirements
+### 26.2 Achievement Requirements
 
 Some depend on experiences.
 
@@ -1910,7 +2021,7 @@ Arcane Guardian, Arcane Archer, Mystic Healer, Vanguard Commander, Scout Captain
 
 ---
 
-# Phase 26 — Mentorship
+# Phase 27 — Mentorship
 
 ## Goal
 
@@ -1918,15 +2029,15 @@ Make veteran heroes valuable outside combat.
 
 ## Tasks
 
-### 26.1 Assign Mentor
+### 27.1 Assign Mentor
 
 Pair veteran and student.
 
-### 26.2 Training Bonus
+### 27.2 Training Bonus
 
 Student improves faster.
 
-### 26.3 Relationship Growth
+### 27.3 Relationship Growth
 
 Mentorship increases relationship.
 
@@ -1934,7 +2045,7 @@ Store mentor/protégé as a meaningful relationship bond. Shared training raises
 mentor death can later create grief, motivation, or a possible inherited technique through the
 memory system.
 
-### 26.4 Skill Transfer
+### 27.4 Skill Transfer
 
 Small chance to teach trait or technique.
 
@@ -1944,7 +2055,7 @@ Veterans shape future recruits.
 
 ---
 
-# Phase 27 — Multiple Expedition Types
+# Phase 28 — Multiple Expedition Types
 
 ## Goal
 
@@ -1970,7 +2081,7 @@ The same squad is not ideal for every mission.
 
 ---
 
-# Phase 28 — Procedural Expedition Generator
+# Phase 29 — Procedural Expedition Generator
 
 ## Goal
 
@@ -2014,7 +2125,7 @@ Different expeditions can be produced from data.
 
 ---
 
-# Phase 29 — Rift Progression
+# Phase 30 — Rift Progression
 
 ## Goal
 
@@ -2041,11 +2152,11 @@ Example:
 11–15 Frozen Kingdom
 ```
 
-### 29.1 Unlock Conditions
+### 30.1 Unlock Conditions
 
 Defeat guardian to advance.
 
-### 29.2 Increasing Risk
+### 30.2 Increasing Risk
 
 Higher depths introduce:
 
@@ -2059,7 +2170,7 @@ The player has a meaningful long-term goal.
 
 ---
 
-# Phase 30 — Bosses
+# Phase 31 — Bosses
 
 ## Goal
 
@@ -2067,11 +2178,11 @@ Create milestone battles.
 
 ## Tasks
 
-### 30.1 First Guardian
+### 31.1 First Guardian
 
 Build one boss.
 
-### 30.2 Boss AI
+### 31.2 Boss AI
 
 Add:
 
@@ -2080,7 +2191,7 @@ Add:
 - Target priority
 - Enrage
 
-### 30.3 Preparation
+### 31.3 Preparation
 
 Player should need:
 
@@ -2095,7 +2206,7 @@ Boss victory feels like a progression milestone.
 
 ---
 
-# Phase 31 — Social Events
+# Phase 32 — Social Events
 
 ## Goal
 
@@ -2114,7 +2225,7 @@ Celebration
 Grief
 ```
 
-### 31.1 Event Conditions
+### 32.1 Event Conditions
 
 Events should use:
 
@@ -2123,7 +2234,7 @@ Events should use:
 - Morale
 - Memories
 
-### 31.2 Social Roles and Reputation
+### 32.2 Social Roles and Reputation
 
 Let repeated refuge behavior establish roles such as Quartermaster, Instructor, Caregiver, Scout,
 or Captain. Generate settlement reputation from witnessed history rather than assigning arbitrary
@@ -2135,7 +2246,7 @@ Social events are generated from hero context, not pure randomness.
 
 ---
 
-# Phase 32 — Loyalty and Order Refusal
+# Phase 33 — Loyalty and Order Refusal
 
 ## Goal
 
@@ -2143,11 +2254,11 @@ Make heroes independent.
 
 ## Tasks
 
-### 32.1 Loyalty Stat
+### 33.1 Loyalty Stat
 
 Track hero trust in Overseer.
 
-### 32.2 Order Compliance
+### 33.2 Order Compliance
 
 Deployment can be refused.
 
@@ -2155,7 +2266,7 @@ Calculate attitude toward authority from loyalty, trust, respect, fear, morale, 
 relationship history. Surface an understandable state such as Obedient, Respectful, Neutral,
 Questioning, Defiant, or Rebellious.
 
-### 32.3 Refusal Reasons
+### 33.3 Refusal Reasons
 
 Examples:
 
@@ -2167,7 +2278,7 @@ Trauma
 Low Loyalty
 ```
 
-### 32.4 Consequences
+### 33.4 Consequences
 
 Forcing deployment may reduce loyalty.
 
@@ -2177,7 +2288,7 @@ Heroes no longer feel like perfectly obedient units.
 
 ---
 
-# Phase 33 — Advanced Combat Relationships
+# Phase 34 — Advanced Combat Relationships
 
 ## Goal
 
@@ -2206,7 +2317,7 @@ Relationships matter during actual combat.
 
 ---
 
-# Phase 34 — Tactical Doctrine Expansion
+# Phase 35 — Tactical Doctrine Expansion
 
 ## Goal
 
@@ -2238,7 +2349,7 @@ Players can meaningfully influence AI without direct control.
 
 ---
 
-# Phase 35 — Hero History
+# Phase 36 — Hero History
 
 ## Goal
 
@@ -2262,7 +2373,7 @@ Veterans have visible personal histories.
 
 ---
 
-# Phase 36 — Memorial and Graveyard
+# Phase 37 — Memorial and Graveyard
 
 ## Goal
 
@@ -2270,15 +2381,15 @@ Preserve dead heroes.
 
 ## Tasks
 
-### 36.1 Grave Generation
+### 37.1 Grave Generation
 
 Create grave mesh.
 
-### 36.2 Memorial Panel
+### 37.2 Memorial Panel
 
 Display hero history.
 
-### 36.3 Relationship Visitors
+### 37.3 Relationship Visitors
 
 Optional:
 
@@ -2290,7 +2401,7 @@ Dead heroes remain part of settlement history.
 
 ---
 
-# Phase 37 — Save System
+# Phase 38 — Save System
 
 ## Goal
 
@@ -2317,7 +2428,7 @@ Save:
 - Facilities
 - Time
 
-### 37.1 Version Save Format
+### 38.1 Version Save Format
 
 Add:
 
@@ -2325,7 +2436,7 @@ Add:
 saveVersion
 ```
 
-### 37.2 Auto Save
+### 38.2 Auto Save
 
 Save periodically and after expedition.
 
@@ -2335,7 +2446,7 @@ Reloading restores the same simulation state.
 
 ---
 
-# Phase 38 — Production UI Expansion
+# Phase 39 — Production UI Expansion
 
 ## Goal
 
@@ -2373,7 +2484,7 @@ compromised playfield visibility, input handoff, mobile operation, or the establ
 
 ---
 
-# Phase 39 — Audio
+# Phase 40 — Audio
 
 ## Goal
 
@@ -2397,7 +2508,7 @@ Important actions have clear audio feedback.
 
 ---
 
-# Phase 40 — Visual Polish
+# Phase 41 — Visual Polish
 
 ## Goal
 
@@ -2420,7 +2531,7 @@ The game no longer looks like a raw Three.js prototype.
 
 ---
 
-# Phase 41 — Performance Optimization
+# Phase 42 — Performance Optimization
 
 ## Goal
 
@@ -2428,7 +2539,7 @@ Keep the browser version smooth.
 
 ## Tasks
 
-### 41.1 Instancing
+### 42.1 Instancing
 
 Use:
 
@@ -2443,7 +2554,7 @@ for:
 - Debris
 - Repeated props
 
-### 41.2 Object Pooling
+### 42.2 Object Pooling
 
 Use for:
 
@@ -2451,15 +2562,15 @@ Use for:
 - Effects
 - Enemies
 
-### 41.3 Simulation Frequency
+### 42.3 Simulation Frequency
 
 Do not update every system every render frame.
 
-### 41.4 LOD
+### 42.4 LOD
 
 Optional later.
 
-### 41.5 Profiling
+### 42.5 Profiling
 
 Measure before optimizing.
 
@@ -2469,7 +2580,7 @@ Stable performance at target roster and combat sizes.
 
 ---
 
-# Phase 42 — Balance Pass
+# Phase 43 — Balance Pass
 
 ## Goal
 
@@ -2504,7 +2615,7 @@ A normal campaign has tension without feeling unfair.
 
 ---
 
-# Phase 43 — Content Expansion
+# Phase 44 — Content Expansion
 
 Only begin major content production after the systems work.
 
@@ -2526,7 +2637,7 @@ Adding content should not require rewriting systems.
 
 ---
 
-# Phase 44 — Lore Layer
+# Phase 45 — Lore Layer
 
 ## Goal
 
@@ -2545,7 +2656,7 @@ Lore should support the simulation rather than dominate it.
 
 ---
 
-# Phase 45 — Advanced Systems
+# Phase 46 — Advanced Systems
 
 Possible later systems:
 
@@ -2627,7 +2738,7 @@ Do not continue until this loop is enjoyable.
 Includes:
 
 ```text
-Phase 17–24
+Phase 17–25
 ```
 
 Result:
@@ -2641,7 +2752,7 @@ Recruitment, base progression, equipment, classes, and specialization exist.
 Includes:
 
 ```text
-Phase 25–35
+Phase 26–36
 ```
 
 Result:
@@ -2655,7 +2766,7 @@ Mentorship, procedural expeditions, Rift progression, bosses, loyalty, social co
 Includes:
 
 ```text
-Phase 36–44
+Phase 37–45
 ```
 
 Result:

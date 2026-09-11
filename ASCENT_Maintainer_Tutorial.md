@@ -11,7 +11,7 @@ Current implementation boundary:
 ```text
 Implemented gameplay phases: 0–20
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 21 — Facility Construction
+Next gameplay phase: 21 — Refuge Layout System
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 
@@ -329,7 +329,7 @@ and expeditions.
 - Current class, social role, and reputation placeholders already required by implemented identity
 
 The only current `HeroClass` value is `Unclassified`, and the only current `SocialRole` is
-`Resident`. Do not add player-facing class choices before Phase 24.
+`Resident`. Do not add player-facing class choices before Phase 25.
 
 ### How initial heroes are created
 
@@ -784,8 +784,8 @@ Change `FIRST_MISSION` in `src/expeditions/ExpeditionSystem.ts`.
 You may safely modify its name, description, threats, difficulty, and reward values. If you add a
 new objective string, update the `ExpeditionMission` objective type and any UI assumptions.
 
-Do not add several missions only as decorative cards. Multiple expedition types belong to Phase 27,
-and procedural mission generation belongs to Phase 28.
+Do not add several missions only as decorative cards. Multiple expedition types belong to Phase 28,
+and procedural mission generation belongs to Phase 29.
 
 ---
 
@@ -1169,7 +1169,7 @@ Implemented hooks:
 - Combat protection or healing resolution: WAS_SAVED and SAVED_ALLY
 - `CombatSimulation`: protection and successful healing report typed combat-memory events
 
-`WON_BOSS` exists in the typed vocabulary but remains uncreated until Phase 30 supplies a real boss
+`WON_BOSS` exists in the typed vocabulary but remains uncreated until Phase 31 supplies a real boss
 victory. The code does not fabricate an event merely to populate the UI.
 
 ### Behavior effects
@@ -1233,8 +1233,8 @@ Do not pull in:
 
 - Trait evolution belongs to Phase 17 and is documented in the next section
 - Recruitment belongs to Phase 18 and is documented below
-- Disk persistence from Phase 37
-- Boss encounters from Phase 30
+- Disk persistence from Phase 38
+- Boss encounters from Phase 31
 
 Phase 16 remained complete without absorbing those systems. Phase 17 is now implemented as a
 separate layer. Phase 18 recruitment is now implemented as another separate layer.
@@ -1449,9 +1449,9 @@ resting, and infirmary navigation rings contain ten positions to match the Phase
 6. Extend browser coverage for no-spend rejection, upgrades, maximum level, recovery, and layout.
 7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
 
-Phase 20 now implements the bounded resource loop described in the next section. Phase 21
-construction placement, timers, builders, facility recipes, and new facility meshes remain outside
-Phase 19.
+Phase 20 now implements the bounded resource loop described in the next section. Phase 21 Refuge
+layout and Phase 22 construction placement, timers, builders, facility recipes, and new facility
+meshes remain outside Phase 19.
 
 ---
 
@@ -1470,7 +1470,7 @@ for Food, Medicine, Scrap, and Rift Shards.
 | Scrap | 0 | 18 from mission victory | Dormitory upgrades |
 | Rift Shards | 0 | 3 from mission victory | Recruitment |
 
-Metal remains absent because no Phase 21 recipe consumes it. Never add a resource to the HUD only
+Metal remains absent because no Phase 22 recipe consumes it. Never add a resource to the HUD only
 because it appears in the future concept vocabulary.
 
 ### Food consumption
@@ -1515,11 +1515,12 @@ Stocked without producing a startup message.
 3. Validate availability before every spend; never partially mutate on rejection.
 4. Update mission reward data and its direct victory regression together.
 5. Keep shortage effects gradual and driven by game minutes.
-6. Do not add Metal until a real Phase 21 construction recipe consumes it.
+6. Do not add Metal until a real Phase 22 construction recipe consumes it.
 7. Test consumption, shortfall, needs effects, notifications, top-bar values, victory, and withdrawal.
 
-Phase 21 placement, construction sites, builders, progress timers, and completed facility models are
-not implemented by this economy layer.
+Phase 21 Build Mode, movable facilities, trails, and seeded environment placement are not
+implemented by this economy layer. Phase 22 construction sites, builders, progress timers, and
+completed facility models are also absent.
 
 ---
 
