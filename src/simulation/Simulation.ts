@@ -10,6 +10,12 @@ import { RECRUITMENT_COST, RecruitmentSystem, type RecruitmentRoll } from "../re
 import { DormitorySystem, type DormitorySnapshot } from "../refuge/DormitorySystem";
 import { ResourceEconomySystem, type ResourceEconomySnapshot } from "../economy/ResourceEconomySystem";
 import {
+  ConstructionSystem,
+  FACILITY_RECIPES,
+  type ConstructionSnapshot,
+  type FacilityRecipeId,
+} from "../refuge/ConstructionSystem";
+import {
   RefugeLayoutSystem,
   type PlacementValidation,
   type RefugeLayoutSnapshot,
@@ -55,6 +61,7 @@ export class Simulation {
   private readonly dormitorySystem = new DormitorySystem();
   private readonly resourceEconomySystem = new ResourceEconomySystem();
   private readonly refugeLayoutSystem = new RefugeLayoutSystem();
+  private readonly constructionSystem = new ConstructionSystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
     elapsedSeconds: 0,
@@ -95,6 +102,7 @@ export class Simulation {
       gameMinutes,
       resources.food,
       (amount) => this.expeditionSystem.consumeFood(amount),
+      this.constructionSystem.getCompletedCount("storage") > 0 ? 0.9 : 1,
     );
     const economy = this.getResourceEconomySnapshot();
     this.heroManager.step(
@@ -103,8 +111,14 @@ export class Simulation {
       this.state.day,
       this.state.minuteOfDay,
       this.refugeLayoutSystem.getSnapshot(),
+      this.constructionSystem.getSnapshot(),
       { ...this.getDormitorySnapshot(), foodSupply: economy.provisionStatus },
+      {
+        injuryRecoveryMultiplier: this.constructionSystem.getCompletedCount("infirmary") > 0 ? 1.2 : 1,
+        trainingMultiplier: this.constructionSystem.getCompletedCount("training-hall") > 0 ? 1.15 : 1,
+      },
     );
+    this.constructionSystem.step(gameMinutes, this.heroManager.getAll());
   }
 
   getSnapshot(): Readonly<SimulationSnapshot> {
@@ -194,14 +208,49 @@ export class Simulation {
   }
 
   getDormitorySnapshot(): Readonly<DormitorySnapshot> {
-    return this.dormitorySystem.getSnapshot(this.heroManager.getAll().length);
+    return this.dormitorySystem.getSnapshot(
+      this.heroManager.getAll().length,
+      this.constructionSystem.getCompletedCount("dormitory"),
+    );
   }
 
   getResourceEconomySnapshot(): Readonly<ResourceEconomySnapshot> {
     return this.resourceEconomySystem.getSnapshot(
       this.heroManager.getAll().length,
       this.getExpeditionSnapshot().resources.food,
+      this.constructionSystem.getCompletedCount("storage") > 0 ? 0.9 : 1,
     );
+  }
+
+  getConstructionSnapshot(): Readonly<ConstructionSnapshot> {
+    return this.constructionSystem.getSnapshot();
+  }
+
+  getFacilityRecipes() { return FACILITY_RECIPES; }
+
+  getFacilityScrapCost(recipeId: FacilityRecipeId): number {
+    return this.constructionSystem.getScrapCost(recipeId);
+  }
+
+  validateConstructionPlacement(recipeId: FacilityRecipeId, x: number, z: number): PlacementValidation {
+    return this.constructionSystem.validatePlacement(
+      recipeId, x, z, this.refugeLayoutSystem,
+    );
+  }
+
+  createConstructionSite(recipeId: FacilityRecipeId, x: number, z: number, rotation: number): boolean {
+    if (!this.canEditRefugeLayout()) return false;
+    const validation = this.validateConstructionPlacement(recipeId, x, z);
+    const cost = this.constructionSystem.getScrapCost(recipeId);
+    if (!validation.valid || this.getExpeditionSnapshot().resources.scrap < cost) return false;
+    if (!this.expeditionSystem.consumeScrap(cost)) return false;
+    this.constructionSystem.createSite(recipeId, validation.x, validation.z, rotation);
+    return true;
+  }
+
+  toggleConstructionBuilder(siteId: string, heroId: string): boolean {
+    return this.canEditRefugeLayout() &&
+      this.constructionSystem.toggleBuilder(siteId, heroId, this.heroManager.getAll());
   }
 
   getRefugeLayout(): Readonly<RefugeLayoutSnapshot> {
@@ -209,11 +258,13 @@ export class Simulation {
   }
 
   validateRefugeFacility(id: RefugeStructureId, x: number, z: number): PlacementValidation {
-    return this.refugeLayoutSystem.validateFacility(id, x, z);
+    return this.refugeLayoutSystem.validateFacility(id, x, z, this.getConstructionFootprints());
   }
 
   moveRefugeFacility(id: RefugeStructureId, x: number, z: number, rotation: number): boolean {
-    return this.canEditRefugeLayout() && this.refugeLayoutSystem.moveFacility(id, x, z, rotation);
+    return this.canEditRefugeLayout() && this.refugeLayoutSystem.moveFacility(
+      id, x, z, rotation, this.getConstructionFootprints(),
+    );
   }
 
   storeRefugeFacility(id: "dormitory" | "infirmary" | "storage" | "training"): boolean {
@@ -221,11 +272,11 @@ export class Simulation {
   }
 
   addRefugeTrail(x: number, z: number): boolean {
-    return this.canEditRefugeLayout() && this.refugeLayoutSystem.addTrail(x, z);
+    return this.canEditRefugeLayout() && this.refugeLayoutSystem.addTrail(x, z, this.getConstructionFootprints());
   }
 
   validateRefugeTrail(x: number, z: number): PlacementValidation {
-    return this.refugeLayoutSystem.validateTrail(x, z);
+    return this.refugeLayoutSystem.validateTrail(x, z, this.getConstructionFootprints());
   }
 
   removeRefugeTrail(x: number, z: number): boolean {
@@ -233,11 +284,13 @@ export class Simulation {
   }
 
   validateRefugeEnvironment(id: string, x: number, z: number): PlacementValidation {
-    return this.refugeLayoutSystem.validateEnvironment(id, x, z);
+    return this.refugeLayoutSystem.validateEnvironment(id, x, z, this.getConstructionFootprints());
   }
 
   moveRefugeEnvironment(id: string, x: number, z: number): boolean {
-    return this.canEditRefugeLayout() && this.refugeLayoutSystem.moveEnvironment(id, x, z);
+    return this.canEditRefugeLayout() && this.refugeLayoutSystem.moveEnvironment(
+      id, x, z, this.getConstructionFootprints(),
+    );
   }
 
   removeRefugeEnvironment(id: string): boolean {
@@ -276,7 +329,10 @@ export class Simulation {
     return this.getExpeditionSnapshot().phase === "Briefing" &&
       this.getCombatSnapshot().result === "Idle" &&
       this.isRefugeStructurePlaced("dormitory") &&
-      this.dormitorySystem.hasCapacity(this.heroManager.getAll().length) &&
+      this.dormitorySystem.hasCapacity(
+        this.heroManager.getAll().length,
+        this.constructionSystem.getCompletedCount("dormitory"),
+      ) &&
       this.getExpeditionSnapshot().resources.riftShards >= RECRUITMENT_COST;
   }
 
@@ -311,6 +367,15 @@ export class Simulation {
 
   private canEditRefugeLayout(): boolean {
     return this.getExpeditionSnapshot().phase === "Briefing" && this.getCombatSnapshot().result === "Idle";
+  }
+
+  private getConstructionFootprints() {
+    return this.getConstructionSnapshot().sites.map((site) => ({
+      footprintRadius: this.constructionSystem.getRecipe(site.recipeId).footprintRadius,
+      label: this.constructionSystem.getRecipe(site.recipeId).label,
+      x: site.x,
+      z: site.z,
+    }));
   }
 
   private isRefugeStructurePlaced(id: RefugeStructureId): boolean {

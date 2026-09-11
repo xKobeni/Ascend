@@ -43,15 +43,16 @@ const DORMITORY_TIERS: readonly Readonly<DormitoryTier>[] = Object.freeze([
 export class DormitorySystem {
   private tierIndex = 0;
 
-  getSnapshot(occupied: number): Readonly<DormitorySnapshot> {
+  getSnapshot(occupied: number, annexBeds = 0): Readonly<DormitorySnapshot> {
     return {
       ...this.getTier(),
+      capacity: this.getTier().capacity + Math.max(0, Math.floor(annexBeds)),
       occupied: Math.max(0, Math.floor(occupied)),
     };
   }
 
-  hasCapacity(occupied: number): boolean {
-    return Math.max(0, Math.floor(occupied)) < this.getTier().capacity;
+  hasCapacity(occupied: number, annexBeds = 0): boolean {
+    return Math.max(0, Math.floor(occupied)) < this.getTier().capacity + Math.max(0, Math.floor(annexBeds));
   }
 
   canUpgrade(availableScrap: number): boolean {

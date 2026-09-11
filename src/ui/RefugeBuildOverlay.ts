@@ -4,15 +4,23 @@ import type {
   RefugeLayoutTool,
   RefugeStructureId,
 } from "../refuge/RefugeLayoutSystem";
+import type { Hero } from "../heroes/Hero";
+import type { ConstructionSnapshot, FacilityRecipe, FacilityRecipeId } from "../refuge/ConstructionSystem";
 
 export interface RefugeBuildViewState {
   active: boolean;
   canUndo: boolean;
+  construction: Readonly<ConstructionSnapshot>;
+  constructionRecipeId: FacilityRecipeId | null;
   draft: PlacementValidation | null;
   environmentId: string | null;
   layout: Readonly<RefugeLayoutSnapshot>;
+  heroes: readonly Readonly<Hero>[];
+  recipes: readonly Readonly<FacilityRecipe>[];
   rotation: number;
   tool: RefugeLayoutTool | null;
+  scrap: number;
+  getRecipeCost(recipeId: FacilityRecipeId): number;
 }
 
 interface RefugeBuildActions {
@@ -25,6 +33,8 @@ interface RefugeBuildActions {
   removeEnvironment(): void;
   rotate(): void;
   selectTool(tool: RefugeLayoutTool): void;
+  selectRecipe(recipeId: FacilityRecipeId): void;
+  toggleBuilder(siteId: string, heroId: string): void;
   store(): void;
   undo(): void;
 }
@@ -71,7 +81,9 @@ export class RefugeBuildOverlay {
       ? "Paint trail tiles on open ground."
       : state.tool === "erase-trail"
         ? "Erase existing trail tiles."
-        : "Choose a facility or trail tool.");
+        : state.constructionRecipeId
+          ? "Choose open ground for the construction site."
+          : "Choose a facility, construction recipe, or trail tool.");
     this.element.dataset.active = "true";
     this.element.innerHTML = `
       <div class="refuge-build__toolbar" aria-label="Layout tools">
@@ -83,21 +95,27 @@ export class RefugeBuildOverlay {
           <button type="button" data-build-tool="trail" aria-pressed="${state.tool === "trail"}"><b>Trail</b><span>Paint</span></button>
           <button type="button" data-build-tool="erase-trail" aria-pressed="${state.tool === "erase-trail"}"><b>Trail</b><span>Erase</span></button>
         </div>
+        <div class="refuge-build__catalog" aria-label="Construction catalog">
+          ${state.recipes.map((recipe) => {
+            const cost = state.getRecipeCost(recipe.id);
+            return `<button type="button" data-build-recipe="${recipe.id}" aria-pressed="${state.constructionRecipeId === recipe.id}" ${state.scrap < cost ? "disabled" : ""}><b>${recipe.label}</b><span>${cost} Scrap · ${Math.round(recipe.durationMinutes / 60)}h</span></button>`;
+          }).join("")}
+        </div>
       </div>
       <aside class="refuge-build__inspector">
-        <header><div><span>REFUGE LAYOUT</span><strong>${subjectLabel ?? "Build Mode"}</strong></div><button type="button" data-build-action="exit" aria-label="Exit Build Mode">×</button></header>
+        <header><div><span>REFUGE BUILD MODE</span><strong>${subjectLabel ?? (state.constructionRecipeId ? state.recipes.find((entry) => entry.id === state.constructionRecipeId)?.label : "Build Mode")}</strong></div><button type="button" data-build-action="exit" aria-label="Exit Build Mode">×</button></header>
         <p data-valid="${state.draft?.valid ?? true}">${status}</p>
         <div class="refuge-build__actions">
-          <button type="button" data-build-action="rotate" ${facility ? "" : "disabled"}>Rotate · R</button>
-          <button type="button" data-build-action="confirm" ${state.draft?.valid && (facility || environment) ? "" : "disabled"}>Confirm</button>
+          <button type="button" data-build-action="rotate" ${facility || state.constructionRecipeId ? "" : "disabled"}>Rotate · R</button>
+          <button type="button" data-build-action="confirm" ${state.draft?.valid && (facility || environment || state.constructionRecipeId) ? "" : "disabled"}>Confirm</button>
           <button type="button" data-build-action="cancel" ${state.draft ? "" : "disabled"}>Cancel</button>
           <button type="button" data-build-action="undo" ${state.canUndo ? "" : "disabled"}>Undo</button>
         </div>
         <div class="refuge-build__nudge" aria-label="Selected facility movement">
-          <span>MOVE</span><button type="button" data-build-nudge="0,-1" ${facility || environment ? "" : "disabled"}>↑</button>
-          <button type="button" data-build-nudge="-1,0" ${facility || environment ? "" : "disabled"}>←</button>
-          <button type="button" data-build-nudge="0,1" ${facility || environment ? "" : "disabled"}>↓</button>
-          <button type="button" data-build-nudge="1,0" ${facility || environment ? "" : "disabled"}>→</button>
+          <span>MOVE</span><button type="button" data-build-nudge="0,-1" ${facility || environment || state.constructionRecipeId ? "" : "disabled"}>↑</button>
+          <button type="button" data-build-nudge="-1,0" ${facility || environment || state.constructionRecipeId ? "" : "disabled"}>←</button>
+          <button type="button" data-build-nudge="0,1" ${facility || environment || state.constructionRecipeId ? "" : "disabled"}>↓</button>
+          <button type="button" data-build-nudge="1,0" ${facility || environment || state.constructionRecipeId ? "" : "disabled"}>→</button>
         </div>
         <div class="refuge-build__camera" aria-label="Camera movement">
           <span>CAMERA</span><button type="button" data-build-pan="0,-1">↑</button>
@@ -107,6 +125,16 @@ export class RefugeBuildOverlay {
         </div>
         ${facility?.removable && facility.placed ? `<button type="button" class="refuge-build__store" data-build-action="store">Store facility</button>` : ""}
         ${environment ? `<button type="button" class="refuge-build__store" data-build-action="remove-environment">Remove ${environment.kind}</button>` : ""}
+        <section class="refuge-build__projects" aria-label="Construction projects">
+          <h3>CONSTRUCTION · ${state.scrap} SCRAP</h3>
+          ${state.construction.sites.length === 0 ? "<p>No active sites.</p>" : state.construction.sites.map((site) => {
+            const recipe = state.recipes.find((entry) => entry.id === site.recipeId);
+            if (!recipe) return "";
+            const progress = site.state === "Complete" ? 100 : Math.round(site.progressMinutes / recipe.durationMinutes * 100);
+            const eligible = state.heroes.filter((hero) => !hero.training.active && !hero.injuries.some((injury) => !injury.permanent));
+            return `<article data-site-state="${site.state}"><strong>${recipe.label}</strong><span>${site.state} · ${progress}%</span><progress max="100" value="${progress}"></progress><div>${site.state === "Complete" ? `<small>${recipe.service} · Operational</small>` : eligible.map((hero) => `<button type="button" data-site-id="${site.id}" data-builder-id="${hero.id}" aria-pressed="${site.builderIds.includes(hero.id)}">${site.builderIds.includes(hero.id) ? "✓ " : ""}${hero.name}</button>`).join("")}</div></article>`;
+          }).join("")}
+        </section>
         <small>${facility ? `${facility.kind} · ${facility.placed ? "Placed" : "Stored"} · ${Math.round(state.rotation * 180 / Math.PI)}°` : `${state.layout.planeSize}×${state.layout.planeSize} field · ${state.layout.trails.length} trail segments · expansion prepared, locked`}</small>
       </aside>
     `;
@@ -123,6 +151,15 @@ export class RefugeBuildOverlay {
     const tool = button.dataset.buildTool;
     if (this.isTool(tool)) {
       this.actions.selectTool(tool);
+      return;
+    }
+    const recipe = button.dataset.buildRecipe;
+    if (this.isRecipe(recipe)) {
+      this.actions.selectRecipe(recipe);
+      return;
+    }
+    if (button.dataset.siteId && button.dataset.builderId) {
+      this.actions.toggleBuilder(button.dataset.siteId, button.dataset.builderId);
       return;
     }
     const nudge = this.parseVector(button.dataset.buildNudge);
@@ -148,6 +185,10 @@ export class RefugeBuildOverlay {
 
   private isTool(value: string | undefined): value is RefugeLayoutTool {
     return value !== undefined && [...STRUCTURES, "trail", "erase-trail"].includes(value as RefugeLayoutTool);
+  }
+
+  private isRecipe(value: string | undefined): value is FacilityRecipeId {
+    return value !== undefined && ["dormitory", "training-hall", "infirmary", "storage", "smithy"].includes(value);
   }
 
   private parseVector(value: string | undefined): { x: number; z: number } | null {

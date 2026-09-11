@@ -5,6 +5,7 @@ import {
   type ScheduledActivity,
 } from "../base/NavigationPoints";
 import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
+import type { ConstructionSnapshot } from "../refuge/ConstructionSystem";
 import type { Hero, HeroActivity } from "./Hero";
 import type { NeedsSystem } from "./NeedsSystem";
 import type { TrainingSystem } from "./TrainingSystem";
@@ -21,12 +22,26 @@ export class HeroRoutineSystem {
     needsSystem: NeedsSystem,
     trainingSystem: TrainingSystem,
     layout: Readonly<RefugeLayoutSnapshot>,
+    construction: Readonly<ConstructionSnapshot>,
   ): void {
     const navigation = createRefugeNavigationPoints(layout);
     const layoutChanged = layout.revision !== this.layoutRevision;
     this.layoutRevision = layout.revision;
     const scheduledActivity = this.getScheduledActivity(minuteOfDay);
     heroes.forEach((hero, index) => {
+      const site = construction.sites.find((entry) => entry.state !== "Complete" && entry.builderIds.includes(hero.id));
+      if (site) {
+        const builderIndex = site.builderIds.indexOf(hero.id);
+        const destination: NavigationPoint = {
+          id: `builder:${site.id}:${hero.id}`,
+          label: "Construction Site",
+          x: site.x + (builderIndex === 0 ? -1.5 : 1.5),
+          z: site.z + 1.6,
+        };
+        this.assignConstruction(hero, destination, layoutChanged);
+        this.moveHero(hero, deltaSeconds, navigation, [destination]);
+        return;
+      }
       const hasTrainingAssignment = trainingSystem.hasAssignment(hero);
       const decision = needsSystem.chooseActivity(
         hero,
@@ -48,6 +63,17 @@ export class HeroRoutineSystem {
       );
       this.moveHero(hero, deltaSeconds, navigation);
     });
+  }
+
+  private assignConstruction(hero: Hero, destination: Readonly<NavigationPoint>, forceAssignment: boolean): void {
+    if (!forceAssignment && hero.movement.targetActivity === "Building" && hero.movement.destinationLabel === destination.label &&
+      (hero.movement.destinationId === destination.id || hero.movement.activity === "Building")) return;
+    hero.movement.targetActivity = "Building";
+    hero.movement.decisionSource = "Construction";
+    hero.movement.decisionReason = "Assigned to facility construction";
+    hero.movement.destinationId = destination.id;
+    hero.movement.destinationLabel = destination.label;
+    hero.movement.activity = "Walking";
   }
 
   getDayPeriod(minuteOfDay: number): DayPeriod {
@@ -109,12 +135,17 @@ export class HeroRoutineSystem {
     hero.movement.activity = "Walking";
   }
 
-  private moveHero(hero: Hero, deltaSeconds: number, navigation: Readonly<RefugeNavigationPoints>): void {
+  private moveHero(
+    hero: Hero,
+    deltaSeconds: number,
+    navigation: Readonly<RefugeNavigationPoints>,
+    extraDestinations: readonly NavigationPoint[] = [],
+  ): void {
     if (!hero.movement.destinationId) {
       return;
     }
 
-    const destination = this.findDestination(hero.movement.destinationId, navigation);
+    const destination = this.findDestination(hero.movement.destinationId, navigation, extraDestinations);
     const deltaX = destination.x - hero.movement.position.x;
     const deltaZ = destination.z - hero.movement.position.z;
     const distance = Math.hypot(deltaX, deltaZ);
@@ -126,7 +157,7 @@ export class HeroRoutineSystem {
       hero.movement.position.z = destination.z;
       hero.movement.destinationId = null;
       hero.movement.activity = hero.movement.targetActivity;
-      this.faceRoutineFocus(hero, hero.movement.activity, navigation);
+      if (hero.movement.activity !== "Building") this.faceRoutineFocus(hero, hero.movement.activity, navigation);
       return;
     }
 
@@ -136,8 +167,13 @@ export class HeroRoutineSystem {
     hero.movement.activity = "Walking";
   }
 
-  private findDestination(destinationId: string, navigation: Readonly<RefugeNavigationPoints>): NavigationPoint {
+  private findDestination(
+    destinationId: string,
+    navigation: Readonly<RefugeNavigationPoints>,
+    extraDestinations: readonly NavigationPoint[] = [],
+  ): NavigationPoint {
     const points = [
+      ...extraDestinations,
       ...navigation.idle,
       ...navigation.infirmary,
       ...navigation.activities.Eating,
@@ -154,7 +190,7 @@ export class HeroRoutineSystem {
 
   private faceRoutineFocus(
     hero: Hero,
-    activity: Exclude<HeroActivity, "Walking">,
+    activity: Exclude<HeroActivity, "Building" | "Walking">,
     navigation: Readonly<RefugeNavigationPoints>,
   ): void {
     const focus = navigation.focus[activity];

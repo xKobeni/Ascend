@@ -137,13 +137,14 @@ export class InjurySystem {
     return this.inflict(hero, type, "Expedition", day, permanent);
   }
 
-  step(heroes: readonly Hero[], gameMinutes: number): void {
+  step(heroes: readonly Hero[], gameMinutes: number, facilityMultiplier = 1): void {
     heroes.forEach((hero) => {
       if (hero.movement.activity !== "Resting") return;
       const recoveryRate = 0.7 + hero.attributes.endurance * 0.035;
       hero.injuries.forEach((injury) => {
         if (injury.permanent || injury.remainingMinutes === null) return;
-        injury.remainingMinutes = Math.max(0, injury.remainingMinutes - gameMinutes * recoveryRate * (injury.treated ? 2.25 : 1));
+        injury.remainingMinutes = Math.max(0, injury.remainingMinutes - gameMinutes * recoveryRate *
+          (injury.treated ? 2.25 : 1) * Math.max(1, facilityMultiplier));
       });
       const recovered = hero.injuries.filter((injury) => !injury.permanent && injury.remainingMinutes === 0);
       if (recovered.length === 0) return;

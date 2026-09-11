@@ -45,6 +45,7 @@ export interface RefugeLayoutSnapshot {
 }
 
 export interface PlacementValidation { message: string; valid: boolean; x: number; z: number; }
+export interface RefugeReservedPlacement extends RefugePoint { footprintRadius: number; label: string; }
 
 interface LayoutHistory {
   environment: RefugeEnvironmentPlacement[];
@@ -94,29 +95,44 @@ export class RefugeLayoutSystem {
     return placement;
   }
 
-  validateFacility(id: RefugeStructureId, x: number, z: number): PlacementValidation {
-    const snapped = this.snapPoint(x, z);
+  validateFacility(id: RefugeStructureId, x: number, z: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): PlacementValidation {
     const facility = this.getFacility(id);
-    if (Math.abs(snapped.x) + facility.footprintRadius > BUILD_HALF_EXTENT || Math.abs(snapped.z) + facility.footprintRadius > BUILD_HALF_EXTENT) {
-      return { ...snapped, message: "Outside the current Refuge boundary.", valid: false };
-    }
-    const structureOverlap = [...this.facilities.values()].find((other) => other.placed && other.id !== id &&
-      Math.hypot(snapped.x - other.x, snapped.z - other.z) < facility.footprintRadius + other.footprintRadius + 0.9);
-    if (structureOverlap) return { ...snapped, message: `Overlaps ${structureOverlap.label}.`, valid: false };
-    const environmentOverlap = [...this.environment.values()].find((other) => other.placed &&
-      Math.hypot(snapped.x - other.x, snapped.z - other.z) < facility.footprintRadius + other.footprintRadius + 0.35);
-    if (environmentOverlap) return { ...snapped, message: `Move or remove the ${environmentOverlap.kind} first.`, valid: false };
-    if ([...this.trails.values()].some((trail) => Math.hypot(snapped.x - trail.x, snapped.z - trail.z) < facility.footprintRadius + 0.7)) {
-      return { ...snapped, message: "Placement blocks a painted trail.", valid: false };
-    }
-    if (!this.hasConnectedEntrances({ ...facility, ...snapped, placed: true })) {
-      return { ...snapped, message: "Placement blocks a critical walking route.", valid: false };
-    }
-    return { ...snapped, message: "Placement ready.", valid: true };
+    return this.validateNewFacility(facility.label, facility.footprintRadius, x, z, reserved, id, facility);
   }
 
-  moveFacility(id: RefugeStructureId, x: number, z: number, rotation: number): boolean {
-    const validation = this.validateFacility(id, x, z);
+  validateNewFacility(
+    label: string,
+    footprintRadius: number,
+    x: number,
+    z: number,
+    reserved: readonly Readonly<RefugeReservedPlacement>[] = [],
+    ignoredStructureId?: RefugeStructureId,
+    routeCandidate?: Readonly<RefugeFacilityPlacement>,
+  ): PlacementValidation {
+    const snapped = this.snapPoint(x, z);
+    if (Math.abs(snapped.x) + footprintRadius > BUILD_HALF_EXTENT || Math.abs(snapped.z) + footprintRadius > BUILD_HALF_EXTENT) {
+      return { ...snapped, message: "Outside the current Refuge boundary.", valid: false };
+    }
+    const structureOverlap = [...this.facilities.values()].find((other) => other.placed && other.id !== ignoredStructureId &&
+      Math.hypot(snapped.x - other.x, snapped.z - other.z) < footprintRadius + other.footprintRadius + 0.9);
+    if (structureOverlap) return { ...snapped, message: `Overlaps ${structureOverlap.label}.`, valid: false };
+    const reservedOverlap = reserved.find((other) =>
+      Math.hypot(snapped.x - other.x, snapped.z - other.z) < footprintRadius + other.footprintRadius + 0.9);
+    if (reservedOverlap) return { ...snapped, message: `Overlaps ${reservedOverlap.label}.`, valid: false };
+    const environmentOverlap = [...this.environment.values()].find((other) => other.placed &&
+      Math.hypot(snapped.x - other.x, snapped.z - other.z) < footprintRadius + other.footprintRadius + 0.35);
+    if (environmentOverlap) return { ...snapped, message: `Move or remove the ${environmentOverlap.kind} first.`, valid: false };
+    if ([...this.trails.values()].some((trail) => Math.hypot(snapped.x - trail.x, snapped.z - trail.z) < footprintRadius + 0.7)) {
+      return { ...snapped, message: "Placement blocks a painted trail.", valid: false };
+    }
+    if (routeCandidate && !this.hasConnectedEntrances({ ...routeCandidate, ...snapped, placed: true })) {
+      return { ...snapped, message: "Placement blocks a critical walking route.", valid: false };
+    }
+    return { ...snapped, message: `${label} placement ready.`, valid: true };
+  }
+
+  moveFacility(id: RefugeStructureId, x: number, z: number, rotation: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): boolean {
+    const validation = this.validateFacility(id, x, z, reserved);
     if (!validation.valid) return false;
     const current = this.getFacility(id);
     this.captureHistory();
@@ -134,9 +150,9 @@ export class RefugeLayoutSystem {
     return true;
   }
 
-  moveEnvironment(id: string, x: number, z: number): boolean {
+  moveEnvironment(id: string, x: number, z: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): boolean {
     const current = this.environment.get(id);
-    const validation = this.validateEnvironment(id, x, z);
+    const validation = this.validateEnvironment(id, x, z, reserved);
     if (!current || !validation.valid) return false;
     this.captureHistory();
     this.environment.set(id, { ...current, placed: true, x: validation.x, z: validation.z });
@@ -153,7 +169,7 @@ export class RefugeLayoutSystem {
     return true;
   }
 
-  validateEnvironment(id: string, x: number, z: number): PlacementValidation {
+  validateEnvironment(id: string, x: number, z: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): PlacementValidation {
     const snapped = this.snapPoint(x, z);
     const item = this.environment.get(id);
     if (!item) return { ...snapped, message: "Unknown environment object.", valid: false };
@@ -163,14 +179,17 @@ export class RefugeLayoutSystem {
     const structureOverlap = [...this.facilities.values()].find((facility) => facility.placed &&
       Math.hypot(snapped.x - facility.x, snapped.z - facility.z) < item.footprintRadius + facility.footprintRadius + 0.3);
     if (structureOverlap) return { ...snapped, message: `Too close to ${structureOverlap.label}.`, valid: false };
+    const reservedOverlap = reserved.find((placement) =>
+      Math.hypot(snapped.x - placement.x, snapped.z - placement.z) < item.footprintRadius + placement.footprintRadius + 0.3);
+    if (reservedOverlap) return { ...snapped, message: `Too close to ${reservedOverlap.label}.`, valid: false };
     const environmentOverlap = [...this.environment.values()].find((other) => other.placed && other.id !== id &&
       Math.hypot(snapped.x - other.x, snapped.z - other.z) < item.footprintRadius + other.footprintRadius + 0.25);
     if (environmentOverlap) return { ...snapped, message: `Overlaps another ${environmentOverlap.kind}.`, valid: false };
     return { ...snapped, message: `${item.kind === "tree" ? "Tree" : "Rock"} placement ready.`, valid: true };
   }
 
-  addTrail(x: number, z: number): boolean {
-    const validation = this.validateTrail(x, z);
+  addTrail(x: number, z: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): boolean {
+    const validation = this.validateTrail(x, z, reserved);
     if (!validation.valid) return false;
     const id = this.trailId(validation.x, validation.z);
     this.captureHistory();
@@ -191,7 +210,7 @@ export class RefugeLayoutSystem {
     return true;
   }
 
-  validateTrail(x: number, z: number): PlacementValidation {
+  validateTrail(x: number, z: number, reserved: readonly Readonly<RefugeReservedPlacement>[] = []): PlacementValidation {
     const snapped = this.snapPoint(x, z);
     if (Math.abs(snapped.x) > BUILD_HALF_EXTENT || Math.abs(snapped.z) > BUILD_HALF_EXTENT) {
       return { ...snapped, message: "Trail is outside the current Refuge boundary.", valid: false };
@@ -199,6 +218,9 @@ export class RefugeLayoutSystem {
     const blocked = [...this.facilities.values()].find((facility) => facility.placed &&
       Math.hypot(snapped.x - facility.x, snapped.z - facility.z) < facility.footprintRadius + 0.65);
     if (blocked) return { ...snapped, message: `${blocked.label} occupies this ground.`, valid: false };
+    const reservedBlock = reserved.find((placement) =>
+      Math.hypot(snapped.x - placement.x, snapped.z - placement.z) < placement.footprintRadius + 0.65);
+    if (reservedBlock) return { ...snapped, message: `${reservedBlock.label} occupies this ground.`, valid: false };
     const id = this.trailId(snapped.x, snapped.z);
     if (this.trails.has(id)) return { ...snapped, message: "A trail already occupies this ground.", valid: false };
     if (!this.isTrailNetworkConnected([...this.trails.values(), { id, ...snapped }])) {

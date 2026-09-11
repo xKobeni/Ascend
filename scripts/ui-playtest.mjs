@@ -183,6 +183,49 @@ try {
       layoutValidation.facilityStored && layoutValidation.facilityStoreUndo && layoutValidation.undo,
     `Phase 21 layout validation failed (${JSON.stringify(layoutValidation)}).`,
   );
+  const constructionValidation = await evaluate(`(async () => {
+    const [{ ConstructionSystem, FACILITY_RECIPES }, { RefugeLayoutSystem }] = await Promise.all([
+      import('/src/refuge/ConstructionSystem.ts'),
+      import('/src/refuge/RefugeLayoutSystem.ts'),
+    ]);
+    const system = new ConstructionSystem();
+    const layoutSystem = new RefugeLayoutSystem();
+    const findSpot = (recipeId) => {
+      for (let x = -30; x <= 30; x += 2) for (let z = -30; z <= 30; z += 2) {
+        const result = system.validatePlacement(recipeId, x, z, layoutSystem);
+        if (result.valid) return result;
+      }
+      return null;
+    };
+    const storageSpot = findSpot('storage');
+    if (!storageSpot) return { missingSpot: true };
+    const storage = system.createSite('storage', storageSpot.x, storageSpot.z, 0);
+    const builder = { id: 'phase-22-builder', injuries: [], movement: { activity: 'Building' }, training: { active: null } };
+    const assigned = system.toggleBuilder(storage.id, builder.id, [builder]);
+    system.step(45, [builder]);
+    const materialsDelivered = system.getSnapshot().sites[0]?.state === 'Materials';
+    system.step(300, [builder]);
+    const completed = system.getSnapshot().sites[0]?.state === 'Complete';
+    const smithySpot = findSpot('smithy');
+    if (!smithySpot) return { missingSmithySpot: true };
+    const smithy = system.createSite('smithy', smithySpot.x, smithySpot.z, 0);
+    system.toggleBuilder(smithy.id, builder.id, [builder]);
+    system.step(45, [builder]);
+    system.step(480, [builder]);
+    return {
+      assigned,
+      catalogComplete: FACILITY_RECIPES.length === 5,
+      completed,
+      materialsDelivered,
+      overlapRejected: !system.validatePlacement('storage', storageSpot.x, storageSpot.z, layoutSystem).valid,
+      smithyDiscount: system.getScrapCost('storage') === 9,
+    };
+  })()`);
+  assert(
+    constructionValidation.assigned && constructionValidation.catalogComplete && constructionValidation.completed &&
+      constructionValidation.materialsDelivered && constructionValidation.overlapRejected && constructionValidation.smithyDiscount,
+    `Phase 22 construction validation failed (${JSON.stringify(constructionValidation)}).`,
+  );
   const recoveryValidation = await evaluate(`(async () => {
     const [{ Simulation }, { InjurySystem, getInjuryModifiers }, { HeroManager }] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
@@ -1047,7 +1090,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, construction: constructionValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

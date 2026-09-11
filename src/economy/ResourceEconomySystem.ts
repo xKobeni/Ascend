@@ -21,10 +21,12 @@ export class ResourceEconomySystem {
     gameMinutes: number,
     availableFood: number,
     consumeFood: (amount: number) => boolean,
+    demandMultiplier = 1,
   ): void {
     const heroes = Math.max(0, Math.floor(activeHeroCount));
     const elapsedMinutes = Math.max(0, gameMinutes);
-    this.foodDemandProgress += heroes * FOOD_PER_HERO_PER_DAY * elapsedMinutes / MINUTES_PER_DAY;
+    const multiplier = Math.max(0.1, Math.min(1, demandMultiplier));
+    this.foodDemandProgress += heroes * FOOD_PER_HERO_PER_DAY * multiplier * elapsedMinutes / MINUTES_PER_DAY;
     const due = Math.floor(this.foodDemandProgress);
     if (due === 0) {
       return;
@@ -38,10 +40,10 @@ export class ResourceEconomySystem {
     this.foodShortfall += due - consumed;
   }
 
-  getSnapshot(activeHeroCount: number, availableFood: number): Readonly<ResourceEconomySnapshot> {
+  getSnapshot(activeHeroCount: number, availableFood: number, demandMultiplier = 1): Readonly<ResourceEconomySnapshot> {
     const heroes = Math.max(0, Math.floor(activeHeroCount));
     const food = Math.max(0, Math.floor(availableFood));
-    const dailyFoodDemand = heroes * FOOD_PER_HERO_PER_DAY;
+    const dailyFoodDemand = heroes * FOOD_PER_HERO_PER_DAY * Math.max(0.1, Math.min(1, demandMultiplier));
     const provisionDays = dailyFoodDemand > 0 ? food / dailyFoodDemand : null;
     const provisionStatus: ProvisionStatus = food === 0
       ? "Empty"

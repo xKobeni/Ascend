@@ -144,15 +144,23 @@ canvas {
 .refuge-build header strong { display: block; margin-top: 3px; font: 500 16px/1.1 var(--display); }
 .refuge-build header button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .refuge-build__toolbar { position: absolute; right: 18px; bottom: 14px; left: 18px; overflow-x: auto; border: 1px solid rgb(167 134 82 / 38%); background: rgb(21 21 19 / 94%); }
-.refuge-build__tools { display: flex; gap: 5px; min-width: max-content; padding: 8px; }
+.refuge-build__tools,
+.refuge-build__catalog { display: flex; gap: 5px; min-width: max-content; padding: 8px; }
+.refuge-build__catalog { padding-top: 0; border-top: 1px solid var(--line-soft); }
 .refuge-build__tools button,
+.refuge-build__catalog button,
 .refuge-build__actions button,
 .refuge-build__nudge button,
 .refuge-build__camera button { min-height: 36px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 8px; }
-.refuge-build__tools button { display: grid; gap: 4px; width: 104px; padding: 8px; text-align: left; }
-.refuge-build__tools button b { color: var(--ink); font: 500 10px/1.2 var(--display); }
-.refuge-build__tools button span { color: var(--faint); font: 7px/1 var(--numbers); letter-spacing: .1em; text-transform: uppercase; }
-.refuge-build__tools button[aria-pressed="true"] { border-color: var(--bronze); background: rgb(167 134 82 / 9%); color: var(--ink); }
+.refuge-build__tools button,
+.refuge-build__catalog button { display: grid; gap: 4px; width: 104px; padding: 8px; text-align: left; }
+.refuge-build__catalog button { width: 130px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.refuge-build__tools button b,
+.refuge-build__catalog button b { color: var(--ink); font: 500 10px/1.2 var(--display); }
+.refuge-build__tools button span,
+.refuge-build__catalog button span { color: var(--faint); font: 7px/1 var(--numbers); letter-spacing: .1em; text-transform: uppercase; }
+.refuge-build__tools button[aria-pressed="true"],
+.refuge-build__catalog button[aria-pressed="true"] { border-color: var(--bronze); background: rgb(167 134 82 / 9%); color: var(--ink); }
 .refuge-build button:disabled { color: var(--faint); cursor: not-allowed; opacity: .5; }
 .refuge-build__inspector > p { min-height: 36px; margin: 0; padding: 9px 12px; border-block: 1px solid var(--line-soft); color: var(--muted); font-size: 8px; line-height: 1.45; }
 .refuge-build__inspector > p[data-valid="false"] { border-left: 2px solid var(--burgundy); color: #c58a8a; }
@@ -162,6 +170,17 @@ canvas {
 .refuge-build__nudge span,
 .refuge-build__camera span { color: var(--faint); font: 7px/1.2 var(--numbers); letter-spacing: .1em; }
 .refuge-build__store { width: calc(100% - 18px); min-height: 36px; margin: 2px 9px 8px; border: 1px solid rgb(122 69 69 / 55%); background: transparent; color: #c58a8a; }
+.refuge-build__projects { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); padding: 10px; }
+.refuge-build__projects h3 { margin: 0 0 8px; color: var(--bronze); font: 8px/1.2 var(--numbers); letter-spacing: .12em; }
+.refuge-build__projects > p { margin: 0; color: var(--faint); font-size: 8px; }
+.refuge-build__projects article { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.refuge-build__projects article > strong { font: 500 10px/1.2 var(--display); }
+.refuge-build__projects article > span { color: var(--muted); font: 7px/1.2 var(--numbers); }
+.refuge-build__projects progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--olive); }
+.refuge-build__projects article > div { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.refuge-build__projects article button { min-height: 30px; padding: 5px 7px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 7px; }
+.refuge-build__projects article button[aria-pressed="true"] { border-color: var(--olive); color: var(--ink); }
+.refuge-build__projects article small { color: var(--olive); font-size: 8px; }
 .refuge-build__inspector > small { display: block; padding: 3px 11px 11px; color: var(--faint); font: 7px/1.3 var(--numbers); text-transform: capitalize; }
 #app[data-build-mode="true"] .controls-hint { display: none; }
 #app[data-build-mode="true"] .hud-navigation { display: none; }
@@ -744,6 +763,8 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .refuge-build__inspector { top: 56px; right: 8px; width: min(300px, calc(100vw - 16px)); max-height: calc(100vh - 150px); overflow: auto; }
   .refuge-build__tools button { width: 96px; }
   .refuge-build__tools button,
+  .refuge-build__catalog button,
+  .refuge-build__projects article button,
   .refuge-build__actions button,
   .refuge-build__nudge button,
   .refuge-build__camera button { min-height: 42px; }

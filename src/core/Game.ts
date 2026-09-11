@@ -22,6 +22,7 @@ import type {
   RefugeLayoutTool,
   RefugeStructureId,
 } from "../refuge/RefugeLayoutSystem";
+import type { FacilityRecipeId } from "../refuge/ConstructionSystem";
 import { EventBus } from "./EventBus";
 import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
@@ -40,11 +41,18 @@ interface RefugeEnvironmentDraft {
   validation: PlacementValidation;
 }
 
+interface ConstructionDraft {
+  recipeId: FacilityRecipeId;
+  rotation: number;
+  validation: PlacementValidation;
+}
+
 export class Game {
   private activeHudSection: HudSection = "Refuge";
   private animationFrameId: number | null = null;
   private buildDraft: RefugeBuildDraft | null = null;
   private buildEnvironmentDraft: RefugeEnvironmentDraft | null = null;
+  private constructionDraft: ConstructionDraft | null = null;
   private buildModeActive = false;
   private buildTool: RefugeLayoutTool | null = null;
   private readonly buildOverlay: RefugeBuildOverlay;
@@ -61,6 +69,7 @@ export class Game {
   private readonly heroRosterOverlay: HeroRosterOverlay;
   private readonly hudShell: HudShell;
   private readonly notificationCenter: NotificationCenter;
+  private lastBuildConstructionRevision = -1;
   private readonly portraits = new HeroPortraitCache();
   private readonly renderer: Renderer;
   private readonly recruitmentOverlay: RecruitmentOverlay;
@@ -72,7 +81,9 @@ export class Game {
 
   constructor(private readonly container: HTMLElement) {
     const heroes = this.simulation.getHeroes();
-    this.renderer = new Renderer(container, this.events, heroes, this.simulation.getRefugeLayout());
+    this.renderer = new Renderer(
+      container, this.events, heroes, this.simulation.getRefugeLayout(), this.simulation.getConstructionSnapshot(),
+    );
     this.cameraControlScheme = loadCameraControlScheme();
     this.renderer.setCameraControlScheme(this.cameraControlScheme);
     this.controlsHint = new ControlsHint(container, this.cameraControlScheme);
@@ -176,6 +187,11 @@ export class Game {
       rotate: () => this.rotateBuildDraft(),
       removeEnvironment: () => this.removeBuildEnvironment(),
       selectTool: (tool) => this.selectBuildTool(tool),
+      selectRecipe: (recipeId) => this.selectConstructionRecipe(recipeId),
+      toggleBuilder: (siteId, heroId) => {
+        this.simulation.toggleConstructionBuilder(siteId, heroId);
+        this.refreshBuildUi();
+      },
       store: () => this.storeBuildFacility(),
       undo: () => {
         this.simulation.undoRefugeLayout();
@@ -300,6 +316,7 @@ export class Game {
       heroes,
       fallenHeroes,
       this.simulation.getRefugeLayout(),
+      this.simulation.getConstructionSnapshot(),
     );
     const simulationSnapshot = this.simulation.getSnapshot();
     this.hudShell.update(
@@ -320,6 +337,10 @@ export class Game {
     this.squadOverlay.updateEvaluation();
     this.combatOverlay.update();
     this.expeditionOverlay.update();
+    const constructionRevision = this.simulation.getConstructionSnapshot().revision;
+    if (this.buildModeActive && constructionRevision !== this.lastBuildConstructionRevision) {
+      this.refreshBuildUi();
+    }
     if (this.selectedHeroId) {
       const selectedHero = this.simulation.getHero(this.selectedHeroId);
       if (selectedHero) {
@@ -464,6 +485,7 @@ export class Game {
     this.buildTool = null;
     this.buildDraft = null;
     this.buildEnvironmentDraft = null;
+    this.constructionDraft = null;
     this.container.dataset.buildMode = "true";
     this.renderer.setUiInteractionActive(false);
     this.renderer.setBuildMode(true);
@@ -476,6 +498,7 @@ export class Game {
     this.buildTool = null;
     this.buildDraft = null;
     this.buildEnvironmentDraft = null;
+    this.constructionDraft = null;
     delete this.container.dataset.buildMode;
     this.renderer.setBuildMode(false);
     this.renderer.setBuildPreview(null);
@@ -487,6 +510,7 @@ export class Game {
     if (!this.buildModeActive) return;
     this.buildTool = tool;
     this.buildEnvironmentDraft = null;
+    this.constructionDraft = null;
     if (this.isFacilityTool(tool)) {
       const facility = this.simulation.getRefugeLayout().facilities.find((candidate) => candidate.id === tool);
       if (facility) {
@@ -503,8 +527,30 @@ export class Game {
     this.refreshBuildUi();
   }
 
+  private selectConstructionRecipe(recipeId: FacilityRecipeId): void {
+    if (!this.buildModeActive) return;
+    const recipe = this.simulation.getFacilityRecipes().find((entry) => entry.id === recipeId);
+    if (!recipe) return;
+    this.buildTool = null;
+    this.buildDraft = null;
+    this.buildEnvironmentDraft = null;
+    this.constructionDraft = {
+      recipeId,
+      rotation: 0,
+      validation: this.simulation.validateConstructionPlacement(recipeId, 0, 0),
+    };
+    this.refreshBuildUi();
+  }
+
   private updateBuildPointer(x: number, z: number, activate: boolean): void {
-    if (!this.buildModeActive || (!this.buildTool && !this.buildEnvironmentDraft)) return;
+    if (!this.buildModeActive || (!this.buildTool && !this.buildEnvironmentDraft && !this.constructionDraft)) return;
+    if (this.constructionDraft) {
+      this.constructionDraft.validation = this.simulation.validateConstructionPlacement(
+        this.constructionDraft.recipeId, x, z,
+      );
+      this.refreshBuildUi();
+      return;
+    }
     if (this.buildEnvironmentDraft) {
       this.buildEnvironmentDraft.validation = this.simulation.validateRefugeEnvironment(
         this.buildEnvironmentDraft.environmentId, x, z,
@@ -535,12 +581,25 @@ export class Game {
   }
 
   private rotateBuildDraft(): void {
+    if (this.constructionDraft) {
+      this.constructionDraft.rotation = (this.constructionDraft.rotation + Math.PI / 2) % (Math.PI * 2);
+      this.refreshBuildUi();
+      return;
+    }
     if (!this.buildDraft) return;
     this.buildDraft.rotation = (this.buildDraft.rotation + Math.PI / 2) % (Math.PI * 2);
     this.refreshBuildUi();
   }
 
   private nudgeBuildDraft(dx: number, dz: number): void {
+    if (this.constructionDraft) {
+      const { x, z } = this.constructionDraft.validation;
+      this.constructionDraft.validation = this.simulation.validateConstructionPlacement(
+        this.constructionDraft.recipeId, x + dx * 2, z + dz * 2,
+      );
+      this.refreshBuildUi();
+      return;
+    }
     if (this.buildEnvironmentDraft) {
       const { x, z } = this.buildEnvironmentDraft.validation;
       this.buildEnvironmentDraft.validation = this.simulation.validateRefugeEnvironment(
@@ -560,6 +619,17 @@ export class Game {
   }
 
   private confirmBuildDraft(): void {
+    if (this.constructionDraft?.validation.valid) {
+      const draft = this.constructionDraft;
+      if (this.simulation.createConstructionSite(
+        draft.recipeId, draft.validation.x, draft.validation.z, draft.rotation,
+      )) {
+        this.constructionDraft = null;
+        this.renderer.setBuildPreview(null);
+      }
+      this.refreshBuildUi();
+      return;
+    }
     if (this.buildEnvironmentDraft?.validation.valid) {
       const draft = this.buildEnvironmentDraft;
       if (this.simulation.moveRefugeEnvironment(draft.environmentId, draft.validation.x, draft.validation.z)) {
@@ -587,6 +657,7 @@ export class Game {
   private cancelBuildDraft(): void {
     this.buildDraft = null;
     this.buildEnvironmentDraft = null;
+    this.constructionDraft = null;
     this.buildTool = null;
     this.renderer.setBuildPreview(null);
     this.refreshBuildUi();
@@ -615,6 +686,7 @@ export class Game {
 
   private refreshBuildUi(): void {
     const layout = this.simulation.getRefugeLayout();
+    this.lastBuildConstructionRevision = this.simulation.getConstructionSnapshot().revision;
     if (this.buildDraft) {
       const facility = layout.facilities.find((candidate) => candidate.id === this.buildDraft?.facilityId);
       if (facility) {
@@ -639,13 +711,31 @@ export class Game {
         });
       }
     }
+    if (this.constructionDraft) {
+      const recipe = this.simulation.getFacilityRecipes().find((entry) => entry.id === this.constructionDraft?.recipeId);
+      if (recipe) {
+        this.renderer.setBuildPreview({
+          radius: recipe.footprintRadius,
+          rotation: this.constructionDraft.rotation,
+          valid: this.constructionDraft.validation.valid,
+          x: this.constructionDraft.validation.x,
+          z: this.constructionDraft.validation.z,
+        });
+      }
+    }
     this.buildOverlay.update({
       active: this.buildModeActive,
       canUndo: this.simulation.canUndoRefugeLayout(),
-      draft: this.buildDraft?.validation ?? this.buildEnvironmentDraft?.validation ?? null,
+      construction: this.simulation.getConstructionSnapshot(),
+      constructionRecipeId: this.constructionDraft?.recipeId ?? null,
+      draft: this.buildDraft?.validation ?? this.buildEnvironmentDraft?.validation ?? this.constructionDraft?.validation ?? null,
       environmentId: this.buildEnvironmentDraft?.environmentId ?? null,
+      getRecipeCost: (recipeId) => this.simulation.getFacilityScrapCost(recipeId),
+      heroes: this.simulation.getHeroes(),
       layout,
-      rotation: this.buildDraft?.rotation ?? 0,
+      recipes: this.simulation.getFacilityRecipes(),
+      rotation: this.buildDraft?.rotation ?? this.constructionDraft?.rotation ?? 0,
+      scrap: this.simulation.getExpeditionSnapshot().resources.scrap,
       tool: this.buildTool,
     });
   }
@@ -659,7 +749,7 @@ export class Game {
     if (this.buildModeActive && !this.isEditableTarget(event.target)) {
       if (event.code === "Escape") {
         event.preventDefault();
-        if (this.buildDraft || this.buildEnvironmentDraft) this.cancelBuildDraft();
+        if (this.buildDraft || this.buildEnvironmentDraft || this.constructionDraft) this.cancelBuildDraft();
         else this.exitBuildMode(true);
         return;
       }

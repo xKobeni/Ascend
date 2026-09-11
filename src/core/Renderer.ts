@@ -14,6 +14,7 @@ import { CombatArenaScene } from "../rendering/combat/CombatArenaScene";
 import { RefugeBuildInput, type RefugeGroundPoint } from "../rendering/RefugeBuildInput";
 import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
 import type { RefugeBuildPreview } from "../rendering/ProceduralBaseScene";
+import type { ConstructionSnapshot } from "../refuge/ConstructionSystem";
 
 export interface RendererEvents {
   buildGroundActivated: RefugeGroundPoint;
@@ -49,6 +50,7 @@ export class Renderer {
     },
     heroes: readonly Readonly<Hero>[],
     layout: Readonly<RefugeLayoutSnapshot>,
+    construction: Readonly<ConstructionSnapshot>,
   ) {
     this.scene = new THREE.Scene();
     this.combatScene = new THREE.Scene();
@@ -65,6 +67,7 @@ export class Renderer {
     this.container.appendChild(this.renderer.domElement);
 
     this.baseScene = new ProceduralBaseScene(this.scene, this.selectableRoots, layout);
+    this.baseScene.syncConstructions(construction);
     this.combatArena = new CombatArenaScene(this.combatScene);
     this.heroRenderer = new HeroRenderer(this.scene, heroes, this.selectableRoots);
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
@@ -102,6 +105,7 @@ export class Renderer {
     heroes: readonly Readonly<Hero>[],
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
     layout: Readonly<RefugeLayoutSnapshot>,
+    construction: Readonly<ConstructionSnapshot>,
   ): void {
     this.cameraController.update(deltaSeconds);
     const combatMode = combatSnapshot.result !== "Idle";
@@ -122,6 +126,7 @@ export class Renderer {
     }
     this.baseScene.syncMemorials(fallenHeroes);
     this.baseScene.syncLayout(layout);
+    this.baseScene.syncConstructions(construction);
     this.baseScene.update(timestampSeconds);
     this.heroRenderer.update(heroes, timestampSeconds, deltaSeconds);
     this.selectionRaycaster.update();

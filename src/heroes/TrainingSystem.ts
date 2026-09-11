@@ -44,7 +44,7 @@ export class TrainingSystem {
     return hero.training.active !== null;
   }
 
-  step(heroes: readonly Hero[], gameMinutes: number, needsSystem: NeedsSystem, day: number): void {
+  step(heroes: readonly Hero[], gameMinutes: number, needsSystem: NeedsSystem, day: number, facilityMultiplier = 1): void {
     heroes.forEach((hero) => {
       const assignment = hero.training.active;
       if (!assignment || hero.movement.activity !== "Training") {
@@ -55,7 +55,7 @@ export class TrainingSystem {
         return;
       }
       const trainingRate = (0.42 + hero.personality.discipline * 0.16 + hero.attributes.endurance * 0.01) *
-        getInjuryModifiers(hero).training;
+        getInjuryModifiers(hero).training * Math.max(1, facilityMultiplier);
       assignment.progress = Math.min(100, assignment.progress + gameMinutes * trainingRate);
       hero.training.injuryCheckMinutes += gameMinutes;
       this.checkForInjury(hero, needsSystem, day);

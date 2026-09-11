@@ -5,10 +5,10 @@
 Current implementation boundary (verified September 11, 2026):
 
 ```text
-Gameplay phases implemented: 0–21
+Gameplay phases implemented: 0–22
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 22 — Facility Construction
+Next gameplay phase: Phase 23 — Equipment
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -59,6 +59,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 11. Available beds and Rift Shards allow a seeded 1–3★ recruit through the Gate
 12. Active residents consume Food and shortages weaken meal recovery and morale
 13. Refuge Build Mode can reorganize all starting structures, store ordinary facilities, edit smooth trails, and move or remove seeded trees and rocks
+14. Victory Scrap can fund new facilities; assigned builders deliver materials and complete them over game time
 
 Before and after a meaningful change, run:
 
@@ -93,9 +94,10 @@ and the Refuge layout editor. A successful static build alone does not prove tho
 | 19 | Authoritative hero capacity, Dormitory upgrades and rest comfort | `refuge/DormitorySystem`, `NeedsSystem` |
 | 20 | Daily Food demand, provision shortages and balanced mission resources | `economy/ResourceEconomySystem` |
 | 21 | Broad editable Refuge plane, Build Mode, movable structures, trails, routing, trees and rocks | `refuge/RefugeLayoutSystem`, `RefugeBuildOverlay` |
+| 22 | Scrap recipes, construction sites, builder assignment, timed completion, and operational facility effects | `refuge/ConstructionSystem`, `RefugeBuildOverlay`, `ProceduralBaseScene` |
 
 Phase 22 is the next boundary. Construction sites, builders, progress timers, build recipes, new
-facilities, and Metal are not implemented by the Phase 21 layout editor.
+Metal, equipment, inventory, and crafting outputs are not implemented by the Phase 22 construction system.
 
 ---
 
@@ -1364,7 +1366,8 @@ assuming a passing typecheck proves layout quality.
 - Pass comfort through `DormitorySnapshot`; do not permanently rewrite hero needs or base recovery rates.
 - Keep capacity at or below the available navigation-point count unless you expand every activity ring.
 - Test full-capacity rejection, no-spend behavior, every upgrade, maximum-tier blocking, and resting recovery.
-- Keep Phase 20 consumption in `ResourceEconomySystem`; do not mix Phase 21 layout or Phase 22 construction into Dormitory balance.
+- Keep the base tier table in `DormitorySystem`; completed annex capacity is supplied by `Simulation`
+  from the construction snapshot rather than rewriting the tier.
 
 ### 10.13 Modify the Resource Economy Safely
 
@@ -1374,7 +1377,7 @@ assuming a passing typecheck proves layout quality.
 - Pass shortage state into `NeedsSystem`; do not edit every hero to apply temporary penalties.
 - Keep consequences gradual and scaled by game minutes.
 - Test Stocked, Low, Empty, restored supplies, partial availability, and zero-resource rejection.
-- Do not introduce Metal until Phase 22 implements a real material-consuming recipe.
+- Do not introduce Metal until a real source and consuming recipe are implemented.
 
 ### 10.14 Modify the Refuge Layout Safely
 
@@ -1393,8 +1396,48 @@ assuming a passing typecheck proves layout quality.
   six-pixel click/placement threshold in `SelectionRaycaster` and `RefugeBuildInput`.
 - Extend `scripts/ui-playtest.mjs` for deterministic seeds, rejection, revision changes, routing,
   trail commit/undo, desktop/mobile controls, and regression paths.
-- Do not add prices, construction sites, builders, timers, Metal, or new completed facilities here;
-  those belong to Phase 22.
+- Route new site footprints into these validators as reserved placements so layout edits, trees, and
+  trails cannot overlap construction.
+
+### 10.15 Modify Facility Construction Safely
+
+Phase 22 separates three responsibilities:
+
+- `ConstructionSystem` owns recipes, site records, builders, delivery, progress, completion, and
+  completed-facility counts. Its snapshot is plain data; it contains no Three.js objects.
+- `RefugeLayoutSystem.validateNewFacility()` owns shared spatial checks. Construction passes every
+  existing site as a reserved footprint, so it does not copy the Phase 21 collision rules.
+- `ProceduralBaseScene.syncConstructions()` converts the snapshot into temporary site frames or
+  completed procedural buildings. Rebuilding visual objects must never mutate construction state.
+
+To change a recipe, edit `FACILITY_RECIPES` in `src/refuge/ConstructionSystem.ts`. Keep costs in real
+Scrap, durations in game minutes, and footprints in world units. The current process is:
+
+```text
+Catalog selection → shared placement validation → Scrap transaction → Site
+→ assign up to two eligible heroes → 45 builder-minutes of material delivery
+→ recipe progress → Complete → service modifier activates
+```
+
+Construction runs at 12 game minutes per real second. Two builders therefore finish twice as fast.
+Recovering heroes and heroes with an active training assignment are ineligible; do not bypass that
+rule only in the UI, because `ConstructionSystem.toggleBuilder()` is the authoritative guard.
+
+Completed services are derived in `Simulation`:
+
+- Dormitory Annex: +1 bed per completed annex.
+- Training Hall: ×1.15 training progress when at least one is complete.
+- Infirmary Ward: ×1.20 injury recovery when at least one is complete.
+- Storehouse: ×0.90 Food demand when at least one is complete.
+- Smithy: 10% lower later facility Scrap costs, rounded up.
+
+When adding another service, pass a temporary modifier into the owning system. Do not permanently
+rewrite hero attributes, resource totals, or recipe definitions. Keep Smithy equipment and crafting
+out until Phases 23–24, and keep Metal absent until its acquisition loop exists.
+
+Test every construction change for unaffordable no-spend behavior, invalid placement, overlap with
+existing sites, builder eligibility, delivery transition, completion, service activation, mobile
+touch targets, and renderer teardown. Construction remains session-only until Phase 38 save/load.
 
 ---
 
@@ -1413,6 +1456,9 @@ assuming a passing typecheck proves layout quality.
 | Initial Refuge plane | 72×72 world units (3×3 planning area) | `src/refuge/RefugeLayoutSystem.ts` |
 | Prepared expansion plane | 120×120 world units (5×5, locked) | `src/refuge/RefugeLayoutSystem.ts` |
 | Seeded environment | 28 trees and 16 rocks, capped at 520 attempts | `src/refuge/RefugeLayoutSystem.ts` |
+| Construction builders | 2 per site | `src/refuge/ConstructionSystem.ts` |
+| Material delivery | 45 builder-minutes | `src/refuge/ConstructionSystem.ts` |
+| Facility recipes | 10–16 Scrap, 300–480 game minutes | `src/refuge/ConstructionSystem.ts` |
 | Starting Food | 12 | `src/expeditions/ExpeditionSystem.ts` |
 | Food consumption | 1 per active hero per game day | `src/economy/ResourceEconomySystem.ts` |
 | First mission reward | 8 Food, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
@@ -1466,6 +1512,7 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/simulation/Simulation.ts` | Top-level simulation coordinator. Time system. |
+| `src/refuge/ConstructionSystem.ts` | Facility catalog, site state, builders, progress, and completed services. |
 
 ### Heroes
 | File | Purpose |
@@ -1560,7 +1607,7 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/ui/HudShell.ts` | Top status bar, Refuge provisioning record, and bottom navigation. |
-| `src/ui/RefugeBuildOverlay.ts` | Contextual Refuge layout tools and accessible build controls. |
+| `src/ui/RefugeBuildOverlay.ts` | Contextual layout tools, construction catalog, projects, and builder controls. |
 | `src/ui/SelectionOverlay.ts` | Hero detail panel (4 tabs). |
 | `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |

@@ -21,6 +21,7 @@ import { TraitEvolutionSystem } from "./TraitEvolutionSystem";
 import { Random } from "../core/Random";
 import type { RestRecoveryModifiers } from "./NeedsSystem";
 import type { RefugeLayoutSnapshot } from "../refuge/RefugeLayoutSystem";
+import type { ConstructionSnapshot } from "../refuge/ConstructionSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -267,7 +268,12 @@ export class HeroManager {
     day: number,
     minuteOfDay: number,
     layout: Readonly<RefugeLayoutSnapshot>,
+    construction: Readonly<ConstructionSnapshot>,
     restRecovery?: Readonly<RestRecoveryModifiers>,
+    facilityEffects: Readonly<{ injuryRecoveryMultiplier: number; trainingMultiplier: number }> = {
+      injuryRecoveryMultiplier: 1,
+      trainingMultiplier: 1,
+    },
   ): void {
     const heroes = [...this.heroes.values()];
     this.trainingSystem.prepare(heroes);
@@ -279,9 +285,10 @@ export class HeroManager {
       this.needsSystem,
       this.trainingSystem,
       layout,
+      construction,
     );
-    this.trainingSystem.step(heroes, gameMinutes, this.needsSystem, day);
-    this.injurySystem.step(heroes, gameMinutes);
+    this.trainingSystem.step(heroes, gameMinutes, this.needsSystem, day, facilityEffects.trainingMultiplier);
+    this.injurySystem.step(heroes, gameMinutes, facilityEffects.injuryRecoveryMultiplier);
     this.memorySystem.step(heroes, gameMinutes);
     this.relationshipSystem.step(heroes, gameMinutes, day, minuteOfDay);
   }

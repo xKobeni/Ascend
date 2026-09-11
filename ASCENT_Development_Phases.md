@@ -30,10 +30,10 @@ Hero
 ## Current Implementation Status — September 11, 2026
 
 ```text
-Gameplay phases implemented: 0–21
-Current playable milestone: Editable, living Refuge layout with seeded environment generation
+Gameplay phases implemented: 0–22
+Current playable milestone: Resource-funded facility construction with assigned builders
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 22 — Facility Construction
+Next gameplay phase: Phase 23 — Equipment
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,9 +47,8 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 21 is complete. Phase 22 and later remain design context and require a new implementation
-approval boundary. Construction costs, construction sites, builders, timers, new facility recipes,
-and Metal are not part of the current build.
+Phase 22 is complete. Phase 23 and later remain design context and require a new implementation
+approval boundary. Equipment, inventory, crafting outputs, and Metal are not part of the current build.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
 adapted into ASCENT as the **Procedural Character Forge**. Its human hero-generation core is now
@@ -1823,7 +1822,7 @@ boundary until supplied models are available.
 
 ---
 
-# Phase 22 — Facility Construction
+# Phase 22 — Facility Construction — Implemented
 
 ## Goal
 
@@ -1842,28 +1841,51 @@ Storage
 Smithy
 ```
 
-### 22.1 Facility Catalog and Recipes
+### 22.1 Facility Catalog and Recipes — Implemented
 
 Define buildable footprints, entrances, prerequisites, and real resource costs. Start with Scrap;
 introduce Metal only when an implemented source and recipe consume it.
 
-### 22.2 Construction Sites
+The live catalog contains five Scrap-only level-one recipes. Their footprint, duration, base cost,
+description, and operational service are plain simulation data in `ConstructionSystem`; a completed
+Smithy reduces subsequent facility Scrap costs by 10%, rounded up. Metal remains absent.
+
+### 22.2 Construction Sites — Implemented
 
 Confirmed placements create construction sites through the authoritative layout system rather than
 immediately spawning completed buildings.
 
-### 22.3 Construction Progress
+The Build Mode catalog uses the same hidden two-unit grid and checks the Phase 21 layout snapshot,
+environment, trails, existing structures, and other sites before spending Scrap. A successful
+transaction creates one authoritative construction-site record; invalid or unaffordable attempts do
+not spend resources.
+
+### 22.3 Construction Progress — Implemented
 
 Assigned builders deliver materials and advance time-based progress.
 
-### 22.4 Facility Completion and Renderer
+Up to two eligible heroes can be assigned from the site inspector. Recovering heroes and heroes with
+active training cannot be assigned. The first 45 builder-minutes deliver materials; subsequent
+builder-minutes advance the recipe timer. Missing heroes are removed from assignments safely.
+
+### 22.4 Facility Completion and Renderer — Implemented
 
 Procedurally generate site and completed visuals. A facility becomes usable only after completion.
+
+The renderer derives temporary foundations, delivered-material frames, and distinct completed
+facility silhouettes from the snapshot. Completion activates bounded services already supported by
+the game: a Dormitory Annex adds one bed, Training Hall grants +15% training progress, Infirmary Ward
+grants +20% injury recovery, Storehouse lowers daily Food demand by 10%, and the Smithy lowers later
+facility Scrap costs. Equipment and crafting remain Phase 23–24 work.
 
 ## Exit Criteria
 
 The player can spend real resources, place a valid construction site, watch assigned builders
 complete it, and use the finished facility without duplicating Phase 21 placement logic.
+
+**Met.** The browser regression covers the five-entry catalog, collision rejection, builder
+assignment, material delivery, completion, and the Smithy cost modifier. Construction state remains
+session-only until the save-system phase.
 
 ---
 

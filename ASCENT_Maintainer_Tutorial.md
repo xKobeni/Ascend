@@ -1,6 +1,6 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 21. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 22. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
@@ -9,9 +9,9 @@ Last verified against the repository: September 11, 2026.
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–21
+Implemented gameplay phases: 0–22
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 22 — Facility Construction
+Next gameplay phase: 23 — Equipment
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 

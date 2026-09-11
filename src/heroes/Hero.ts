@@ -209,6 +209,7 @@ export interface HeroTraining {
 }
 
 export type HeroActivity =
+  | "Building"
   | "Eating"
   | "Idle"
   | "Resting"
@@ -219,7 +220,7 @@ export type HeroActivity =
 export interface HeroMovement {
   activity: HeroActivity;
   decisionReason: string | null;
-  decisionSource: "Need" | "Schedule" | "Training";
+  decisionSource: "Construction" | "Need" | "Schedule" | "Training";
   destinationId: string | null;
   destinationLabel: string | null;
   facingRadians: number;

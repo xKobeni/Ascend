@@ -8,11 +8,11 @@ export interface NavigationPoint {
   z: number;
 }
 
-export type ScheduledActivity = Exclude<HeroActivity, "Idle" | "Walking">;
+export type ScheduledActivity = Exclude<HeroActivity, "Building" | "Idle" | "Walking">;
 
 export interface RefugeNavigationPoints {
   activities: Readonly<Record<ScheduledActivity, readonly NavigationPoint[]>>;
-  focus: Readonly<Record<Exclude<HeroActivity, "Walking">, RefugePoint>>;
+  focus: Readonly<Record<ScheduledActivity | "Idle", RefugePoint>>;
   idle: readonly NavigationPoint[];
   infirmary: readonly NavigationPoint[];
 }

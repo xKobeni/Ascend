@@ -114,15 +114,16 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–21 and the first persistent
+The implemented build currently covers Phases 0–22 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
 decisions, earned traits, bounded personality drift, Rift-funded procedural recruitment, hero
 capacity, dormitory upgrades, comfort-driven rest recovery, daily Food demand, provision shortages,
 Medicine replenishment, the expedition-funded resource loop, movable Refuge facilities, editable
-trails, placement validation, and deterministic placeholder trees are active. Facility construction,
-equipment, classes, and campaign depth in this document describe future phases; they must remain
+trails, placement validation, deterministic placeholder trees, Scrap-funded construction sites,
+builder assignments, build timers, and completed facility services are active. Equipment, classes,
+crafting, and campaign depth in this document describe future phases; they must remain
 absent from the playable interface until their authoritative systems are implemented.
 
 The standalone character-generator prototype now supplies the bounded human-generation core of the
@@ -2135,7 +2136,8 @@ The four destinations grow with the game instead of multiplying into a dashboard
 | Broad memories | Hero Relations and behavior influence | Implemented |
 | Recruitment and capacity | Recruit Gate and Dormitory record inside Heroes/Refuge | Implemented |
 | Current resource economy | Persistent HUD plus compact Refuge provisioning record | Implemented |
-| Facility construction and crafting | Refuge world locations and contextual work panels | Future |
+| Facility construction | Refuge Build Mode and contextual world locations | Implemented |
+| Equipment and crafting | Hero details and contextual Smithy work panels | Future |
 | Equipment and classes | Hero details; Party shows only resulting squad impact | Future |
 | Expedition variety and Rift depth | Rift mission selection and regional progression | Future |
 | Doctrine and advanced relationships | Party planning and hero Relations details | Future |

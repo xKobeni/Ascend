@@ -8,6 +8,8 @@ import {
   type RefugeStructureId,
 } from "../refuge/RefugeLayoutSystem";
 import { placeObjectOnRefugeGround, REFUGE_GROUND_Y } from "./RefugeGround";
+import type { ConstructionSnapshot, ConstructionSite, FacilityRecipeId } from "../refuge/ConstructionSystem";
+import { FACILITY_RECIPES } from "../refuge/ConstructionSystem";
 
 interface FacilityRenderObject {
   anchorRotation: number;
@@ -28,6 +30,9 @@ export interface RefugeBuildPreview {
 }
 
 export class ProceduralBaseScene {
+  private constructionRevision = -1;
+  private readonly constructionRoot = new THREE.Group();
+  private readonly constructionSelectionRoots = new Set<THREE.Object3D>();
   private readonly environmentRoot = new THREE.Group();
   private readonly environmentSelectionRoots = new Set<THREE.Object3D>();
   private readonly facilityObjects = new Map<RefugeStructureId, FacilityRenderObject[]>();
@@ -62,6 +67,8 @@ export class ProceduralBaseScene {
     this.addDimensionalGate();
     this.addMemorialGrounds();
     this.createBuildPreview();
+    this.constructionRoot.name = "Refuge Construction";
+    this.root.add(this.constructionRoot);
     this.environmentRoot.name = "Refuge Layout Environment";
     this.root.add(this.environmentRoot);
     this.scene.add(this.root);
@@ -116,6 +123,19 @@ export class ProceduralBaseScene {
     });
     this.rebuildEnvironment(layout);
     this.layoutRevision = layout.revision;
+  }
+
+  syncConstructions(snapshot: Readonly<ConstructionSnapshot>): void {
+    if (snapshot.revision === this.constructionRevision) return;
+    this.constructionSelectionRoots.forEach((root) => this.removeSelectableRoot(root));
+    this.constructionSelectionRoots.clear();
+    while (this.constructionRoot.children.length > 0) {
+      const child = this.constructionRoot.children[0];
+      if (!child) break;
+      this.disposeObject(child);
+    }
+    snapshot.sites.forEach((site) => this.addConstruction(site));
+    this.constructionRevision = snapshot.revision;
   }
 
   setBuildMode(active: boolean): void {
@@ -532,6 +552,82 @@ export class ProceduralBaseScene {
     this.previewRoot.visible = false;
     this.previewRoot.renderOrder = 9;
     this.root.add(this.previewRoot);
+  }
+
+  private addConstruction(site: Readonly<ConstructionSite>): void {
+    const recipe = FACILITY_RECIPES.find((entry) => entry.id === site.recipeId);
+    if (!recipe) return;
+    const group = new THREE.Group();
+    group.position.set(site.x, 0.2, site.z);
+    group.rotation.y = site.rotation;
+    const complete = site.state === "Complete";
+    markSelectable(group, {
+      category: "facility",
+      detail: complete ? `${recipe.service}. Operational.` : `${site.state} · ${site.builderIds.length} builder${site.builderIds.length === 1 ? "" : "s"} assigned.`,
+      id: site.id,
+      label: recipe.label,
+    });
+    this.selectableRoots.push(group);
+    this.constructionSelectionRoots.add(group);
+    if (complete) this.addCompletedFacilityGeometry(group, site.recipeId);
+    else this.addSiteGeometry(group, recipe.footprintRadius, site.state === "Materials");
+    placeObjectOnRefugeGround(group);
+    this.constructionRoot.add(group);
+  }
+
+  private addSiteGeometry(group: THREE.Group, radius: number, materialsDelivered: boolean): void {
+    const timber = new THREE.MeshStandardMaterial({ color: "#735638", roughness: 1 });
+    const foundation = new THREE.MeshStandardMaterial({ color: materialsDelivered ? "#747b5d" : "#5d5a51", roughness: 1 });
+    const slab = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.78, radius * 0.9, 0.35, 12), foundation);
+    slab.position.y = 0.18;
+    slab.receiveShadow = true;
+    group.add(slab);
+    [-1, 1].forEach((x) => [-1, 1].forEach((z) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, materialsDelivered ? 2.8 : 1.4, 6), timber);
+      post.position.set(x * radius * 0.52, materialsDelivered ? 1.4 : 0.7, z * radius * 0.52);
+      post.castShadow = true;
+      group.add(post);
+    }));
+  }
+
+  private addCompletedFacilityGeometry(group: THREE.Group, type: FacilityRecipeId): void {
+    const stone = new THREE.MeshStandardMaterial({ color: "#5d5a51", roughness: 0.94 });
+    const timber = new THREE.MeshStandardMaterial({ color: "#72543a", roughness: 0.96 });
+    const bronze = new THREE.MeshStandardMaterial({ color: "#a78652", metalness: 0.18, roughness: 0.78 });
+    const cloth = new THREE.MeshStandardMaterial({ color: type === "infirmary" ? "#7a4545" : "#747b5d", roughness: 1 });
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, 0.42, 10), stone);
+    floor.position.y = 0.21;
+    floor.receiveShadow = true;
+    group.add(floor);
+    if (type === "smithy") {
+      const shelter = new THREE.Mesh(new THREE.BoxGeometry(5.5, 3.4, 4.2), stone);
+      shelter.position.y = 1.9;
+      shelter.castShadow = true;
+      const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.82, 4.8, 8), timber);
+      chimney.position.set(1.7, 3.8, -0.8);
+      chimney.castShadow = true;
+      group.add(shelter, chimney);
+      return;
+    }
+    if (type === "training-hall") {
+      [-2.2, 0, 2.2].forEach((x) => {
+        const target = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.3, 12), cloth);
+        target.position.set(x, 2.4, 0);
+        target.rotation.x = Math.PI / 2;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 3.6, 6), timber);
+        post.position.set(x, 1.8, 0);
+        group.add(post, target);
+      });
+      return;
+    }
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.6, 3.2, 4.5), type === "storage" ? timber : cloth);
+    body.position.y = 1.8;
+    body.castShadow = true;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.2, 2.5, 4), type === "dormitory" ? cloth : bronze);
+    roof.position.y = 4.55;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    group.add(body, roof);
   }
 
   private rebuildEnvironment(layout: Readonly<RefugeLayoutSnapshot>): void {
