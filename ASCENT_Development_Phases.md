@@ -59,6 +59,67 @@ unrestricted equipment authoring, sliders, or localStorage authoring controls.
 
 ---
 
+## Table of Contents
+
+### Implemented Phases (0–23)
+1. [Phase 0 — Project Foundation](#phase-0--project-foundation)
+2. [Phase 1 — Procedural Base Scene](#phase-1--procedural-base-scene)
+3. [Phase 2 — Procedural Hero Generator](#phase-2--procedural-hero-generator)
+4. [Phase 3 — Hero Identity and Stats](#phase-3--hero-identity-and-stats)
+5. [Phase 4 — Base Hero Movement](#phase-4--base-hero-movement)
+6. [Phase 5 — Needs System](#phase-5--needs-system)
+7. [Phase 6 — Relationship System](#phase-6--relationship-system)
+8. [Phase 7 — Training System](#phase-7--training-system)
+9. [Phase 8 — Squad System](#phase-8--squad-system)
+10. [Phase 9 — Combat Sandbox](#phase-9--combat-sandbox)
+11. [Phase 10 — Utility AI](#phase-10--utility-ai)
+12. [Phase 11 — Combat Roles and Formation](#phase-11--combat-roles-and-formation)
+13. [Phase 12 — Hero Skill Forge](#phase-12--hero-skill-forge)
+14. [Phase 13 — First Expedition](#phase-13--first-expedition)
+15. [UI Milestone U1 — Current-System Client Foundation](#ui-milestone-u1--current-system-client-foundation--complete)
+16. [Phase 14 — Injury and Recovery](#phase-14--injury-and-recovery--complete)
+17. [Phase 15 — Permanent Death](#phase-15--permanent-death--complete)
+18. [Phase 16 — Memory System](#phase-16--memory-system--complete)
+19. [Phase 17 — Trait Evolution](#phase-17--trait-evolution--complete)
+20. [Phase 18 — Recruitment System](#phase-18--recruitment-system--complete)
+21. [Phase 19 — Hero Capacity and Dormitories](#phase-19--hero-capacity-and-dormitories--complete)
+22. [Phase 20 — Resource Economy](#phase-20--resource-economy--complete)
+23. [Phase 21 — Refuge Layout System](#phase-21--refuge-layout-system--complete)
+24. [Phase 22 — Facility Construction](#phase-22--facility-construction--implemented)
+25. [Phase 23 — Equipment](#phase-23--equipment--implemented)
+
+### Future Phases (24–46)
+26. [Phase 24 — Smithy and Crafting](#phase-24--smithy-and-crafting)
+27. [Phase 25 — Class System](#phase-25--class-system)
+28. [Phase 26 — Branching Classes](#phase-26--branching-classes)
+29. [Phase 27 — Mentorship](#phase-27--mentorship)
+30. [Phase 28 — Multiple Expedition Types](#phase-28--multiple-expedition-types)
+31. [Phase 29 — Procedural Expedition Generator](#phase-29--procedural-expedition-generator)
+32. [Phase 30 — Rift Progression](#phase-30--rift-progression)
+33. [Phase 31 — Bosses](#phase-31--bosses)
+34. [Phase 32 — Social Events](#phase-32--social-events)
+35. [Phase 33 — Loyalty and Order Refusal](#phase-33--loyalty-and-order-refusal)
+36. [Phase 34 — Advanced Combat Relationships](#phase-34--advanced-combat-relationships)
+37. [Phase 35 — Tactical Doctrine Expansion](#phase-35--tactical-doctrine-expansion)
+38. [Phase 36 — Hero History](#phase-36--hero-history)
+39. [Phase 37 — Memorial and Graveyard](#phase-37--memorial-and-graveyard)
+40. [Phase 38 — Save System](#phase-38--save-system)
+41. [Phase 39 — Production UI Expansion](#phase-39--production-ui-expansion)
+42. [Phase 40 — Audio](#phase-40--audio)
+43. [Phase 41 — Visual Polish](#phase-41--visual-polish)
+44. [Phase 42 — Performance Optimization](#phase-42--performance-optimization)
+45. [Phase 43 — Balance Pass](#phase-43--balance-pass)
+46. [Phase 44 — Content Expansion](#phase-44--content-expansion)
+47. [Phase 45 — Lore Layer](#phase-45--lore-layer)
+48. [Phase 46 — Advanced Systems](#phase-46--advanced-systems)
+
+### Milestones and Principles
+49. [Recommended Development Milestones](#recommended-development-milestones)
+50. [Recommended MVP Cut](#recommended-mvp-cut)
+51. [Final Development Principle](#final-development-principle)
+
+---
+
 # Phase 0 — Project Foundation
 
 ## Goal
