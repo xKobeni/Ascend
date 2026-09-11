@@ -27,13 +27,13 @@ Hero
 → Repeat
 ```
 
-## Current Implementation Status — September 10, 2026
+## Current Implementation Status — September 11, 2026
 
 ```text
-Gameplay phases implemented: 0–18
-Current playable milestone: Rift-funded procedural recruitment through the Dimensional Gate
+Gameplay phases implemented: 0–19
+Current playable milestone: Dormitory-gated recruitment and comfort-driven rest recovery
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 19 — Hero Capacity and Dormitories
+Next gameplay phase: Phase 20 — Resource Economy
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,7 +47,7 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 18 is complete. Phase 19 and later remain design context and require a new implementation
+Phase 19 is complete. Phase 20 and later remain design context and require a new implementation
 approval boundary.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
@@ -1539,7 +1539,7 @@ plus the complete earlier UI, expedition, recovery, legacy, memory, and trait re
 
 ---
 
-# Phase 19 — Hero Capacity and Dormitories
+# Phase 19 — Hero Capacity and Dormitories — Complete
 
 ## Goal
 
@@ -1547,25 +1547,56 @@ Make roster size part of base management.
 
 ## Tasks
 
-### 19.1 Population Limit
+### 19.1 Population Limit — Implemented
 
-Example:
+The Dormitory is authoritative for active-roster capacity. The top status bar and Heroes surface
+show occupancy as a current/maximum pair. The current tiers are:
 
 ```text
-8 / 10 Heroes
+Level 1: 5 beds
+Level 2: 7 beds
+Level 3: 10 beds
 ```
 
-### 19.2 Dormitory Capacity
+Recruitment checks capacity before spending Rift Shards. A full refuge therefore cannot lose
+recruitment currency on a rejected action.
 
-Upgrade to increase hero capacity.
+### 19.2 Dormitory Capacity — Implemented
 
-### 19.3 Comfort
+The Heroes surface contains the active Dormitory record rather than adding a fifth navigation
+destination. Selecting the Dormitory in the 3D Refuge also routes to Heroes. Upgrades are immediate,
+bounded transactions using the already-real Scrap stockpile:
 
-Dorm quality affects morale and fatigue recovery.
+```text
+Level 1 → Level 2: 12 Scrap
+Level 2 → Level 3: 24 Scrap
+Level 3: maximum
+```
+
+`Simulation.upgradeDormitory()` verifies idle expedition/combat state and available Scrap before
+spending through `ExpeditionSystem`. No construction timer, placement mode, worker assignment, or
+new material is introduced before later phases.
+
+### 19.3 Comfort — Implemented
+
+Dormitory comfort modifies existing recovery only while a hero is Resting:
+
+```text
+Basic:       fatigue ×1.00, morale +0.0/hour
+Settled:     fatigue ×1.15, morale +0.5/hour
+Restorative: fatigue ×1.30, morale +1.0/hour
+```
+
+These values are passed from the Dormitory snapshot into `NeedsSystem`; they are not copied into
+each hero. Navigation rings now contain enough resting, activity, and infirmary points for the
+implemented 10-hero maximum.
 
 ## Exit Criteria
 
-Recruitment and base growth become connected.
+Recruitment and base growth are connected through an authoritative, visible capacity rule. Browser
+validation confirms full-capacity blocking without shard loss, Scrap spending, both upgrades, the
+maximum tier, improved resting recovery, post-upgrade recruitment, live UI occupancy, and all prior
+combat/expedition/hero regressions.
 
 ---
 

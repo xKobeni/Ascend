@@ -319,9 +319,11 @@ try {
     `Phase 17 trait validation failed (${JSON.stringify(traitValidation)}).`,
   );
   const recruitmentValidation = await evaluate(`(async () => {
-    const [{ Simulation }, { RecruitmentSystem }, { HeroGenerator }, { Random }, { createInitialMovement }, { validateHeroAppearanceConfig }, { HeroPortraitCache }, { RecruitmentOverlay }, { NotificationCenter }, { ProceduralBaseScene }, THREE] = await Promise.all([
+    const [{ Simulation }, { RecruitmentSystem }, { DormitorySystem }, { NeedsSystem }, { HeroGenerator }, { Random }, { createInitialMovement }, { validateHeroAppearanceConfig }, { HeroPortraitCache }, { RecruitmentOverlay }, { NotificationCenter }, { ProceduralBaseScene }, THREE] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
       import('/src/recruitment/RecruitmentSystem.ts'),
+      import('/src/refuge/DormitorySystem.ts'),
+      import('/src/heroes/NeedsSystem.ts'),
       import('/src/heroes/HeroGenerator.ts'),
       import('/src/core/Random.ts'),
       import('/src/base/NavigationPoints.ts'),
@@ -343,6 +345,12 @@ try {
     const notification = new NotificationCenter(document.querySelector('#app'), () => undefined);
     notification.update(initialHeroes, [], simulation.getExpeditionSnapshot(), []);
     simulation.getExpeditionSnapshot().resources.riftShards = 3;
+    const capacityBlocked = simulation.recruitHero(187450) === null;
+    const shardsPreservedAtCapacity = simulation.getExpeditionSnapshot().resources.riftShards === 3;
+    simulation.getExpeditionSnapshot().resources.scrap = 12;
+    const upgraded = simulation.upgradeDormitory();
+    const dormitoryAfterUpgrade = simulation.getDormitorySnapshot();
+    const scrapAfterUpgrade = simulation.getExpeditionSnapshot().resources.scrap;
     const shardsBefore = simulation.getExpeditionSnapshot().resources.riftShards;
     const result = simulation.recruitHero(187451);
     const shardsAfter = simulation.getExpeditionSnapshot().resources.riftShards;
@@ -352,6 +360,29 @@ try {
     notification.update(simulation.getHeroes(), [], simulation.getExpeditionSnapshot(), []);
     const recruitmentNotice = [...document.querySelectorAll('.notification-feed li')].some((entry) => entry.textContent.includes(result.hero.name + ' emerged'));
     notification.dispose();
+
+    const dormitory = new DormitorySystem();
+    const basicRest = dormitory.getSnapshot(5);
+    dormitory.upgrade();
+    const settledRest = dormitory.getSnapshot(5);
+    const basicHero = structuredClone(initialHeroes[0]);
+    const settledHero = structuredClone(initialHeroes[0]);
+    [basicHero, settledHero].forEach((hero) => {
+      hero.movement.activity = 'Resting';
+      Object.assign(hero.needs, { fatigue: 80, health: 100, hunger: 100, morale: 50, social: 100, stress: 0 });
+    });
+    const needs = new NeedsSystem();
+    needs.step([basicHero], 60, basicRest);
+    needs.step([settledHero], 60, settledRest);
+    const comfortImprovesRecovery = settledHero.needs.fatigue < basicHero.needs.fatigue && settledHero.needs.morale > basicHero.needs.morale;
+
+    const maximumSimulation = new Simulation();
+    maximumSimulation.getExpeditionSnapshot().resources.scrap = 36;
+    const firstMaximumUpgrade = maximumSimulation.upgradeDormitory();
+    const secondMaximumUpgrade = maximumSimulation.upgradeDormitory();
+    const scrapAtMaximum = maximumSimulation.getExpeditionSnapshot().resources.scrap;
+    const maximumBlocked = maximumSimulation.upgradeDormitory() === false;
+    const maximumDormitory = maximumSimulation.getDormitorySnapshot();
 
     const reproduced = new HeroGenerator(new Random(result.seed)).generate(
       createInitialMovement(initialHeroes.length),
@@ -383,13 +414,16 @@ try {
     return {
       appearanceReproduced,
       blocked,
+      capacityBlocked,
       countAfter,
+      comfortImprovesRecovery,
       deterministicRank,
       generationSeed: result.hero.generationSeed,
       gateActive,
       hiddenPotentialPresent: Object.values(result.hero.hiddenPotential).every((value) => value >= 0.25 && value <= 0.98),
       invalidRejected: invalidImport === null,
       joinedRelationships: Object.keys(result.hero.relationships).length === initialHeroes.length,
+      maximum: firstMaximumUpgrade && secondMaximumUpgrade && maximumBlocked && maximumDormitory.capacity === 10 && maximumDormitory.upgradeCost === null && scrapAtMaximum === 0,
       portrait: Boolean(portraitUrl?.startsWith('blob:') && revealPortrait.startsWith('blob:')),
       ranks: [...ranks].sort(),
       recruitmentNotice,
@@ -397,19 +431,23 @@ try {
       revealRank,
       shardsAfter,
       shardsBefore,
+      shardsPreservedAtCapacity,
+      upgrade: upgraded && dormitoryAfterUpgrade.capacity === 7 && dormitoryAfterUpgrade.comfort === 'Settled' && scrapAfterUpgrade === 0,
       validImport: Boolean(validImport),
     };
   })()`);
   assert(
-    recruitmentValidation.appearanceReproduced && recruitmentValidation.blocked &&
+    recruitmentValidation.appearanceReproduced && recruitmentValidation.blocked && recruitmentValidation.capacityBlocked &&
       recruitmentValidation.countAfter === 6 && recruitmentValidation.deterministicRank &&
+      recruitmentValidation.comfortImprovesRecovery &&
       recruitmentValidation.generationSeed === 187451 && recruitmentValidation.gateActive && recruitmentValidation.hiddenPotentialPresent &&
-      recruitmentValidation.invalidRejected && recruitmentValidation.joinedRelationships &&
+      recruitmentValidation.invalidRejected && recruitmentValidation.joinedRelationships && recruitmentValidation.maximum &&
       recruitmentValidation.portrait && JSON.stringify(recruitmentValidation.ranks) === JSON.stringify([1, 2, 3]) &&
       recruitmentValidation.recruitmentNotice && recruitmentValidation.reveal &&
       recruitmentValidation.revealRank >= 1 && recruitmentValidation.revealRank <= 3 &&
-      recruitmentValidation.shardsBefore === 3 && recruitmentValidation.shardsAfter === 0 && recruitmentValidation.validImport,
-    `Phase 18 recruitment validation failed (${JSON.stringify(recruitmentValidation)}).`,
+      recruitmentValidation.shardsBefore === 3 && recruitmentValidation.shardsAfter === 0 &&
+      recruitmentValidation.shardsPreservedAtCapacity && recruitmentValidation.upgrade && recruitmentValidation.validImport,
+    `Phase 18-19 recruitment and capacity validation failed (${JSON.stringify(recruitmentValidation)}).`,
   );
   const legacyValidation = await evaluate(`(async () => {
     const [{ HeroManager }, { SquadSystem }, { HeroRenderer }, { ProceduralBaseScene }, { NotificationCenter }, { HeroRosterOverlay }, THREE] = await Promise.all([
@@ -478,10 +516,13 @@ try {
       () => manager.getFallen(),
       () => squad.getSquad(),
       () => 0,
+      () => 0,
       () => 3,
+      () => ({ capacity: 5, comfort: 'Basic', fatigueRecoveryMultiplier: 1, level: 1, moraleRecoveryBonus: 0, occupied: 2, upgradeCost: 12 }),
       { get: () => null },
       () => undefined,
       (heroId) => { inspectedMemorial = heroId; },
+      () => undefined,
       () => undefined,
       () => undefined,
     );
@@ -624,6 +665,10 @@ try {
   await click('[data-hud-section="Heroes"]');
   await waitFor("!document.querySelector('.roster-panel').hidden", "Heroes panel");
   assert(await evaluate("document.querySelector('[data-roster-action=\"recruit\"]')?.disabled") === true, "Recruitment must begin blocked without Rift Shards.");
+  assert(await evaluate("document.querySelector('[data-roster-count]')?.textContent") === "5 / 5", "Heroes must show authoritative occupied/capacity status.");
+  assert(await evaluate("document.querySelector('[data-dormitory=\"occupancy\"]')?.textContent") === "5 / 5 beds", "Dormitory occupancy must be visible in Heroes.");
+  assert(await evaluate("document.querySelector('[data-roster-action=\"upgrade-dormitory\"]')?.disabled") === true, "Dormitory upgrade must be blocked without Scrap.");
+  assert(await evaluate("document.querySelector('[data-hud=\"heroes\"]')?.textContent") === "5/5", "Top status must show hero capacity.");
   await waitFor("document.querySelectorAll('.hero-roster-card img').length === 5", "procedural portraits", 20_000);
   const portraits = await evaluate("[...document.querySelectorAll('.hero-roster-card img')].map((image) => image.src)");
   assert(new Set(portraits).size === 5 && portraits.every((src) => src.startsWith("blob:")), "Each hero must receive a distinct cached procedural portrait.");

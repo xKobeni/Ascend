@@ -22,7 +22,7 @@ export class ProceduralBaseScene {
 
     this.addLighting();
     this.addGround();
-    this.addFacilityZone("dormitory-zone", "Dormitory Zone", "#49758a", -17.1, -13.2);
+    this.addFacilityZone("dormitory-zone", "Dormitory", "#49758a", -17.1, -13.2);
     this.addFacilityZone("training-zone", "Training Zone", "#926d3f", 16.2, -13.5);
     this.addFacilityZone("storage-zone", "Storage Zone", "#56765e", -16.2, 13.5);
     this.addFacilityZone("gate-zone", "Gate Zone", "#755b8c", 16.8, 12.9);

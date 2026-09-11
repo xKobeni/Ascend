@@ -7,6 +7,7 @@ import { SquadSystem } from "../squads/SquadSystem";
 import { CombatSimulation } from "../combat/CombatSimulation";
 import { ExpeditionSystem } from "../expeditions/ExpeditionSystem";
 import { RECRUITMENT_COST, RecruitmentSystem, type RecruitmentRoll } from "../recruitment/RecruitmentSystem";
+import { DormitorySystem, type DormitorySnapshot } from "../refuge/DormitorySystem";
 
 export interface RecruitmentResult extends RecruitmentRoll {
   cost: number;
@@ -44,6 +45,7 @@ export class Simulation {
   );
   private readonly squadSystem = new SquadSystem();
   private readonly recruitmentSystem = new RecruitmentSystem();
+  private readonly dormitorySystem = new DormitorySystem();
   private readonly state: SimulationSnapshot = {
     day: 1,
     elapsedSeconds: 0,
@@ -82,6 +84,7 @@ export class Simulation {
       deltaSeconds * GAME_MINUTES_PER_REAL_SECOND,
       this.state.day,
       this.state.minuteOfDay,
+      this.getDormitorySnapshot(),
     );
   }
 
@@ -170,9 +173,33 @@ export class Simulation {
     return RECRUITMENT_COST;
   }
 
+  getDormitorySnapshot(): Readonly<DormitorySnapshot> {
+    return this.dormitorySystem.getSnapshot(this.heroManager.getAll().length);
+  }
+
+  upgradeDormitory(): boolean {
+    if (this.getExpeditionSnapshot().phase !== "Briefing" ||
+      this.getCombatSnapshot().result !== "Idle") {
+      return false;
+    }
+    const resources = this.getExpeditionSnapshot().resources;
+    const snapshot = this.getDormitorySnapshot();
+    if (!this.dormitorySystem.canUpgrade(resources.scrap) || snapshot.upgradeCost === null) {
+      return false;
+    }
+    if (!this.expeditionSystem.consumeScrap(snapshot.upgradeCost)) {
+      return false;
+    }
+    if (!this.dormitorySystem.upgrade()) {
+      throw new Error("Dormitory upgrade validation and commit diverged.");
+    }
+    return true;
+  }
+
   canRecruit(): boolean {
     return this.getExpeditionSnapshot().phase === "Briefing" &&
       this.getCombatSnapshot().result === "Idle" &&
+      this.dormitorySystem.hasCapacity(this.heroManager.getAll().length) &&
       this.getExpeditionSnapshot().resources.riftShards >= RECRUITMENT_COST;
   }
 

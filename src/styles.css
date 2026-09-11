@@ -204,6 +204,35 @@ canvas {
 .roster-panel > .system-panel__header { grid-template-columns: 1fr auto auto auto; }
 .system-panel__header .roster-recruit { width: auto; padding: 0 10px; border-color: var(--bronze); color: var(--ink); font: 8px/1.2 var(--numbers); letter-spacing: .08em; }
 .system-panel__header .roster-recruit:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
+.dormitory-status {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) minmax(220px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin: 14px 20px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: #171714;
+}
+.dormitory-status > div:first-child { display: grid; gap: 3px; }
+.dormitory-status > div:first-child > span { color: var(--bronze); font: 8px/1 var(--numbers); letter-spacing: .14em; }
+.dormitory-status strong { color: var(--ink); font: 500 15px/1.2 var(--display); letter-spacing: .04em; }
+.dormitory-status small,
+.dormitory-status__effects { color: var(--muted); font: 8px/1.5 var(--numbers); letter-spacing: .06em; text-transform: uppercase; }
+.dormitory-status__effects { display: flex; gap: 18px; }
+.dormitory-status > button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--bronze);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 8px/1.2 var(--numbers);
+  letter-spacing: .08em;
+}
+.dormitory-status > button:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
 .roster-filters { display: flex; gap: 20px; padding: 13px 20px 0; }
 .roster-filters button,
 .hero-detail-tabs button {
@@ -605,6 +634,9 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .roster-grid { grid-template-columns: 1fr 1fr; gap: 9px; padding: 12px 14px 18px; }
   .roster-panel > .system-panel__header { grid-template-columns: 1fr auto auto; gap: 9px; }
   .system-panel__header .roster-recruit { grid-column: 1 / -1; grid-row: 2; min-height: 38px; }
+  .dormitory-status { grid-template-columns: 1fr; gap: 9px; margin: 10px 14px 0; }
+  .dormitory-status__effects { justify-content: space-between; gap: 8px; }
+  .dormitory-status > button { min-height: 40px; }
   .memorial-ledger { margin: 0 14px 18px; }
   .memorial-ledger__list { grid-template-columns: 1fr; }
   .hero-detail-tabs { gap: 7px; margin: 10px 14px 0; }

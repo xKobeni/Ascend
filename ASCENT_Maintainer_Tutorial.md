@@ -1,17 +1,17 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 18. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 19. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
-Last verified against the repository: September 10, 2026.
+Last verified against the repository: September 11, 2026.
 
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–18
+Implemented gameplay phases: 0–19
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 19 — Hero Capacity and Dormitories
+Next gameplay phase: 20 — Resource Economy
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 
@@ -1317,8 +1317,8 @@ Recruitment is implemented separately in Phase 18; the other systems retain late
 Phase 18 adds a real acquisition loop without adding another primary destination:
 
 ```text
-Win Rift expedition → receive 3 Rift Shards → Heroes / Dimensional Gate
-→ spend 3 Shards → generate seeded hero → reveal → active Refuge roster
+Win Rift expedition → receive 3 Rift Shards and 18 Scrap → expand Dormitory if full
+→ Heroes / Dimensional Gate → spend 3 Shards → generate seeded hero → reveal → active roster
 ```
 
 ### Recruitment ownership
@@ -1327,7 +1327,7 @@ Win Rift expedition → receive 3 Rift Shards → Heroes / Dimensional Gate
 distribution is 72% 1★, 23% 2★, and 5% 3★. Only these ranks exist in the current acquisition flow.
 
 `Simulation.recruitHero(seed?)` is the transaction boundary. It verifies that combat and expedition
-are idle, verifies the stockpile, spends Rift Shards through `ExpeditionSystem`, asks `HeroManager`
+are idle, verifies Dormitory capacity and the stockpile, spends Rift Shards through `ExpeditionSystem`, asks `HeroManager`
 to generate/admit the recruit, updates hero count, and returns the reveal result. Player code omits
 the seed; the optional argument exists for reproducible validation.
 
@@ -1382,12 +1382,73 @@ the context is released, superseded URLs are revoked, and all remaining URLs are
 6. Extend Phase 18 browser validation for spending, reproducibility, ranks, admission, portrait, and reveal.
 7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
 
-Phase 19 capacity and dormitory limits are not implemented. Phase 18 therefore does not invent a
-population cap, comfort modifier, bed requirement, or dormitory upgrade cost.
+Phase 19 now supplies the capacity rule around Phase 18 recruitment. Keep rank, appearance, and
+recruitment cost changes within the Phase 18 owners described above.
 
 ---
 
-## 29. Debugging Method
+## 29. Phase 19 Reference: Hero Capacity and Dormitories
+
+`src/refuge/DormitorySystem.ts` owns the three immutable tier definitions and the current tier index.
+It derives a `DormitorySnapshot` containing level, occupied beds, capacity, comfort, rest effects,
+and the next upgrade cost. The implemented tiers are:
+
+| Level | Comfort | Capacity | Upgrade to next | Rest fatigue | Rest morale |
+|------:|---------|---------:|----------------:|-------------:|------------:|
+| 1 | Basic | 5 | 12 Scrap | ×1.00 | +0.0/hour |
+| 2 | Settled | 7 | 24 Scrap | ×1.15 | +0.5/hour |
+| 3 | Restorative | 10 | Maximum | ×1.30 | +1.0/hour |
+
+### Capacity and upgrade transactions
+
+`Simulation.canRecruit()` checks Dormitory capacity before recruitment spends 3 Rift Shards. The
+starting roster therefore begins at `5 / 5`, and a blocked Gate attempt preserves all Shards.
+
+`Simulation.upgradeDormitory()` is the upgrade transaction boundary. It requires Briefing/Idle
+state, checks the tier and real Scrap balance, spends through `ExpeditionSystem.consumeScrap`, and
+then commits exactly one tier. JavaScript executes this synchronously, so no other action can alter
+the balance between validation and commit.
+
+### Comfort data flow
+
+```text
+DormitorySystem.getSnapshot()
+  ↓ Simulation.step()
+HeroManager.step()
+  ↓
+NeedsSystem.step()
+  ↓ only when movement.activity === "Resting"
+fatigue recovery multiplier + morale recovery bonus
+```
+
+Comfort is not copied onto heroes and does not modify base needs when they are walking, eating,
+training, or socializing. The normal `NeedsSystem` defaults remain ×1.00 and +0 when no modifier is
+provided, preserving direct callers and earlier tests.
+
+### UI and world behavior
+
+The Heroes surface shows occupancy, comfort, recovery effects, and the next Scrap cost. The Gate
+button reports a capacity-specific reason when full. The top status displays `occupied/capacity`.
+Selecting the 3D Dormitory routes to Heroes, but there is no fifth navigation item. Activity,
+resting, and infirmary navigation rings contain ten positions to match the Phase 19 maximum.
+
+### Safe recipe: modify Dormitory balance
+
+1. Change tier data only in `DORMITORY_TIERS`.
+2. Keep roster admission checks in `Simulation.canRecruit()`.
+3. Keep Scrap ownership in `ExpeditionSystem`; never subtract a UI copy.
+4. Pass new comfort effects through the snapshot instead of storing derived values on every hero.
+5. Update UI text by reading the snapshot rather than hardcoding costs or capacity.
+6. Extend browser coverage for no-spend rejection, upgrades, maximum level, recovery, and layout.
+7. Run `npm run check`, `npm run build`, `npm run playtest:ui`, and `git diff --check`.
+
+Phase 20 recurring consumption, broader economy balancing, new resources, upkeep, and shortages are
+not implemented. Phase 21 construction placement, timers, builders, and facility meshes also remain
+outside this phase.
+
+---
+
+## 30. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1466,7 +1527,7 @@ git diff --check
 
 ---
 
-## 30. Safe Git Workflow
+## 31. Safe Git Workflow
 
 Before editing:
 
@@ -1494,7 +1555,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 31. Definition of Done for a Change
+## 32. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1518,7 +1579,7 @@ Use this checklist:
 
 ---
 
-## 32. Final Rule of Thumb
+## 33. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 

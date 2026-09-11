@@ -115,6 +115,15 @@ export class ExpeditionSystem {
     return true;
   }
 
+  consumeScrap(amount: number): boolean {
+    const normalized = Math.max(0, Math.floor(amount));
+    if (normalized === 0 || this.resources.scrap < normalized) {
+      return false;
+    }
+    this.resources.scrap -= normalized;
+    return true;
+  }
+
   private resolve(
     combat: Readonly<CombatSnapshot>,
     outcome: Exclude<CombatResult, "Idle" | "Running">,

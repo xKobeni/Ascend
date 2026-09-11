@@ -7,12 +7,26 @@ export interface HeroDecision {
   source: "Need" | "Schedule";
 }
 
+export interface RestRecoveryModifiers {
+  fatigueRecoveryMultiplier: number;
+  moraleRecoveryBonus: number;
+}
+
+const DEFAULT_REST_RECOVERY: Readonly<RestRecoveryModifiers> = Object.freeze({
+  fatigueRecoveryMultiplier: 1,
+  moraleRecoveryBonus: 0,
+});
+
 const clampNeed = (value: number): number => Math.min(100, Math.max(0, value));
 
 export class NeedsSystem {
-  step(heroes: readonly Hero[], gameMinutes: number): void {
+  step(
+    heroes: readonly Hero[],
+    gameMinutes: number,
+    restRecovery: Readonly<RestRecoveryModifiers> = DEFAULT_REST_RECOVERY,
+  ): void {
     const gameHours = gameMinutes / 60;
-    heroes.forEach((hero) => this.updateHero(hero, gameHours));
+    heroes.forEach((hero) => this.updateHero(hero, gameHours, restRecovery));
   }
 
   chooseActivity(
@@ -100,7 +114,11 @@ export class NeedsSystem {
     hero.needs.stress = clampNeed(hero.needs.stress + boundedDamage * 0.65);
   }
 
-  private updateHero(hero: Hero, gameHours: number): void {
+  private updateHero(
+    hero: Hero,
+    gameHours: number,
+    restRecovery: Readonly<RestRecoveryModifiers>,
+  ): void {
     const { needs } = hero;
     const activity = hero.movement.activity;
 
@@ -110,7 +128,7 @@ export class NeedsSystem {
     needs.fatigue = clampNeed(
       needs.fatigue +
         (activity === "Resting"
-          ? -22
+          ? -22 * Math.max(1, restRecovery.fatigueRecoveryMultiplier)
           : activity === "Training"
             ? 9
             : activity === "Walking"
@@ -127,7 +145,7 @@ export class NeedsSystem {
     );
 
     const moraleRate =
-      (activity === "Resting" ? 1.5 : 0) +
+      (activity === "Resting" ? 1.5 + Math.max(0, restRecovery.moraleRecoveryBonus) : 0) +
       (activity === "Socializing" ? 2.5 : 0) +
       (needs.hunger < 35 ? -4 : 0) +
       (needs.health < 70 ? -3 : 0) +

@@ -1,5 +1,6 @@
 import type { ExpeditionResources } from "../expeditions/Expedition";
 import type { SimulationSnapshot } from "../simulation/Simulation";
+import type { DormitorySnapshot } from "../refuge/DormitorySystem";
 
 export type HudSection = "Heroes" | "Party" | "Refuge" | "Rift";
 
@@ -55,11 +56,12 @@ export class HudShell {
   update(
     snapshot: Readonly<SimulationSnapshot>,
     resources: Readonly<ExpeditionResources>,
+    dormitory: Readonly<DormitorySnapshot>,
   ): void {
     const hours = Math.floor(snapshot.minuteOfDay / 60);
     const minutes = Math.floor(snapshot.minuteOfDay % 60);
     this.time.textContent = `DAY ${snapshot.day} · ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-    this.heroCount.textContent = String(snapshot.heroCount);
+    this.heroCount.textContent = `${snapshot.heroCount}/${dormitory.capacity}`;
     this.resourceValues.scrap.textContent = String(resources.scrap);
     this.resourceValues.food.textContent = String(resources.food);
     this.resourceValues.medicine.textContent = String(resources.medicine);

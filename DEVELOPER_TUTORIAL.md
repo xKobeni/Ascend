@@ -2,13 +2,13 @@
 
 > A complete guide to understanding, maintaining, and modifying the ASCENT codebase.
 
-Current implementation boundary (verified September 10, 2026):
+Current implementation boundary (verified September 11, 2026):
 
 ```text
-Gameplay phases implemented: 0–18
+Gameplay phases implemented: 0–19
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 19 — Hero Capacity and Dormitories
+Next gameplay phase: Phase 20 — Resource Economy
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -55,7 +55,8 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 7. Survivors remember rescues, trauma, and fallen allies
 8. Experience can award traits and gently change personality
 9. Fallen heroes get memorial graves in the refuge
-10. A victory's Rift Shards can recruit a seeded 1–3★ hero through the Gate
+10. A victory's Scrap can expand the Dormitory when the 5-bed refuge is full
+11. Available beds and Rift Shards allow a seeded 1–3★ recruit through the Gate
 
 Before and after a meaningful change, run:
 
@@ -87,9 +88,10 @@ static build alone does not prove those runtime paths.
 | 16 | Typed memories, reinforcement/decay, relationships and Utility AI influence | `memories/` |
 | 17 | Earned traits, provenance, notifications and bounded personality drift | `TraitEvolutionSystem` |
 | 18 | Rift-funded seeded recruitment and human Procedural Character Forge | `recruitment/`, `RecruitmentOverlay` |
+| 19 | Authoritative hero capacity, Dormitory upgrades and rest comfort | `refuge/DormitorySystem`, `NeedsSystem` |
 
-Phase 19 is the next boundary. It will make roster capacity and dormitories authoritative. Until
-then, do not invent a population cap, bed requirement, comfort modifier, or dormitory upgrade cost.
+Phase 20 is the next boundary. Do not add recurring food consumption, shortages, new materials,
+upkeep, or broader economy balancing before that phase is implemented.
 
 ---
 
@@ -487,15 +489,16 @@ again. This is intentional compatibility behavior, not a missing evolution.
 
 ### 4.12 Recruitment (`src/recruitment/RecruitmentSystem.ts`)
 
-Recruitment costs 3 Rift Shards and is allowed only while combat is idle and the expedition is in
-Briefing. The actual flow is coordinated by `Simulation.recruitHero()`:
+Recruitment costs 3 Rift Shards and is allowed only while combat is idle, the expedition is in
+Briefing, and the Dormitory has a free bed. The actual flow is coordinated by `Simulation.recruitHero()`:
 
-1. Check the real `ExpeditionSystem` shard stockpile.
-2. Create a deterministic seed/rank roll in `RecruitmentSystem`.
-3. Spend 3 shards.
-4. Generate and admit the hero through `HeroManager.recruit()`.
-5. Initialize relationships with all current residents.
-6. Return one `RecruitmentResult` to the reveal UI.
+1. Check authoritative Dormitory capacity before any spending.
+2. Check the real `ExpeditionSystem` shard stockpile.
+3. Create a deterministic seed/rank roll in `RecruitmentSystem`.
+4. Spend 3 shards.
+5. Generate and admit the hero through `HeroManager.recruit()`.
+6. Initialize relationships with all current residents.
+7. Return one `RecruitmentResult` to the reveal UI.
 
 Rank odds are 72% 1★, 23% 2★, and 5% 3★. Rank is assigned after hero generation, so it does not
 modify hidden potential. Recruits store their generation seed; the same seed reproduces the same
@@ -508,6 +511,29 @@ builds the portrait cache signature.
 
 The prototype's races, classes, weapons, armor, enemies, unrestricted sliders, standalone sidebar,
 and localStorage presets remain excluded.
+
+### 4.13 Dormitory Capacity (`src/refuge/DormitorySystem.ts`)
+
+The Dormitory owns three fixed tiers:
+
+| Level | Comfort | Beds | Next cost | Rest fatigue | Rest morale |
+|------:|---------|-----:|----------:|-------------:|------------:|
+| 1 | Basic | 5 | 12 Scrap | ×1.00 | +0.0/hour |
+| 2 | Settled | 7 | 24 Scrap | ×1.15 | +0.5/hour |
+| 3 | Restorative | 10 | Maximum | ×1.30 | +1.0/hour |
+
+`DormitorySystem` stores only the tier index. `getSnapshot(heroCount)` derives occupied beds and
+all current values. `Simulation.upgradeDormitory()` verifies Briefing/Idle state and Scrap, spends
+through `ExpeditionSystem.consumeScrap()`, and advances one tier.
+
+`Simulation.step()` passes the current Dormitory snapshot through `HeroManager` to `NeedsSystem`.
+Only a hero whose activity is `Resting` receives the fatigue multiplier and morale bonus. These
+effects are derived modifiers, not fields stored on every hero.
+
+The starting five heroes fill the Basic Dormitory, so the first successful expedition provides the
+18 Scrap needed for the 12-Scrap expansion and the 3 Shards needed for recruitment. The remaining
+6 Scrap stays in the stockpile. Phase 19 does not add construction time, builders, placement,
+maintenance, food upkeep, shortages, or new resources.
 
 ---
 
@@ -883,6 +909,7 @@ All UI panels are built with **vanilla DOM manipulation** (no framework). Each p
 | DebugOverlay | `DebugOverlay.ts` | F3 diagnostics |
 | NotificationCenter | `NotificationCenter.ts` | Event feed |
 | RecruitmentOverlay | `RecruitmentOverlay.ts` | Seeded Dimensional Gate arrival reveal |
+| Dormitory status | inside `HeroRosterOverlay.ts` | Beds, comfort effects, Scrap upgrade action |
 | ControlsHint | `ControlsHint.ts` | Camera controls hint |
 | SocialLogOverlay | `SocialLogOverlay.ts` | Social event log |
 
@@ -1236,12 +1263,22 @@ assuming a passing typecheck proves layout quality.
 - Change `RECRUITMENT_COST` or rank thresholds in `src/recruitment/RecruitmentSystem.ts`.
 - Keep the button reading the cost through `Simulation`; never hardcode a second UI value.
 - Keep shard ownership in `ExpeditionSystem` and the full eligibility check in `Simulation`.
+- Preserve the Dormitory capacity check before shard spending.
 - Add appearance fields across `HeroAppearance`, `HeroGenerator`, `HeroAppearanceConfig`, and
   `HeroMeshGenerator` together so the world, portrait, and reveal cannot disagree.
 - Preserve `generationSeed` and prove the same seed reproduces the same appearance.
 - Do not expose hidden potential or player-controlled rank, class, equipment, or race selection.
 - Update the Phase 18 browser block to cover insufficient funds, spending, rank range, relationships,
   validated JSON, portrait generation, reveal content, notification, and roster count.
+
+### 10.12 Modify Dormitory Tiers Safely
+
+- Edit the tier definitions in `src/refuge/DormitorySystem.ts`; do not hardcode capacity or cost in UI.
+- Keep `Simulation.upgradeDormitory()` as the transaction boundary and Scrap in `ExpeditionSystem`.
+- Pass comfort through `DormitorySnapshot`; do not permanently rewrite hero needs or base recovery rates.
+- Keep capacity at or below the available navigation-point count unless you expand every activity ring.
+- Test full-capacity rejection, no-spend behavior, every upgrade, maximum-tier blocking, and resting recovery.
+- Do not add Phase 20 upkeep or Phase 21 placement/construction while changing Phase 19 balance.
 
 ---
 
@@ -1252,6 +1289,10 @@ assuming a passing typecheck proves layout quality.
 | Squad size | 3 | `src/squads/SquadSystem.ts` |
 | Recruitment cost | 3 Rift Shards | `src/recruitment/RecruitmentSystem.ts` |
 | Recruit rank odds | 72% / 23% / 5% for 1★ / 2★ / 3★ | `src/recruitment/RecruitmentSystem.ts` |
+| Dormitory capacities | 5 / 7 / 10 | `src/refuge/DormitorySystem.ts` |
+| Dormitory upgrade costs | 12 / 24 Scrap | `src/refuge/DormitorySystem.ts` |
+| Dormitory fatigue recovery | ×1.00 / ×1.15 / ×1.30 while Resting | `src/refuge/DormitorySystem.ts` |
+| Dormitory morale recovery | +0.0 / +0.5 / +1.0 per game hour while Resting | `src/refuge/DormitorySystem.ts` |
 | Max training slots | 3 | `src/heroes/TrainingSystem.ts` |
 | Active skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
 | Passive skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
@@ -1312,7 +1353,7 @@ assuming a passing typecheck proves layout quality.
 | `src/heroes/HeroManager.ts` | Hero lifecycle management. |
 | `src/heroes/NameGenerator.ts` | Fantasy name generation. |
 | `src/heroes/OccupationDefinitions.ts` | 35 occupation definitions. |
-| `src/heroes/NeedsSystem.ts` | Hunger, fatigue, health, morale, social, stress. |
+| `src/heroes/NeedsSystem.ts` | Hunger, fatigue, health, morale, social, stress, and Dormitory rest modifiers. |
 | `src/heroes/HeroRoutineSystem.ts` | Daily schedule, movement, navigation. |
 | `src/heroes/TrainingSystem.ts` | Training queue and completion. |
 | `src/heroes/InjurySystem.ts` | 11 injury types, stacking/aggravation, treatment, and recovery. |
@@ -1341,6 +1382,11 @@ assuming a passing typecheck proves layout quality.
 | File | Purpose |
 |------|---------|
 | `src/recruitment/RecruitmentSystem.ts` | Recruitment cost, stored seed, and 1–3★ rank roll. |
+
+### Refuge
+| File | Purpose |
+|------|---------|
+| `src/refuge/DormitorySystem.ts` | Hero capacity tiers, Scrap upgrade costs, and rest comfort modifiers. |
 
 ### Combat
 | File | Purpose |
@@ -1383,7 +1429,7 @@ assuming a passing typecheck proves layout quality.
 |------|---------|
 | `src/ui/HudShell.ts` | Top status bar + bottom navigation. |
 | `src/ui/SelectionOverlay.ts` | Hero detail panel (4 tabs). |
-| `src/ui/HeroRosterOverlay.ts` | Hero card grid with filters. |
+| `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |
 | `src/ui/ExpeditionOverlay.ts` | Mission briefing/combat/debrief. |
 | `src/ui/CombatOverlay.ts` | Sandbox combat viewer with AI debug. |

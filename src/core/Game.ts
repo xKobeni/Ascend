@@ -62,11 +62,14 @@ export class Game {
       () => this.simulation.getFallenHeroes(),
       () => this.simulation.getSquad(),
       () => this.simulation.getExpeditionSnapshot().resources.riftShards,
+      () => this.simulation.getExpeditionSnapshot().resources.scrap,
       () => this.simulation.getRecruitmentCost(),
+      () => this.simulation.getDormitorySnapshot(),
       this.portraits,
       (heroId) => this.openHeroDetail(heroId, "Overview", "Heroes"),
       (heroId) => this.openMemorial(heroId, "Heroes"),
       () => this.openRecruitment(),
+      () => this.simulation.upgradeDormitory(),
       () => this.activateHudSection("Refuge", true),
     );
     this.squadOverlay = new SquadOverlay(
@@ -146,6 +149,10 @@ export class Game {
           this.activateHudSection("Heroes");
           return;
         }
+        if (selection.category === "facility" && selection.id === "dormitory-zone") {
+          this.activateHudSection("Heroes");
+          return;
+        }
         this.closePlayerPanels();
         this.hudShell.setActive("Refuge");
         this.activeHudSection = "Refuge";
@@ -211,7 +218,11 @@ export class Game {
       fallenHeroes,
     );
     const simulationSnapshot = this.simulation.getSnapshot();
-    this.hudShell.update(simulationSnapshot, expeditionSnapshot.resources);
+    this.hudShell.update(
+      simulationSnapshot,
+      expeditionSnapshot.resources,
+      this.simulation.getDormitorySnapshot(),
+    );
     this.debugOverlay.update(timestampMs, simulationSnapshot, this.renderer.getCameraDiagnostics());
     this.notificationCenter.update(
       heroes,

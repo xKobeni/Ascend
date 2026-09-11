@@ -15,10 +15,14 @@ const createRing = (
   centerX: number,
   centerZ: number,
   radius: number,
-  count = 5,
+  count = 10,
 ): readonly NavigationPoint[] =>
   Array.from({ length: count }, (_, index) => {
-    const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+    const firstWaveSize = Math.ceil(count / 2);
+    const slotIndex = index < firstWaveSize
+      ? index * 2
+      : (index - firstWaveSize) * 2 + 1;
+    const angle = (slotIndex / count) * Math.PI * 2 - Math.PI / 2;
     return {
       id: `${id}-${index + 1}`,
       label,
@@ -46,7 +50,7 @@ export const INFIRMARY_NAVIGATION_POINTS: readonly NavigationPoint[] =
   createRing("infirmary-cot", "Infirmary", -10.4, -16.8, 2.15);
 
 export const IDLE_NAVIGATION_POINTS: readonly NavigationPoint[] = [
-  ...createRing("storage-work", "Storage", -16.2, 13.5, 4.95, 3),
+  ...createRing("storage-work", "Storage", -16.2, 13.5, 4.95, 6),
   { id: "idle-lookout-1", label: "Idle Area", x: -7.2, z: 17.4 },
   { id: "idle-lookout-2", label: "Idle Area", x: 6.6, z: 17.1 },
 ] as const;

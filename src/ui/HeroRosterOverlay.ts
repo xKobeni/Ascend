@@ -1,6 +1,7 @@
 import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { Squad } from "../squads/Squad";
 import type { HeroPortraitCache } from "../rendering/heroes/HeroPortraitCache";
+import type { DormitorySnapshot } from "../refuge/DormitorySystem";
 
 type RosterFilter = "All" | "Ready" | "Recovering" | "Training";
 
@@ -19,11 +20,14 @@ export class HeroRosterOverlay {
     private readonly getFallenHeroes: () => readonly Readonly<FallenHeroRecord>[],
     private readonly getSquad: () => Readonly<Squad>,
     private readonly getRiftShards: () => number,
+    private readonly getScrap: () => number,
     private readonly getRecruitmentCost: () => number,
+    private readonly getDormitory: () => Readonly<DormitorySnapshot>,
     private readonly portraits: HeroPortraitCache,
     private readonly onInspect: (heroId: string) => void,
     private readonly onInspectMemorial: (heroId: string) => void,
     private readonly onRecruit: () => void,
+    private readonly onUpgradeDormitory: () => void,
     private readonly onClose: () => void,
   ) {
     this.element = document.createElement("section");
@@ -34,9 +38,14 @@ export class HeroRosterOverlay {
       <header class="system-panel__header">
         <div><span>REFUGE PERSONNEL</span><h1>Heroes</h1></div>
         <button type="button" class="roster-recruit" data-roster-action="recruit">OPEN GATE · ${this.getRecruitmentCost()} SHARDS</button>
-        <strong data-roster-count>${this.getHeroes().length}</strong>
+        <strong data-roster-count></strong>
         <button type="button" data-roster-action="close" aria-label="Close hero roster">×</button>
       </header>
+      <section class="dormitory-status" aria-label="Dormitory status">
+        <div><span>DORMITORY</span><strong data-dormitory="occupancy"></strong><small data-dormitory="comfort"></small></div>
+        <div class="dormitory-status__effects"><span data-dormitory="fatigue"></span><span data-dormitory="morale"></span></div>
+        <button type="button" data-roster-action="upgrade-dormitory"></button>
+      </section>
       <div class="roster-filters" role="toolbar" aria-label="Filter heroes">
         ${FILTERS.map((filter) => `<button type="button" data-roster-filter="${filter}" aria-pressed="${filter === "All"}">${filter}</button>`).join("")}
       </div>
@@ -88,13 +97,24 @@ export class HeroRosterOverlay {
     const heroes = this.getHeroes();
     const visibleHeroes = heroes.filter((hero) => this.matchesFilter(hero));
     const count = this.element.querySelector<HTMLElement>("[data-roster-count]");
+    const dormitory = this.getDormitory();
     if (count) {
-      count.textContent = String(heroes.length);
+      count.textContent = `${heroes.length} / ${dormitory.capacity}`;
     }
+    this.renderDormitory(dormitory);
     const recruit = this.element.querySelector<HTMLButtonElement>("[data-roster-action='recruit']");
     if (recruit) {
-      recruit.disabled = this.getRiftShards() < this.getRecruitmentCost();
-      recruit.title = recruit.disabled ? "Secure Rift Shards through a successful expedition." : "Open the Dimensional Gate";
+      const full = dormitory.occupied >= dormitory.capacity;
+      const lacksShards = this.getRiftShards() < this.getRecruitmentCost();
+      recruit.disabled = full || lacksShards;
+      recruit.title = full
+        ? "Upgrade the Dormitory before recruiting another hero."
+        : lacksShards
+          ? "Secure Rift Shards through a successful expedition."
+          : "Open the Dimensional Gate";
+      recruit.setAttribute("aria-label", recruit.disabled
+        ? `Open Gate unavailable. ${recruit.title}`
+        : `Open Dimensional Gate for ${this.getRecruitmentCost()} Rift Shards.`);
     }
     this.grid.replaceChildren(...visibleHeroes.map((hero) => {
       const card = document.createElement("button");
@@ -166,6 +186,11 @@ export class HeroRosterOverlay {
       this.onRecruit();
       return;
     }
+    if (button.dataset.rosterAction === "upgrade-dormitory") {
+      this.onUpgradeDormitory();
+      this.render();
+      return;
+    }
     if (this.isFilter(button.dataset.rosterFilter)) {
       this.filter = button.dataset.rosterFilter;
       this.render();
@@ -209,6 +234,36 @@ export class HeroRosterOverlay {
     container.replaceChildren(heading, list);
   }
 
+  private renderDormitory(dormitory: Readonly<DormitorySnapshot>): void {
+    const occupancy = this.element.querySelector<HTMLElement>("[data-dormitory='occupancy']");
+    const comfort = this.element.querySelector<HTMLElement>("[data-dormitory='comfort']");
+    const fatigue = this.element.querySelector<HTMLElement>("[data-dormitory='fatigue']");
+    const morale = this.element.querySelector<HTMLElement>("[data-dormitory='morale']");
+    const upgrade = this.element.querySelector<HTMLButtonElement>("[data-roster-action='upgrade-dormitory']");
+    if (!occupancy || !comfort || !fatigue || !morale || !upgrade) {
+      throw new Error("Dormitory status structure is incomplete.");
+    }
+    occupancy.textContent = `${dormitory.occupied} / ${dormitory.capacity} beds`;
+    comfort.textContent = `Level ${dormitory.level} · ${dormitory.comfort} comfort`;
+    fatigue.textContent = `Rest fatigue ×${dormitory.fatigueRecoveryMultiplier.toFixed(2)}`;
+    morale.textContent = `Rest morale +${dormitory.moraleRecoveryBonus.toFixed(1)}/hr`;
+    if (dormitory.upgradeCost === null) {
+      upgrade.textContent = "MAXIMUM CAPACITY";
+      upgrade.disabled = true;
+      upgrade.title = "The Phase 19 dormitory is fully upgraded.";
+      upgrade.setAttribute("aria-label", "Dormitory is at maximum capacity.");
+      return;
+    }
+    upgrade.textContent = `UPGRADE · ${dormitory.upgradeCost} SCRAP`;
+    upgrade.disabled = this.getScrap() < dormitory.upgradeCost;
+    upgrade.title = upgrade.disabled
+      ? `Requires ${dormitory.upgradeCost} Scrap.`
+      : `Increase capacity and improve rest comfort.`;
+    upgrade.setAttribute("aria-label", upgrade.disabled
+      ? `Dormitory upgrade unavailable. ${upgrade.title}`
+      : `Upgrade Dormitory for ${dormitory.upgradeCost} Scrap.`);
+  }
+
   private matchesFilter(hero: Readonly<Hero>): boolean {
     const status = this.getStatus(hero);
     return this.filter === "All" || status === this.filter;
@@ -237,6 +292,8 @@ export class HeroRosterOverlay {
     return JSON.stringify({
       filter: this.filter,
       riftShards: this.getRiftShards(),
+      scrap: this.getScrap(),
+      dormitory: this.getDormitory(),
       heroes: this.getHeroes().map((hero) => [
         hero.id,
         Math.round(hero.needs.health),

@@ -114,11 +114,12 @@ A weak recruit from Day 2 may become the strongest veteran in the settlement by 
 
 ## 4.1 Current Build and Future Vision
 
-The implemented build currently covers Phases 0–18 and the first persistent
+The implemented build currently covers Phases 0–19 and the first persistent
 Train → Squad → Expedition → Combat → Injury or Death → Recovery or Memorial loop. Its live client
 contains Heroes, Party, Refuge, and Rift only. Permanent expedition casualties, survivor loss
 records, Refuge memorials, rescue memories, lasting trauma, memory decay, memory-shaped combat
-decisions, earned traits, bounded personality drift, and Rift-funded procedural recruitment are active. Facilities, equipment,
+decisions, earned traits, bounded personality drift, Rift-funded procedural recruitment, hero
+capacity, dormitory upgrades, and comfort-driven rest recovery are active. Construction, equipment,
 classes, and campaign depth in this document describe future phases; they must remain absent from
 the playable interface until their authoritative systems are implemented.
 
@@ -379,6 +380,22 @@ Initial facilities:
 - Basic Infirmary
 
 The base expands over time.
+
+## 7.1 Current Dormitory System
+
+The current build starts with 5 occupied beds. Recruitment is blocked while the refuge is full and
+does not spend Rift Shards on a rejected attempt. Two immediate, bounded Scrap upgrades connect
+expedition rewards to roster growth:
+
+```text
+Basic Dormitory       Level 1 · 5 beds  · rest fatigue ×1.00 · morale +0.0/hour
+Settled Dormitory     Level 2 · 7 beds  · 12 Scrap · fatigue ×1.15 · morale +0.5/hour
+Restorative Dormitory Level 3 · 10 beds · 24 Scrap · fatigue ×1.30 · morale +1.0/hour
+```
+
+Comfort affects only heroes whose current activity is Resting. The Dormitory appears inside Heroes
+and as a selectable Refuge facility, so the four-destination client remains unchanged. Physical
+construction, placement, staffing, repair, upkeep, and material expansion belong to later phases.
 
 Later facilities:
 

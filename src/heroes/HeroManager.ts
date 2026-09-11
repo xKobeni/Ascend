@@ -19,6 +19,7 @@ import type { CombatMemoryEvent } from "../memories/HeroMemory";
 import { MemorySystem } from "../memories/MemorySystem";
 import { TraitEvolutionSystem } from "./TraitEvolutionSystem";
 import { Random } from "../core/Random";
+import type { RestRecoveryModifiers } from "./NeedsSystem";
 
 export class HeroManager {
   private readonly heroes = new Map<string, Hero>();
@@ -264,10 +265,11 @@ export class HeroManager {
     gameMinutes: number,
     day: number,
     minuteOfDay: number,
+    restRecovery?: Readonly<RestRecoveryModifiers>,
   ): void {
     const heroes = [...this.heroes.values()];
     this.trainingSystem.prepare(heroes);
-    this.needsSystem.step(heroes, gameMinutes);
+    this.needsSystem.step(heroes, gameMinutes, restRecovery);
     this.routineSystem.step(
       heroes,
       deltaSeconds,
