@@ -43,7 +43,7 @@ npm run dev
 
 Open the URL shown in the terminal (usually `http://localhost:5173`). The game loads with 5 procedurally generated heroes in a 3D refuge.
 
-**Controls:** WASD to pan camera, Q/E to rotate, mouse wheel to zoom, click heroes to select, F3 for debug overlay.
+**Controls:** WASD or right/middle mouse drag to pan the camera, Q/E to rotate, mouse wheel to zoom, click heroes to select, F3 for the developer drawer.
 
 **Core gameplay loop:**
 1. Heroes walk around the refuge eating, training, socializing, resting
@@ -762,6 +762,10 @@ Fixed 3-member squad ("Squad Alpha"). Members are assigned to Front/Middle/Back 
 the two heroes exchange formation positions while retaining their roles. Both pointer drag-and-drop
 and accessible move controls use this same operation. Do not reproduce swap logic in the UI.
 
+Assigned Party cards reuse each hero's cached procedural portrait, but `.party-hero-card__portrait`
+applies a Party-only half-body crop. Keep that framing rule separate from the Heroes roster so a
+Party layout change does not alter the shared portrait renderer or create another WebGL context.
+
 **Squad evaluation:**
 ```
 combatPower = strength*4 + agility*2 + max(weaponSkills)*5 + level*10  (injury-modified)
@@ -803,6 +807,7 @@ combatPower = strength*4 + agility*2 + max(weaponSkills)*5 + level*10  (injury-m
 
 Elevated isometric orbital camera:
 - **WASD:** Pan (7.5 units/sec, clamped to -24..24)
+- **Right or middle mouse drag:** Pan relative to the current camera yaw. Drag distance scales with zoom and uses the same -24..24 target bounds.
 - **Q/E:** Rotate yaw (1.15 rad/sec)
 - **Mouse wheel:** Zoom (distance 30-84)
 - **Elevation:** Fixed at 43 degrees
@@ -810,7 +815,7 @@ Elevated isometric orbital camera:
 
 ### 8.2 Selection Raycaster (`src/rendering/SelectionRaycaster.ts`)
 
-Click-to-select heroes and objects in the 3D scene. Uses Three.js raycasting from mouse position to selectable meshes.
+Left-click to select heroes and objects in the 3D scene. Right and middle buttons are reserved for camera panning. Selection uses Three.js raycasting from mouse position to selectable meshes.
 
 Selection categories: `hero`, `facility`, `prop`, `base`, `memorial`
 

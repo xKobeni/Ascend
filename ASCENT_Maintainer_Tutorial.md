@@ -109,13 +109,15 @@ directory yet.
 ### Current player controls
 
 - `W`, `A`, `S`, `D`: pan the Refuge camera
+- Right-drag or middle-drag: pan the Refuge camera relative to its current angle
 - `Q`, `E`: rotate the Refuge camera
 - Mouse wheel: zoom
 - Click a selectable world object: inspect it
 - `Escape`: close the active player panel or return to Refuge
 - `F3`: open or close developer diagnostics
 
-Camera and world selection intentionally pause while a player panel or developer drawer is being
+Mouse panning is captured by the canvas, so the drag continues cleanly if the pointer leaves its
+bounds. Left click remains dedicated to world selection. Camera and world selection intentionally pause while a player panel or developer drawer is being
 operated.
 
 ---
@@ -658,6 +660,11 @@ assigned roles, and the three-member limit.
 
 The Party panel supports both drag-and-drop and `select` controls. Keep both paths when changing the
 layout; drag-and-drop alone is not keyboard-accessible.
+
+Assigned hero cards mark their portrait container with `data-portrait-framing="half-body"`. The CSS
+zooms and anchors the existing cached still around the upper body; it does not generate a second
+portrait. Keep the crop on `.party-hero-card__portrait img` so Heroes and recruitment retain their
+own framing.
 
 ### Squad readiness
 

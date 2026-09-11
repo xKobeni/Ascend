@@ -152,6 +152,7 @@ export class SquadOverlay {
     card.className = "party-hero-card";
     const portrait = document.createElement("div");
     portrait.className = "party-hero-card__portrait";
+    portrait.dataset.portraitFraming = "half-body";
     const url = this.portraits.get(hero.id);
     if (url) {
       const image = document.createElement("img");

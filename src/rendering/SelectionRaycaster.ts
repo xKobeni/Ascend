@@ -121,14 +121,14 @@ export class SelectionRaycaster {
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    if (!this.enabled) {
+    if (!this.enabled || event.button !== 0) {
       return;
     }
     this.pointerDownPosition = { x: event.clientX, y: event.clientY };
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    if (!this.enabled) {
+    if (!this.enabled || event.button !== 0) {
       return;
     }
     if (!this.pointerDownPosition) {

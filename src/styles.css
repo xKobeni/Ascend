@@ -451,7 +451,14 @@ canvas {
 .formation-slot__empty { display: grid; min-height: 250px; border: 1px dashed var(--line); color: var(--faint); place-items: center; font-size: 9px; }
 .party-hero-card { position: relative; padding: 5px 5px 9px; overflow: hidden; border: 1px solid #574b38; background: #181815; text-align: center; }
 .party-hero-card__portrait { display: grid; aspect-ratio: 4 / 5; overflow: hidden; background: linear-gradient(160deg, #24231e, #151513); color: var(--faint); place-items: center; font: 28px/1 var(--display); }
-.party-hero-card__portrait img { width: 100%; height: 100%; object-fit: cover; }
+.party-hero-card__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+  transform: scale(1.7);
+  transform-origin: 50% 18%;
+}
 .party-hero-card__rank { display: block; margin: 5px 0 2px; color: var(--bronze); font-size: 8px; letter-spacing: 0.14em; }
 .party-hero-card strong { display: block; overflow: hidden; font: 500 14px/1.2 var(--display); text-overflow: ellipsis; white-space: nowrap; }
 .party-hero-card > span:last-child { display: block; margin-top: 2px; color: var(--muted); font-size: 8px; }

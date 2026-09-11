@@ -92,8 +92,8 @@ export class Renderer {
       this.renderer.domElement.setAttribute(
         "aria-label",
         combatMode
-          ? "ASCENT combat encounter. Use W A S D to pan, Q and E to rotate, and the mouse wheel to zoom."
-          : "ASCENT refuge. Use W A S D to pan, Q and E to rotate, and the mouse wheel to zoom.",
+          ? "ASCENT combat encounter. Camera input is paused during combat."
+          : "ASCENT refuge. Use W A S D or right-drag to pan, Q and E to rotate, and the mouse wheel to zoom.",
       );
     }
     if (combatMode) {

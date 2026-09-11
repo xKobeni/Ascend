@@ -7,6 +7,7 @@ export class ControlsHint {
     this.element.className = "controls-hint";
     this.element.innerHTML = `
       <span><kbd>WASD</kbd> Pan</span>
+      <span><kbd>Right-drag</kbd> Pan</span>
       <span><kbd>Q</kbd><kbd>E</kbd> Rotate</span>
       <span><kbd>Wheel</kbd> Zoom</span>
       <span><kbd>Click</kbd> Inspect</span>

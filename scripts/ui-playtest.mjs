@@ -709,9 +709,20 @@ try {
 
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
   await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer camera baseline");
+  const cameraInitial = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  await click('[data-debug-action="close"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "right", buttons: 2, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 840, y: 500, button: "right", buttons: 2 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 840, y: 500, button: "right", buttons: 0, clickCount: 1 });
+  await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
+  await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer after pointer pan");
   const cameraBeforePanel = await evaluate("document.querySelector('[data-debug=\"camera\"]').textContent");
+  assert(cameraBeforePanel !== cameraInitial, `Right-drag did not pan the camera (${cameraInitial} -> ${cameraBeforePanel}).`);
   await click('[data-debug-action="close"]');
   await click('[data-hud-section="Heroes"]');
+  await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 430, button: "right", buttons: 2, clickCount: 1 });
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 600, y: 360, button: "right", buttons: 2 });
+  await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 600, y: 360, button: "right", buttons: 0, clickCount: 1 });
   await command("Input.dispatchMouseEvent", { type: "mouseWheel", x: 100, y: 200, deltaX: 0, deltaY: 100 });
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'F3', bubbles:true}))");
   await waitFor("!document.querySelector('.debug-overlay').hidden", "developer drawer over panel");
@@ -795,6 +806,12 @@ try {
     await pause(80);
   }
   assert(await evaluate("document.querySelectorAll('.party-hero-card').length") === 3, "Party must accept three heroes.");
+  assert(
+    await evaluate(`[...document.querySelectorAll('.party-hero-card__portrait')].every((portrait) =>
+      portrait.dataset.portraitFraming === 'half-body' && getComputedStyle(portrait.querySelector('img')).transform !== 'none'
+    )`),
+    "Assigned Party heroes must use the dedicated half-body portrait framing.",
+  );
   const before = await evaluate("[...document.querySelectorAll('.formation-slot')].map((slot) => slot.querySelector('.party-hero-card')?.dataset.heroId)");
   await evaluate(`(() => { const select = document.querySelectorAll('.party-card__controls [data-party-field="formation"]')[1]; select.value = 'Front'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
   const after = await evaluate("[...document.querySelectorAll('.formation-slot')].map((slot) => slot.querySelector('.party-hero-card')?.dataset.heroId)");
