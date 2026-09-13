@@ -447,7 +447,7 @@ canvas {
 .memorial-record dd { margin: 0; color: var(--ink); font: 9px/1.2 var(--numbers); }
 .memorial-record section { margin-top: 20px; padding: 13px; border-left: 2px solid var(--burgundy); background: rgb(122 69 69 / 7%); }
 .memorial-record section strong { color: #c58a8a; font: 500 14px/1.3 var(--display); }
-.hero-detail-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 20px 0; border-bottom: 1px solid var(--line); }
+.hero-detail-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 12px 20px 0; border-bottom: 1px solid var(--line); }
 .hero-panel { position: relative; z-index: 1; padding: 16px 20px 22px; }
 .hero-panel section { margin-top: 19px; }
 .hero-panel__identity { color: var(--ink); font: 15px/1.3 var(--display); }
@@ -535,6 +535,27 @@ canvas {
 .hero-inventory__item > div:last-child { min-width: 128px; text-align: right; }
 .hero-inventory__item[data-rarity="Uncommon"] { border-left: 2px solid var(--olive); padding-left: 10px; }
 .hero-inventory__item button:disabled { border-color: var(--line); color: var(--faint); cursor: not-allowed; }
+.hero-class-current { margin-top: 8px; padding: 13px; border-left: 2px solid var(--bronze); background: rgb(167 134 82 / 7%); }
+.hero-class-current span,
+.hero-class-option header span { color: var(--bronze); font: 7px/1.2 var(--numbers); letter-spacing: .12em; }
+.hero-class-current strong { display: block; margin-top: 4px; font: 500 18px/1.2 var(--display); }
+.hero-class-current small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+.hero-class-options { display: grid; gap: 8px; margin-top: 12px; }
+.hero-class-option { padding: 12px; border: 1px solid var(--line); background: rgb(231 225 212 / 2%); }
+.hero-class-option[data-class-unlocked="true"] { border-left: 2px solid var(--olive); }
+.hero-class-option header { display: flex; justify-content: space-between; gap: 12px; align-items: end; }
+.hero-class-option header strong { display: block; margin-top: 3px; font: 500 15px/1.2 var(--display); }
+.hero-class-option header > small { color: var(--olive); font: 7px/1.2 var(--numbers); }
+.hero-class-option > p,
+.hero-classes > p { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.hero-class-option ul { display: grid; gap: 3px; margin: 8px 0; padding: 0; list-style: none; }
+.hero-class-option li { display: grid; grid-template-columns: 14px 1fr auto; gap: 6px; color: var(--faint); font-size: 8px; }
+.hero-class-option li[data-met="true"] { color: var(--ink); }
+.hero-class-option li b { color: var(--burgundy); font-family: var(--numbers); }
+.hero-class-option li[data-met="true"] b { color: var(--olive); }
+.hero-class-option li small { color: var(--faint); }
+.hero-class-option button { width: 100%; min-height: 34px; margin-top: 4px; border: 0; border-bottom: 1px solid var(--bronze); background: transparent; color: var(--ink); cursor: pointer; font-size: 8px; }
+.hero-class-option button:disabled { border-color: var(--line); color: var(--faint); cursor: default; }
 .hero-panel__relationships { display: grid; gap: 0; }
 .hero-panel__relationships > div { display: flex; justify-content: space-between; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .hero-panel__relationships strong { display: block; color: var(--ink); font: 500 14px/1.2 var(--display); text-align: right; }
@@ -725,11 +746,59 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
 .debug-overlay > small { display: block; margin-top: 12px; color: var(--faint); font-size: 7px; }
 .debug-overlay[data-render-status="lost"] { border-color: var(--burgundy); }
 
+.smithy-overlay { position: fixed; inset: 0; z-index: 24; color: var(--ink); }
+.smithy-overlay__scrim { position: absolute; inset: 0; background: rgb(10 10 9 / 48%); }
+.smithy-panel { position: absolute; inset: 54px 0 0 auto; width: min(570px, 100vw); overflow: auto; border-left: 1px solid rgb(167 134 82 / 42%); background: rgb(21 21 19 / 98%); }
+.smithy-panel__header { display: flex; justify-content: space-between; gap: 24px; padding: 24px 24px 18px; border-bottom: 1px solid var(--line); }
+.smithy-panel__header span,
+.smithy-section__heading span,
+.smithy-job > span,
+.smithy-completion > span { color: var(--bronze); font: 7px/1.2 var(--numbers); letter-spacing: .16em; }
+.smithy-panel__header h2 { margin: 4px 0 5px; font: 500 28px/1 var(--display); }
+.smithy-panel__header p { margin: 0; color: var(--muted); font-size: 9px; }
+.smithy-panel__header button { align-self: start; min-width: 36px; min-height: 36px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 20px; }
+.smithy-resources { display: flex; gap: 28px; padding: 12px 24px; border-bottom: 1px solid var(--line-soft); }
+.smithy-resources span { display: grid; gap: 2px; }
+.smithy-resources i { color: var(--faint); font: 7px/1.2 var(--numbers); font-style: normal; letter-spacing: .12em; }
+.smithy-resources b { font: 600 14px/1.2 var(--numbers); }
+.smithy-job,
+.smithy-completion,
+.smithy-idle { margin: 16px 24px 0; padding: 12px 14px; border-left: 2px solid var(--bronze); background: rgb(167 134 82 / 7%); }
+.smithy-job strong,
+.smithy-completion strong { display: block; margin: 4px 0 7px; font: 500 16px/1.2 var(--display); }
+.smithy-job progress { width: 100%; height: 3px; border: 0; accent-color: var(--olive); }
+.smithy-job small { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; }
+.smithy-idle { color: var(--muted); font-size: 9px; }
+.smithy-section { padding: 22px 24px 0; }
+.smithy-section:last-child { padding-bottom: 28px; }
+.smithy-section__heading { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 10px; }
+.smithy-section__heading h3 { margin: 3px 0 0; font: 500 17px/1.2 var(--display); }
+.smithy-section__heading > small,
+.smithy-quality-note { color: var(--faint); font-size: 8px; }
+.smithy-recipes { display: grid; gap: 7px; }
+.smithy-recipe { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; padding: 12px; border: 1px solid var(--line); background: var(--panel); }
+.smithy-recipe span { color: var(--bronze); font: 7px/1.2 var(--numbers); letter-spacing: .08em; }
+.smithy-recipe strong { display: block; margin-top: 3px; font: 500 15px/1.2 var(--display); }
+.smithy-recipe p { margin: 4px 0; color: var(--muted); font-size: 8px; }
+.smithy-recipe small { color: var(--olive); font: 7px/1.2 var(--numbers); }
+.smithy-recipe button,
+.smithy-repairs article button { min-height: 36px; padding: 6px 0; border: 0; border-bottom: 1px solid var(--bronze); background: transparent; color: var(--ink); cursor: pointer; font-size: 8px; }
+.smithy-recipe button:disabled,
+.smithy-repairs article button:disabled { border-color: var(--line); color: var(--faint); cursor: default; }
+.smithy-quality-note { margin: 9px 0 0; }
+.smithy-repairs > p { color: var(--faint); font-size: 9px; }
+.smithy-repairs article { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.smithy-repairs article strong,
+.smithy-repairs article small { display: block; }
+.smithy-repairs article strong { font-size: 10px; }
+.smithy-repairs article small { margin-top: 3px; color: var(--muted); font-size: 8px; }
+
 #app[data-mode="combat"] .hud-navigation,
 #app[data-mode="combat"] .notification-center,
 #app[data-mode="combat"] .discovery-notice,
 #app[data-mode="combat"] .debug-overlay,
 #app[data-mode="combat"] .system-panel,
+#app[data-mode="combat"] .smithy-overlay,
 #app[data-mode="expedition"] .hud-navigation,
 #app[data-mode="expedition"] .notification-center,
 #app[data-mode="expedition"] .discovery-notice,
@@ -738,6 +807,7 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
 #app[data-mode="expedition"] .party-panel,
 #app[data-mode="expedition"] .roster-panel,
 #app[data-mode="expedition"] .combat-overlay,
+#app[data-mode="expedition"] .smithy-overlay,
 #app[data-mode="combat"] .expedition-overlay,
 #app[data-mode="combat"] .controls-hint,
 #app[data-mode="expedition"] .controls-hint { display: none !important; }
@@ -804,6 +874,11 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .hero-inventory__item > div:last-child { text-align: left; }
   .hero-equipment__slot button,
   .hero-inventory__item button { min-height: 44px; }
+  .hero-class-option button { min-height: 44px; }
+  .hero-class-option header,
+  .hero-class-option li { grid-template-columns: 14px 1fr; }
+  .hero-class-option header { display: grid; }
+  .hero-class-option li small { grid-column: 2; }
   .hero-panel { padding: 13px 14px 18px; }
   .hero-panel__grid { grid-template-columns: 1fr 1fr; }
   .hero-panel__meters { grid-template-columns: 1fr; }
@@ -826,6 +901,17 @@ kbd { padding: 1px 3px; border: 1px solid var(--line); background: transparent; 
   .notification-center { right: 10px; bottom: 66px; left: 10px; width: auto; }
   .controls-hint { display: none; }
   .debug-overlay { inset: 56px 8px auto; width: auto; }
+  .smithy-panel { inset: 50px 0 0; width: 100%; border-left: 0; }
+  .smithy-panel__header { padding: 18px 14px 14px; }
+  .smithy-resources { padding: 11px 14px; }
+  .smithy-job,
+  .smithy-completion,
+  .smithy-idle { margin-right: 14px; margin-left: 14px; }
+  .smithy-section { padding-right: 14px; padding-left: 14px; }
+  .smithy-recipe { grid-template-columns: 1fr; }
+  .smithy-recipe button,
+  .smithy-repairs article button { min-height: 44px; }
+  .smithy-repairs article { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

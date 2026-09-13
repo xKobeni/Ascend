@@ -27,13 +27,13 @@ Hero
 → Repeat
 ```
 
-## Current Implementation Status — September 11, 2026
+## Current Implementation Status — September 12, 2026
 
 ```text
-Gameplay phases implemented: 0–23
-Current playable milestone: Reversible hero equipment affecting combat and appearance
+Gameplay phases implemented: 0–25
+Current playable milestone: Evidence-based basic class specialization
 Current UI milestone: Current-System Client Foundation complete
-Next gameplay phase: Phase 24 — Smithy and Crafting
+Next gameplay phase: Phase 26 — Branching Classes
 ```
 
 The Phase 13 client now exposes only implemented player destinations:
@@ -47,21 +47,21 @@ Developer diagnostics and the Phase 9 Arena remain available through the `F3` dr
 part of player navigation. Future systems must not receive a destination, resource counter, or
 placeholder panel before their gameplay phase exists.
 
-Phase 23 is complete. Phase 24 and later remain design context and require a new implementation
-approval boundary. Crafting outputs, item repair, equipment recipes, and Metal are not part of the
-current build.
+Phase 25 is complete. Phase 26 and later remain design context and require a new implementation
+approval boundary. Advanced, hybrid, and branching classes are not part of the current build.
 
 Approved future technical direction: the existing standalone character-generator prototype will be
 adapted into ASCENT as the **Procedural Character Forge**. Its human hero-generation core is now
 active through Phase 18 recruitment inside Heroes, while Phase 23 reuses bounded primitive weapon
-attachments. It does not add a fifth destination or expose prototype races, classes, enemies,
+attachments and Phase 25 uses stored identity and progression evidence for basic class eligibility.
+It does not add a fifth destination or expose prototype races, advanced class authoring, enemies,
 unrestricted equipment authoring, sliders, or localStorage authoring controls.
 
 ---
 
 ## Table of Contents
 
-### Implemented Phases (0–23)
+### Implemented Phases (0–25)
 1. [Phase 0 — Project Foundation](#phase-0--project-foundation)
 2. [Phase 1 — Procedural Base Scene](#phase-1--procedural-base-scene)
 3. [Phase 2 — Procedural Hero Generator](#phase-2--procedural-hero-generator)
@@ -87,10 +87,10 @@ unrestricted equipment authoring, sliders, or localStorage authoring controls.
 23. [Phase 21 — Refuge Layout System](#phase-21--refuge-layout-system--complete)
 24. [Phase 22 — Facility Construction](#phase-22--facility-construction--implemented)
 25. [Phase 23 — Equipment](#phase-23--equipment--implemented)
+26. [Phase 24 — Smithy and Crafting](#phase-24--smithy-and-crafting--implemented)
+27. [Phase 25 — Class System](#phase-25--class-system--implemented)
 
-### Future Phases (24–46)
-26. [Phase 24 — Smithy and Crafting](#phase-24--smithy-and-crafting)
-27. [Phase 25 — Class System](#phase-25--class-system)
+### Future Phases (26–46)
 28. [Phase 26 — Branching Classes](#phase-26--branching-classes)
 29. [Phase 27 — Mentorship](#phase-27--mentorship)
 30. [Phase 28 — Multiple Expedition Types](#phase-28--multiple-expedition-types)
@@ -392,7 +392,8 @@ The integration must preserve these boundaries:
   external fonts, editor shell, and glow-heavy presentation are not carried into the game client.
 
 Activation is phase-gated: Phase 18 uses the human hero-generation core, Phase 23 activates
-visual equipment modules, and Phase 25 may activate class-linked presentation. Additional fantasy
+visual equipment modules, and Phase 25 consumes identity evidence for basic classes without adding
+class-specific meshes. Additional fantasy
 races, magical effects, and enemy tiers remain unapproved future content until their own gameplay
 and lore phases define them.
 
@@ -1061,7 +1062,7 @@ moved to the new APIs.
 - Phase 15 permanent death: emit legacy events, but do not copy skills directly.
 - Phase 16 memories: let memories satisfy discovery and awakening context.
 - Phase 17 trait evolution: unlock Mental and instinct skills from repeated behavior.
-- Phase 25 classes: provide easier access to specialized skills without erasing old skills.
+- Phase 25 classes: add derived specialization without erasing old skills. Implemented.
 - Phase 26 branching classes: connect class paths to skill branches and mastery options.
 - Phase 27 mentorship: enable XP bonuses, technique transfer, and personalized variants.
 - Phase 36 hero history: record usage, breakthroughs, awakenings, and mastered skills.
@@ -1573,7 +1574,7 @@ Extract and adapt the approved parts of the standalone prototype:
 Keep prototype-only concepts dormant:
 
 - Fantasy races beyond the currently established recruit population
-- Player-selected classes before Phase 25
+- Advanced or branching class authoring beyond the five Phase 25 basics
 - Weapons and armor progression before Phase 23
 - Enemy tiers, magical glow effects, and enemy-authoring controls
 - The prototype's standalone sidebar, persistent editor layout, and localStorage save behavior
@@ -1671,7 +1672,7 @@ Turn expeditions and facilities into an economy.
 
 ## Tasks
 
-The current economy uses only resources with real implemented consumers:
+Phase 20 introduced only resources that had real implemented consumers at that boundary:
 
 ```text
 Food
@@ -1680,8 +1681,8 @@ Scrap
 Rift Shards
 ```
 
-Metal remains deferred until Phase 22 provides a real construction recipe and material consumer. It
-does not appear as an inert HUD counter or mocked stockpile.
+Metal remained deferred through Phase 23 rather than appearing as inert mocked stock. Phase 24 now
+adds it with both a mission source and real Smithy crafting/repair consumers.
 
 ### 20.1 Consumption — Implemented
 
@@ -1911,7 +1912,8 @@ introduce Metal only when an implemented source and recipe consume it.
 
 The live catalog contains five Scrap-only level-one recipes. Their footprint, duration, base cost,
 description, and operational service are plain simulation data in `ConstructionSystem`; a completed
-Smithy reduces subsequent facility Scrap costs by 10%, rounded up. Metal remains absent.
+Smithy reduces subsequent facility Scrap costs by 10%, rounded up. Metal remained absent at this
+phase boundary and activates in Phase 24.
 
 ### 22.2 Construction Sites — Implemented
 
@@ -1971,8 +1973,9 @@ Bow
 Shield
 ```
 
-The Refuge begins with a limited six-item equipment cache: two swords, one spear, one bow, and two
-shields. These are starting inventory, not Smithy crafting results or expedition loot.
+The Refuge begins with a shared 27-item equipment cache across swords, axes, maces, daggers, spears,
+staves, bows, crossbows, and shields. These are starting inventory, not Smithy crafting results or
+expedition loot.
 
 ### 23.2 Equipment Stats — Implemented
 
@@ -2016,13 +2019,13 @@ and materials. Equipment state remains authoritative outside Three.js.
 
 Equipment changes both stats and appearance.
 
-**Met.** Automated coverage verifies the four weapon types, limited inventory, reversible Party stat
+**Met.** Automated coverage verifies the supported weapon types, shared inventory, reversible Party stat
 changes, atomic transfers, expedition condition wear, unequip behavior, primitive mesh differences,
 and the real Equipment-tab interaction. Repair and crafting remain Phase 24.
 
 ---
 
-# Phase 24 — Smithy and Crafting
+# Phase 24 — Smithy and Crafting — Implemented
 
 ## Goal
 
@@ -2030,25 +2033,40 @@ Connect resources to equipment progression.
 
 ## Tasks
 
-### 24.1 Recipes
+### 24.1 Recipes — Implemented
 
-Example:
+The operational Smithy exposes three plain-data recipes:
 
 ```text
 Iron Sword
 10 Metal
 5 Scrap
+
+Ranger Spear
+8 Metal
+4 Scrap
+
+Ward Shield
+9 Metal
+4 Scrap
 ```
 
-### 24.2 Crafting Time
+Metal is now a real expedition reward and a persistent stockpile value. `Simulation.startCrafting()`
+validates the operational Smithy, idle forge, and both resource balances before atomically spending
+Metal and Scrap. Rejected work does not partially spend either resource.
 
-Items take time.
+### 24.2 Crafting Time — Implemented
 
-### 24.3 Smith Skill
+One Smithy job runs at a time and advances in game minutes while the Refuge simulation is active.
+Crafting takes 150–180 game minutes. Completed output enters the same authoritative shared equipment
+inventory used by hero loadouts, combat evaluation, and procedural weapon rendering.
 
-Later allow hero crafting skill to affect quality.
+### 24.3 Smith Skill — Future Hook Preserved
 
-### 24.4 Quality Levels
+Hero crafting skill does not yet modify time or quality. `CraftingSystem` owns the current base
+quality roll so a later worker-skill modifier can be added without rewriting equipment or UI state.
+
+### 24.4 Quality Levels — Implemented
 
 Keep simple:
 
@@ -2058,13 +2076,33 @@ Good
 Excellent
 ```
 
-## Exit Criteria
+Quality scales the recipe's Damage, Defense, and Range output. Normal maps to Common rarity, Good to
+Uncommon, and Excellent to Rare. Quality is stored on the unique equipment instance.
 
-Player can turn expedition resources into better equipment.
+### 24.5 Repair — Implemented
+
+Damaged equipment can be queued from the same Smithy panel. Repair cost and time scale with missing
+condition, resources are spent atomically, and completion restores the original unique item to 100%
+without replacing its identity or loadout assignment.
+
+### 24.6 Client Integration — Implemented
+
+The Smithy is a contextual Refuge work panel rather than a fifth HUD destination. It opens by
+selecting a completed Smithy in the 3D world or choosing **Open Smithy** on its completed Build Mode
+project. The panel shows exact Metal/Scrap, live timed progress, recipes, quality information, and
+repairable items. Camera and world selection pause while it is open; Escape restores Refuge focus.
+Metal also appears in the real top status bar and Rift reward summaries.
+
+## Exit Criteria — Met
+
+The player can recover Metal from the Rift, build an operational Smithy, atomically spend expedition
+resources on timed recipes, receive quality-scaled equipment in the existing inventory, and repair
+damaged items. Static checks and browser regression coverage validate the transaction, timer,
+quality, inventory output, repair, and responsive contextual panel.
 
 ---
 
-# Phase 25 — Class System
+# Phase 25 — Class System — Implemented
 
 ## Goal
 
@@ -2074,7 +2112,8 @@ Allow heroes to specialize organically.
 
 ### 25.1 Unclassified State
 
-All new heroes begin unclassified.
+All new and recruited heroes begin `Unclassified`. Class state is stored on the hero and is retained
+in permanent memorial records.
 
 ### 25.2 Basic Classes
 
@@ -2088,36 +2127,47 @@ Medic
 Scout
 ```
 
-### 25.3 Requirements
+### 25.3 Requirements — Implemented
 
-Example:
+Each basic class has three visible requirements drawn only from existing authoritative state:
 
-```text
-Guardian:
-Defense 5
-Endurance 5
-Shield Skill 4
-```
+- **Fighter** — Strength, Sword/Spear practice, and military, training, or combat evidence
+- **Guardian** — Endurance, Defense, and an equipped Shield or discovered Shield Mastery
+- **Archer** — Agility, an equipped Bow/Crossbow, and expedition, wilderness, or Scouting evidence
+- **Medic** — Intelligence, Medicine, and empathy or discovered Field Treatment
+- **Scout** — Agility, Discipline, and tracking, scouting, wilderness, or underworld evidence
 
 Class possibilities are calculated from origin experience, training, stats, personality, combat
 experience, achievements, and discovered compatibility. Origin occupation may help satisfy a
 requirement but never selects a class automatically. Magical potential remains mostly hidden and
 rare.
 
-### 25.4 Class Selection
+### 25.4 Class Selection — Implemented
 
-Only unlocked classes can be chosen.
+Only unlocked classes can be chosen. The shared hero detail panel exposes a Class tab, reports every
+met or unmet requirement, and sends the validated selection through `Simulation` to `ClassSystem`.
+Origins can satisfy one evidence requirement but never choose a class automatically.
 
-### 25.5 Class Bonuses
+### 25.5 Class Bonuses — Implemented
 
-Add modest bonuses.
+Bonuses are deliberately modest and derived at read time:
 
-Class-specific silhouettes or presentation may activate compatible Procedural Character Forge
-modules only after the class is unlocked. Visual presets must never grant a class or its bonuses.
+- Fighter: +2 Attack, +5 HP
+- Guardian: +3 Defense, +12 HP
+- Archer: +2 Attack, +1.5 Range
+- Medic: +3 Healing, +0.5 Range
+- Scout: +0.25 Speed, +0.5 Range
 
-## Exit Criteria
+`SquadSystem` and `CombatSimulation` consume these modifiers without rewriting hero attributes,
+skills, personality, or equipment. Party cards and notifications expose the selected class.
 
-Hero development produces meaningful specialization.
+Class-specific silhouettes remain a future presentation option. Visual presets must never grant a
+class or its bonuses.
+
+## Exit Criteria — Met
+
+Heroes begin unclassified, qualify through readable evidence, explicitly choose one of five basic
+paths, and receive bounded squad/combat specialization. Branching and hybrid classes remain Phase 26.
 
 ---
 

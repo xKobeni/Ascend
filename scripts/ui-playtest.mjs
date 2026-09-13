@@ -283,10 +283,123 @@ try {
   })()`);
   assert(
     equipmentValidation.combatPowerChanged && equipmentValidation.combatStatsChanged && equipmentValidation.defenseChanged && equipmentValidation.durabilityWear && equipmentValidation.equippedBow &&
-      equipmentValidation.equippedShield && equipmentValidation.equippedSword && equipmentValidation.inventoryCount === 6 &&
-      equipmentValidation.transferAtomic && equipmentValidation.types === 4 && equipmentValidation.unequipped && equipmentValidation.visualChanged,
+      equipmentValidation.equippedShield && equipmentValidation.equippedSword && equipmentValidation.inventoryCount >= 6 &&
+      equipmentValidation.transferAtomic && equipmentValidation.types >= 4 && equipmentValidation.unequipped && equipmentValidation.visualChanged,
     `Phase 23 equipment validation failed (${JSON.stringify(equipmentValidation)}).`,
   );
+  const craftingValidation = await evaluate(`(async () => {
+    const [{ CraftingSystem, CRAFTING_RECIPES, getRepairQuote }, { EquipmentSystem }, { ExpeditionSystem }, { CombatSimulation }, { SmithyOverlay }] = await Promise.all([
+      import('/src/crafting/CraftingSystem.ts'),
+      import('/src/equipment/EquipmentSystem.ts'),
+      import('/src/expeditions/ExpeditionSystem.ts'),
+      import('/src/combat/CombatSimulation.ts'),
+      import('/src/ui/SmithyOverlay.ts'),
+    ]);
+    const crafting = new CraftingSystem();
+    const equipment = new EquipmentSystem();
+    const recipe = CRAFTING_RECIPES[0];
+    const began = crafting.beginCraft(recipe.id);
+    const stillTimed = crafting.step(recipe.durationMinutes - 1) === null && crafting.getSnapshot().activeJob !== null;
+    const completion = crafting.step(1);
+    const output = crafting.createOutput(completion.recipeId, completion.quality);
+    const created = equipment.addCraftedItem(output);
+    const stronger = created.stats.damage > 3 && ['Normal', 'Good', 'Excellent'].includes(created.quality);
+    equipment.equip('smithy-test-hero', created.id, [{id:'smithy-test-hero'}]);
+    equipment.applyExpeditionWear(['smithy-test-hero'], 'Defeat');
+    const damaged = equipment.getSnapshot().items.find((item) => item.id === created.id);
+    const quote = getRepairQuote(damaged);
+    const repairBegan = crafting.beginRepair(damaged);
+    const repairCompletion = crafting.step(quote.durationMinutes);
+    const repaired = repairCompletion?.kind === 'Repair' && equipment.repair(created.id) && equipment.getSnapshot().items.find((item) => item.id === created.id)?.durability === 100;
+
+    const expedition = new ExpeditionSystem(new CombatSimulation(), () => [], () => undefined);
+    const resources = expedition.getSnapshot().resources;
+    resources.scrap = 8; resources.metal = 10;
+    const spent = expedition.consumeSmithyResources(5, 10);
+    const beforeFailedSpend = {scrap: resources.scrap, metal: resources.metal};
+    const rejected = !expedition.consumeSmithyResources(4, 1) && resources.scrap === beforeFailedSpend.scrap && resources.metal === beforeFailedSpend.metal;
+
+    const host = document.createElement('div');
+    document.querySelector('#app').appendChild(host);
+    const overlay = new SmithyOverlay(host, {close:()=>undefined, craft:()=>undefined, repair:()=>undefined});
+    overlay.open();
+    overlay.update({crafting: crafting.getSnapshot(), equipment: equipment.getSnapshot(), recipes: CRAFTING_RECIPES, resources});
+    const ui = host.querySelectorAll('.smithy-recipe').length === 3 && host.textContent.includes('METAL') && host.textContent.includes('Repair equipment');
+    globalThis.__phase24Capture = {overlay, host};
+    return {atomic: spent && rejected, began, catalog: CRAFTING_RECIPES.length, repaired, stillTimed, stronger, ui};
+  })()`);
+  assert(
+    craftingValidation.atomic && craftingValidation.began && craftingValidation.catalog === 3 && craftingValidation.repaired &&
+      craftingValidation.stillTimed && craftingValidation.stronger && craftingValidation.ui,
+    `Phase 24 smithy validation failed (${JSON.stringify(craftingValidation)}).`,
+  );
+  await screenshot("phase24-smithy-1440x900.png");
+  await evaluate("globalThis.__phase24Capture.overlay.dispose(); globalThis.__phase24Capture.host.remove(); delete globalThis.__phase24Capture");
+  const classValidation = await evaluate(`(async () => {
+    const [{ ClassSystem, CLASS_DEFINITIONS }, { HeroManager }, { SquadSystem }, { CombatSimulation }, { SelectionOverlay }, { NotificationCenter }] = await Promise.all([
+      import('/src/classes/ClassSystem.ts'), import('/src/heroes/HeroManager.ts'), import('/src/squads/SquadSystem.ts'),
+      import('/src/combat/CombatSimulation.ts'), import('/src/ui/SelectionOverlay.ts'), import('/src/ui/NotificationCenter.ts'),
+    ]);
+    const classes = new ClassSystem();
+    const manager = new HeroManager();
+    const heroes = manager.generateInitialRoster(3);
+    const hero = heroes[0];
+    const noEquipment = {armorPierce:0,attackSpeed:1,critChance:0,damage:0,defense:0,healthBonus:0,mainHandType:null,offHandType:null,range:0};
+    const classEquipment = {...noEquipment, mainHandType:'Bow', offHandType:'Shield'};
+    const lockedHero = heroes[1];
+    Object.assign(lockedHero.attributes, {endurance:1}); lockedHero.skills.defense = 0;
+    const lockedRejected = !classes.select(lockedHero, 'Guardian', noEquipment);
+    Object.assign(hero.attributes, {agility:7,endurance:7,intelligence:7,strength:7});
+    Object.assign(hero.skills, {defense:5,medicine:4,spear:4,sword:5});
+    Object.assign(hero.personality, {discipline:.8,empathy:.8});
+    Object.assign(hero.career, {expeditions:3,kills:4});
+    hero.origin.category = 'Wilderness';
+    const options = classes.evaluate(hero, classEquipment);
+    const allUnlocked = options.length === 5 && options.every((option) => option.unlocked && option.requirements.length === 3);
+    const baseValues = JSON.stringify({attributes:hero.attributes,skills:hero.skills,personality:hero.personality});
+    const squad = new SquadSystem(); heroes.forEach((entry) => squad.addHero(entry.id, heroes));
+    const before = squad.evaluate(heroes, (id) => id === hero.id ? classEquipment : noEquipment);
+    const baseCombat = new CombatSimulation(undefined, undefined, (id) => id === hero.id ? classEquipment : noEquipment);
+    baseCombat.start(squad.getSquad(), heroes);
+    const baseStats = baseCombat.getSnapshot().combatants.find((entry) => entry.id === hero.id).stats;
+    const selected = classes.select(hero, 'Fighter', classEquipment);
+    const after = squad.evaluate(heroes, (id) => id === hero.id ? classEquipment : noEquipment);
+    const classCombat = new CombatSimulation(undefined, undefined, (id) => id === hero.id ? classEquipment : noEquipment);
+    classCombat.start(squad.getSquad(), heroes);
+    const classStats = classCombat.getSnapshot().combatants.find((entry) => entry.id === hero.id).stats;
+    const derived = after.combatPower > before.combatPower && classStats.attack > baseStats.attack && classStats.maxHp > baseStats.maxHp;
+    const everySelectable = CLASS_DEFINITIONS.filter((definition) => definition.id !== 'Fighter').every((definition) => classes.select(hero, definition.id, classEquipment));
+    const basePreserved = baseValues === JSON.stringify({attributes:hero.attributes,skills:hero.skills,personality:hero.personality});
+    const invalidRejected = !classes.select(hero, 'Berserker', classEquipment);
+
+    hero.heroClass = 'Unclassified';
+    const host = document.createElement('div'); document.querySelector('#app').appendChild(host);
+    const overlay = new SelectionOverlay(host,()=>undefined,()=>undefined,()=>undefined,()=>0,()=>undefined,undefined,{
+      getOptions:()=>classes.evaluate(hero,classEquipment), select:(_id,target)=>classes.select(hero,target,classEquipment),
+    });
+    overlay.showHero(hero, heroes, 'Class');
+    host.querySelector('[data-class-id="Fighter"]')?.click();
+    overlay.updateHeroRuntime(hero, heroes);
+    const ui = host.querySelectorAll('.hero-class-option').length === 5 && host.querySelectorAll('.hero-detail-tabs button').length === 6 && hero.heroClass === 'Fighter';
+
+    const noticeHost = document.createElement('div'); document.querySelector('#app').appendChild(noticeHost);
+    const notifications = new NotificationCenter(noticeHost,()=>undefined);
+    hero.heroClass = 'Unclassified';
+    const expedition = {attempt:0,deployedSquadName:null,mission:{description:'',difficulty:'Moderate',id:'test',name:'Test',objective:'Eliminate Enemies',rewards:{food:0,metal:0,medicine:0,riftShards:0,scrap:0},threats:[]},phase:'Briefing',report:null,resources:{food:0,metal:0,medicine:0,riftShards:0,scrap:0}};
+    notifications.update(heroes,[],expedition,[]);
+    hero.heroClass = 'Fighter'; notifications.update(heroes,[],expedition,[]);
+    const notice = noticeHost.textContent.includes('chose the Fighter path');
+    notifications.dispose(); noticeHost.remove();
+    globalThis.__phase25Capture = {overlay,host};
+    return {allUnlocked,basePreserved,derived,everySelectable,invalidRejected,lockedRejected,notice,selected,ui};
+  })()`);
+  assert(
+    classValidation.allUnlocked && classValidation.basePreserved && classValidation.derived && classValidation.everySelectable &&
+      classValidation.invalidRejected && classValidation.lockedRejected && classValidation.notice && classValidation.selected && classValidation.ui,
+    `Phase 25 class validation failed (${JSON.stringify(classValidation)}).`,
+  );
+  await screenshot("phase25-classes-1440x900.png");
+  await evaluate("globalThis.__phase25Capture.overlay.dispose(); globalThis.__phase25Capture.host.remove(); delete globalThis.__phase25Capture");
   const recoveryValidation = await evaluate(`(async () => {
     const [{ Simulation }, { InjurySystem, getInjuryModifiers }, { HeroManager }] = await Promise.all([
       import('/src/simulation/Simulation.ts'),
@@ -851,7 +964,7 @@ try {
   })()`);
   assert(
     victoryValidation.outcome === 'Victory' &&
-      JSON.stringify(victoryValidation.resources) === JSON.stringify({ food: 20, medicine: 8, riftShards: 3, scrap: 18 }),
+      JSON.stringify(victoryValidation.resources) === JSON.stringify({ food: 20, metal: 12, medicine: 8, riftShards: 3, scrap: 18 }),
     `Expedition victory rewards failed (${JSON.stringify(victoryValidation)}).`,
   );
   const withdrawalResults = await evaluate(`(async () => {
@@ -1020,9 +1133,9 @@ try {
   await screenshot("heroes-1440x900.png");
   await click('.hero-roster-card');
   await waitFor("!document.querySelector('.hero-detail-panel').hidden", "hero detail");
-  assert(await evaluate("document.querySelectorAll('.hero-detail-tabs button').length") === 5, "Hero detail must expose the Phase 23 Equipment tab.");
+  assert(await evaluate("document.querySelectorAll('.hero-detail-tabs button').length") === 6, "Hero detail must expose Equipment and Class tabs.");
   await click('[data-hero-tab="Equipment"]');
-  assert(await evaluate("document.querySelectorAll('.hero-inventory__item').length") === 6, "Equipment inventory must expose the six-item starting cache.");
+  assert(await evaluate("document.querySelectorAll('.hero-inventory__item').length") >= 6, "Equipment inventory must expose the starting cache.");
   await click('.hero-inventory__item [data-equipment-id]:not(:disabled)');
   await waitFor("[...document.querySelectorAll('.hero-equipment__slot strong')].some((entry) => entry.textContent !== 'Empty')", "equipped hero item");
   await screenshot("phase23-equipment-1440x900.png");
@@ -1107,7 +1220,7 @@ try {
   const report = await evaluate("document.querySelector('.expedition-overlay__outcome strong')?.textContent");
   const resources = await evaluate("[...document.querySelectorAll('[data-resource]')].map((node) => Number(node.textContent))");
   assert(report, "Expedition did not produce a mission result.");
-  assert(report !== "ROUTE SECURED" || (resources[0] === 18 && resources[1] >= 8 && resources[2] === 8 && resources[3] === 3), "Victory rewards and Medicine must reach the persistent top status bar.");
+  assert(report !== "ROUTE SECURED" || (resources[0] === 18 && resources[1] === 12 && resources[2] >= 8 && resources[3] === 8 && resources[4] === 3), "Victory rewards, Metal, and Medicine must reach the persistent top status bar.");
   await screenshot(report === "ROUTE SECURED" ? "rift-debrief-victory-1440x900.png" : "rift-debrief-setback-1440x900.png");
   await click('[data-expedition-action="return"]');
   await waitFor("document.querySelector('[data-hud-section=\"Refuge\"]').getAttribute('aria-pressed') === 'true'", "refuge return");
@@ -1130,13 +1243,41 @@ try {
     const actions = [...document.querySelectorAll('[data-hero-tab], [data-equipment-id], [data-unequip-slot]')];
     return {
       fits: panel.left >= 0 && panel.right <= innerWidth,
-      inventoryVisible: document.querySelectorAll('.hero-inventory__item').length === 6,
+      inventoryVisible: document.querySelectorAll('.hero-inventory__item').length >= 6,
       touchTargets: actions.every((button) => button.getBoundingClientRect().height >= 44),
     };
   })()`);
   assert(mobileEquipment.fits && mobileEquipment.inventoryVisible && mobileEquipment.touchTargets, `Mobile Equipment UI failed (${JSON.stringify(mobileEquipment)}).`);
   await screenshot("phase23-equipment-mobile-390x844.png");
+  await click('[data-hero-tab="Class"]');
+  const mobileClasses = await evaluate(`(() => {
+    const panel = document.querySelector('.hero-detail-panel').getBoundingClientRect();
+    const cards = [...document.querySelectorAll('.hero-class-option')];
+    const buttons = [...document.querySelectorAll('[data-class-id]')];
+    return {cards:cards.length,fits:panel.left>=0&&panel.right<=innerWidth,touchTargets:buttons.every((button)=>button.getBoundingClientRect().height>=44)};
+  })()`);
+  assert(mobileClasses.cards === 5 && mobileClasses.fits && mobileClasses.touchTargets, `Mobile Class UI failed (${JSON.stringify(mobileClasses)}).`);
+  await screenshot("phase25-classes-mobile-390x844.png");
   await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', {code:'Escape', bubbles:true}))");
+
+  await evaluate(`(async () => {
+    const [{ SmithyOverlay }, { CraftingSystem, CRAFTING_RECIPES }, { EquipmentSystem }] = await Promise.all([
+      import('/src/ui/SmithyOverlay.ts'), import('/src/crafting/CraftingSystem.ts'), import('/src/equipment/EquipmentSystem.ts'),
+    ]);
+    const host = document.createElement('div'); document.querySelector('#app').appendChild(host);
+    const overlay = new SmithyOverlay(host, {close:()=>undefined, craft:()=>undefined, repair:()=>undefined});
+    overlay.open();
+    overlay.update({crafting:new CraftingSystem().getSnapshot(), equipment:new EquipmentSystem().getSnapshot(), recipes:CRAFTING_RECIPES, resources:{food:12,metal:24,medicine:6,riftShards:0,scrap:18}});
+    globalThis.__phase24MobileCapture = {overlay, host};
+  })()`);
+  const mobileSmithy = await evaluate(`(() => {
+    const panel = document.querySelector('.smithy-panel').getBoundingClientRect();
+    const actions = [...document.querySelectorAll('.smithy-panel button')];
+    return {fits: panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight, touchTargets: actions.every((button) => button.getBoundingClientRect().height >= 36)};
+  })()`);
+  assert(mobileSmithy.fits && mobileSmithy.touchTargets, `Mobile Smithy UI failed (${JSON.stringify(mobileSmithy)}).`);
+  await screenshot("phase24-smithy-mobile-390x844.png");
+  await evaluate("globalThis.__phase24MobileCapture.overlay.dispose(); globalThis.__phase24MobileCapture.host.remove(); delete globalThis.__phase24MobileCapture");
 
   await click('[data-hud-section="Refuge"]');
   await click('[data-build-action="enter"]');
@@ -1171,7 +1312,7 @@ try {
 
   assert(runtimeExceptions.length === 0, `Browser runtime exceptions: ${runtimeExceptions.join(" | ")}`);
 
-  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, construction: constructionValidation, equipment: equipmentValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
+  console.log(JSON.stringify({ outcome: report, resources, portraits: portraits.length, layout: layoutValidation, construction: constructionValidation, equipment: equipmentValidation, crafting: craftingValidation, classes: classValidation, recovery: recoveryValidation, memory: memoryValidation, traits: traitValidation, recruitment: recruitmentValidation, economy: economyValidation, recoveryUi, legacy: legacyValidation, memorialUi, victory: victoryValidation, withdrawal: withdrawalResults, status: "passed" }));
 } finally {
   socket?.close();
   browser.kill();

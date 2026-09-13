@@ -22,6 +22,14 @@ import {
   type RefugeStructureId,
 } from "../refuge/RefugeLayoutSystem";
 import { EquipmentSystem, type EquipmentSlot } from "../equipment/EquipmentSystem";
+import {
+  CRAFTING_RECIPES,
+  CraftingSystem,
+  getRepairQuote,
+  type CraftingRecipeId,
+} from "../crafting/CraftingSystem";
+import { ClassSystem } from "../classes/ClassSystem";
+import type { BasicHeroClass } from "../heroes/Hero";
 
 export interface RecruitmentResult extends RecruitmentRoll {
   cost: number;
@@ -41,8 +49,10 @@ export interface SimulationSnapshot {
 }
 
 export class Simulation {
+  private readonly classSystem = new ClassSystem();
   private readonly heroManager = new HeroManager();
   private readonly equipmentSystem = new EquipmentSystem();
+  private readonly craftingSystem = new CraftingSystem();
   private readonly combatSimulation = new CombatSimulation((event) => {
     this.heroManager.recordSkillUsage(event);
   }, (event) => {
@@ -122,6 +132,16 @@ export class Simulation {
       },
     );
     this.constructionSystem.step(gameMinutes, this.heroManager.getAll());
+    if (this.isSmithyOperational()) {
+      const completion = this.craftingSystem.step(gameMinutes);
+      if (completion?.kind === "Craft" && completion.recipeId && completion.quality) {
+        this.equipmentSystem.addCraftedItem(
+          this.craftingSystem.createOutput(completion.recipeId, completion.quality),
+        );
+      } else if (completion?.kind === "Repair" && completion.itemId) {
+        this.equipmentSystem.repair(completion.itemId);
+      }
+    }
   }
 
   getSnapshot(): Readonly<SimulationSnapshot> {
@@ -134,6 +154,17 @@ export class Simulation {
 
   getHero(id: string): Readonly<Hero> | undefined {
     return this.heroManager.getById(id);
+  }
+
+  getHeroClassOptions(heroId: string) {
+    const hero = this.heroManager.getById(heroId);
+    return hero ? this.classSystem.evaluate(hero, this.equipmentSystem.getModifiers(heroId)) : [];
+  }
+
+  selectHeroClass(heroId: string, heroClass: BasicHeroClass): boolean {
+    if (!this.canManageEquipment()) return false;
+    const hero = this.heroManager.getById(heroId);
+    return hero ? this.classSystem.select(hero, heroClass, this.equipmentSystem.getModifiers(heroId)) : false;
   }
 
   getFallenHeroes() {
@@ -171,6 +202,37 @@ export class Simulation {
   }
 
   getEquipmentSnapshot() { return this.equipmentSystem.getSnapshot(); }
+
+  getCraftingSnapshot() { return this.craftingSystem.getSnapshot(); }
+
+  getCraftingRecipes() { return CRAFTING_RECIPES; }
+
+  isSmithyOperational(): boolean {
+    return this.constructionSystem.getCompletedCount("smithy") > 0;
+  }
+
+  startCrafting(recipeId: CraftingRecipeId): boolean {
+    if (!this.canManageEquipment() || !this.isSmithyOperational() || !this.craftingSystem.canBegin()) return false;
+    const recipe = this.craftingSystem.getRecipe(recipeId);
+    if (!recipe) return false;
+    if (!this.expeditionSystem.consumeSmithyResources(recipe.scrapCost, recipe.metalCost)) return false;
+    if (!this.craftingSystem.beginCraft(recipeId)) {
+      throw new Error("Smithy resource validation and craft commit diverged.");
+    }
+    return true;
+  }
+
+  startEquipmentRepair(itemId: string): boolean {
+    if (!this.canManageEquipment() || !this.isSmithyOperational() || !this.craftingSystem.canBegin()) return false;
+    const item = this.getEquipmentSnapshot().items.find((candidate) => candidate.id === itemId);
+    if (!item || item.durability >= 100) return false;
+    const quote = getRepairQuote(item);
+    if (!this.expeditionSystem.consumeSmithyResources(quote.scrapCost, quote.metalCost)) return false;
+    if (!this.craftingSystem.beginRepair(item)) {
+      throw new Error("Smithy resource validation and repair commit diverged.");
+    }
+    return true;
+  }
 
   equipItem(heroId: string, itemId: string): boolean {
     return this.canManageEquipment() && this.equipmentSystem.equip(heroId, itemId, this.getHeroes());

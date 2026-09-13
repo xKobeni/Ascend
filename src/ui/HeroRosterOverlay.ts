@@ -148,7 +148,9 @@ export class HeroRosterOverlay {
       name.textContent = hero.name;
       const member = squad.members.find((candidate) => candidate.heroId === hero.id);
       const path = document.createElement("span");
-      path.textContent = member ? `${member.role} · ${member.formation}` : hero.origin.occupation;
+      path.textContent = member
+        ? `${member.role} · ${member.formation}${hero.heroClass !== "Unclassified" ? ` · ${hero.heroClass}` : ""}`
+        : hero.heroClass === "Unclassified" ? hero.origin.occupation : `${hero.heroClass} · ${hero.origin.occupation}`;
       identity.append(name, path);
       const footer = document.createElement("span");
       footer.className = "hero-roster-card__footer";

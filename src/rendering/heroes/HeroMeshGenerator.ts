@@ -169,12 +169,31 @@ export class HeroMeshGenerator {
     const metal = new THREE.MeshStandardMaterial({ color: "#9b9a92", metalness: 0.55, roughness: 0.48 });
     const bronze = new THREE.MeshStandardMaterial({ color: "#a78652", metalness: 0.32, roughness: 0.68 });
     const wood = new THREE.MeshStandardMaterial({ color: "#684a30", roughness: 0.95 });
+    const dark = new THREE.MeshStandardMaterial({ color: "#2a1a0a", metalness: 0.15, roughness: 0.85 });
     const main = equipment.find((item) => item.slot === "mainHand");
     if (main?.type === "Sword") {
       const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.035), metal);
       blade.position.y = -0.42;
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.07), bronze);
       guard.position.y = -0.08;
+      handRight.add(blade, guard);
+    } else if (main?.type === "Axe") {
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.7, 7), wood);
+      handle.position.y = -0.38;
+      const bladeHead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.025), metal);
+      bladeHead.position.set(0.06, -0.7, 0);
+      handRight.add(handle, bladeHead);
+    } else if (main?.type === "Mace") {
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.6, 7), wood);
+      handle.position.y = -0.34;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bronze);
+      head.position.y = -0.72;
+      handRight.add(handle, head);
+    } else if (main?.type === "Dagger") {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.02), metal);
+      blade.position.y = -0.22;
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.05), bronze);
+      guard.position.y = -0.04;
       handRight.add(blade, guard);
     } else if (main?.type === "Spear") {
       const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.35, 7), wood);
@@ -183,11 +202,24 @@ export class HeroMeshGenerator {
       tip.position.y = -1.36;
       tip.rotation.z = Math.PI;
       handRight.add(shaft, tip);
+    } else if (main?.type === "Staff") {
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 1.3, 7), wood);
+      shaft.position.y = -0.55;
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), bronze);
+      orb.position.y = -1.28;
+      handRight.add(shaft, orb);
     } else if (main?.type === "Bow") {
       const bow = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.025, 6, 18, Math.PI), wood);
       bow.position.y = -0.32;
       bow.rotation.z = Math.PI / 2;
       handRight.add(bow);
+    } else if (main?.type === "Crossbow") {
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.04), dark);
+      stock.position.y = -0.25;
+      const bowArm = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 12, Math.PI), metal);
+      bowArm.position.y = -0.52;
+      bowArm.rotation.z = Math.PI / 2;
+      handRight.add(stock, bowArm);
     }
     if (equipment.some((item) => item.type === "Shield")) {
       const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.34, 0.09, 8), bronze);

@@ -1,17 +1,17 @@
 # ASCENT Maintainer Tutorial
 
-This guide explains the ASCENT codebase as it exists after Phase 23. It is written for someone who
+This guide explains the ASCENT codebase as it exists after Phase 25. It is written for someone who
 wants to learn the project, make changes without an AI assistant, and understand why the code is
 organized the way it is.
 
-Last verified against the repository: September 11, 2026.
+Last verified against the repository: September 12, 2026.
 
 Current implementation boundary:
 
 ```text
-Implemented gameplay phases: 0–23
+Implemented gameplay phases: 0–25
 Implemented UI milestone: U1 — Current-System Client Foundation
-Next gameplay phase: 24 — Smithy and Crafting
+Next gameplay phase: 26 — Branching Classes
 Procedural Character Forge activation: human recruitment subset implemented
 ```
 
@@ -119,10 +119,14 @@ for working systems.
     - [Environment props and future model replacement](#environment-props-and-future-model-replacement)
     - [Controls and responsive behavior](#controls-and-responsive-behavior)
     - [Safe recipe: add another movable existing structure](#safe-recipe-add-another-movable-existing-structure)
-32. [Debugging Method](#32-debugging-method)
-33. [Safe Git Workflow](#33-safe-git-workflow)
-34. [Definition of Done for a Change](#34-definition-of-done-for-a-change)
-35. [Final Rule of Thumb](#35-final-rule-of-thumb)
+32. [Phase 22 Reference: Facility Construction](#32-phase-22-reference-facility-construction)
+33. [Phase 23 Reference: Equipment](#33-phase-23-reference-equipment)
+34. [Phase 24 Reference: Smithy and Crafting](#34-phase-24-reference-smithy-and-crafting)
+35. [Phase 25 Reference: Class System](#35-phase-25-reference-class-system)
+36. [Debugging Method](#36-debugging-method)
+37. [Safe Git Workflow](#37-safe-git-workflow)
+38. [Definition of Done for a Change](#38-definition-of-done-for-a-change)
+39. [Final Rule of Thumb](#39-final-rule-of-thumb)
 
 ---
 
@@ -441,10 +445,11 @@ and expeditions.
 - Injuries and recovery outcome
 - Career totals
 - Loss memories created by permanent death
-- Current class, social role, and reputation placeholders already required by implemented identity
+- Current basic class, plus social role and reputation placeholders
 
-The only current `HeroClass` value is `Unclassified`, and the only current `SocialRole` is
-`Resident`. Do not add player-facing class choices before Phase 25.
+`HeroClass` supports `Unclassified`, Fighter, Guardian, Archer, Medic, and Scout. New heroes still
+start unclassified and only an explicit, unlocked selection changes that value. The only current
+`SocialRole` remains `Resident`.
 
 ### How initial heroes are created
 
@@ -1203,6 +1208,10 @@ whether a panel has intentionally gated input before editing camera math.
 | 19 | Hero capacity, Dormitory upgrades, and comfort recovery | `DormitorySystem`, Heroes surface |
 | 20 | Daily Food use, shortages, and expedition-funded stockpile | `ResourceEconomySystem`, `ExpeditionSystem` |
 | 21 | Editable Refuge layout, validation, trails, routing, and seeded trees | `RefugeLayoutSystem`, Build Mode |
+| 22 | Scrap-funded sites, assigned builders, timed construction, completed facility services | `ConstructionSystem`, Build Mode |
+| 23 | Shared equipment, reversible loadouts, condition wear, combat modifiers, visible weapons | `EquipmentSystem`, hero Equipment tab |
+| 24 | Expedition Metal, timed Smithy recipes, quality equipment, and repair | `CraftingSystem`, `SmithyOverlay` |
+| 25 | Five evidence-gated basic classes and derived Party/combat specialization | `ClassSystem`, hero Class tab |
 
 Anything beyond this table is future scope unless code and validation are added under an approved
 phase.
@@ -1577,19 +1586,20 @@ facility meshes remain outside Phase 19.
 
 `src/economy/ResourceEconomySystem.ts` owns time-scaled Food demand and provision status. It does not
 own the stockpile. `ExpeditionSystem` remains the sole resource owner and exposes narrow consumers
-for Food, Medicine, Scrap, and Rift Shards.
+for Food, Metal, Medicine, Scrap, and Rift Shards.
 
 ### Current resource loop
 
 | Resource | Starting amount | Current source | Current consumer |
 |----------|----------------:|----------------|------------------|
 | Food | 12 | 8 from mission victory | 1 per active hero per game day |
+| Metal | 0 | 12 from mission victory | Smithy crafting and repair |
 | Medicine | 6 | 2 from mission victory | Injury treatment |
 | Scrap | 0 | 18 from mission victory | Dormitory upgrades |
 | Rift Shards | 0 | 3 from mission victory | Recruitment |
 
-Metal remains absent because no Phase 22 recipe consumes it. Never add a resource to the HUD only
-because it appears in the future concept vocabulary.
+Metal became active in Phase 24 because the mission now supplies it and the operational Smithy has
+real consuming recipes. Do not add another future resource without the same source-and-sink rule.
 
 ### Food consumption
 
@@ -1633,12 +1643,11 @@ Stocked without producing a startup message.
 3. Validate availability before every spend; never partially mutate on rejection.
 4. Update mission reward data and its direct victory regression together.
 5. Keep shortage effects gradual and driven by game minutes.
-6. Do not add Metal until a real Phase 22 construction recipe consumes it.
+6. Keep Metal costs in `CraftingSystem` and the atomic spend in `ExpeditionSystem`.
 7. Test consumption, shortfall, needs effects, notifications, top-bar values, victory, and withdrawal.
 
-Phase 21 Build Mode, movable facilities, trails, and seeded environment placement are implemented
-by a separate layout layer, not by the economy. Phase 22 construction sites, builders, progress
-timers, material recipes, and completed new facility models remain absent.
+Phase 21 layout, Phase 22 construction, and Phase 24 crafting remain separate authoritative layers;
+the economy supplies resources but does not own site, job, or equipment state.
 
 ---
 
@@ -1742,7 +1751,99 @@ Disk persistence remains Phase 38. The current session layout resets on a reload
 
 ---
 
-## 32. Debugging Method
+## 32. Phase 22 Reference: Facility Construction
+
+`ConstructionSystem` owns five Scrap recipes and session-only sites. Placement first reuses
+`RefugeLayoutSystem.validateNewFacility()`, then `Simulation.createConstructionSite()` spends Scrap
+and commits one site. Up to two eligible builders deliver materials for 45 builder-minutes and then
+advance the recipe timer. Completed sites become selectable procedural facilities and expose derived
+services; a complete Smithy also unlocks Phase 24.
+
+Safe edits preserve this order: validate placement, validate resources, spend once, create once.
+Never let `ProceduralBaseScene` own progress or completion.
+
+---
+
+## 33. Phase 23 Reference: Equipment
+
+`EquipmentSystem` owns unique item instances and per-hero Main Hand/Off Hand loadouts. Equip transfers
+an item atomically from its previous owner; unequip clears the assignment. Consumers request derived
+modifiers, so equipment never rewrites hero attributes. Expedition results apply condition wear and
+broken items stop contributing modifiers. `HeroRenderer` rebuilds disposable meshes when the
+equipment revision changes.
+
+Crafted items use `addCraftedItem()` and repairs use `repair()`. Keep both mutations here so the
+Smithy never bypasses the shared inventory or breaks an equipped item ID.
+
+---
+
+## 34. Phase 24 Reference: Smithy and Crafting
+
+The first bounded crafting loop is:
+
+```text
+Mission victory supplies Metal
+  → player builds and completes a Smithy
+  → contextual Smithy panel validates one recipe or repair
+  → ExpeditionSystem atomically spends Metal + Scrap
+  → CraftingSystem advances one job in game minutes
+  → EquipmentSystem receives a unique quality item or restores condition
+```
+
+Recipe data lives in `CRAFTING_RECIPES`. Current outputs are Iron Sword, Ranger Spear, and Ward
+Shield. Normal output uses base stats, Good scales Damage/Defense/Range by ×1.25, and Excellent by
+×1.50. The quality roll is deterministic; hero smith skill remains a future hook and currently does
+not change time or output.
+
+`SmithyOverlay` is a contextual full-height Refuge drawer, not a HUD destination. It opens from a
+completed Smithy in the world or **Open Smithy** in Build Mode, pauses camera/world selection, and
+closes with Escape. `NotificationCenter` reports completed forge and repair jobs.
+
+When adding a recipe:
+
+1. Extend `CraftingRecipeId` and `CRAFTING_RECIPES` together.
+2. Supply the complete `EquipmentStats` shape and an already-renderable `WeaponType`.
+3. Add the ID to `SmithyOverlay.isRecipeId()`.
+4. Keep dual-resource validation in `consumeSmithyResources()` atomic.
+5. Exercise insufficient funds, active-job rejection, timer completion, quality, inventory output,
+   repair identity, Escape/camera gating, and mobile touch targets.
+
+Crafting remains session-only until Phase 38. Do not add worker assignment, skill bonuses, armor,
+tools, ammunition, salvage, or trading as part of Phase 24 maintenance.
+
+---
+
+## 35. Phase 25 Reference: Class System
+
+`ClassSystem` is the single rules owner for basic specialization. Every new hero begins
+`Unclassified`. `evaluate()` produces five options with three visible requirements each, while
+`select()` refuses unknown, locked, or already-selected paths. Requirements read existing attributes,
+legacy skills, equipment types, personality, training outcomes, career history, origins, and known
+Skill Forge abilities. An origin can count as evidence but never selects a path automatically.
+
+The five current classes are Fighter, Guardian, Archer, Medic, and Scout. Their bonuses are returned
+as `ClassModifiers` and added by `SquadSystem` and `CombatSimulation` when derived values are
+calculated. Never apply a class by incrementing `hero.attributes`, `hero.skills`, or equipment stats;
+that would permanently stack the bonus and make switching or future evolution unsafe.
+
+The player-facing route is **Heroes → select a hero → Class**. `SelectionOverlay` asks `Simulation`
+for immutable class options and invokes `selectHeroClass()` for the mutation. Roster and Party cards,
+notifications, and permanent memorial records then read `hero.heroClass`.
+
+When editing a class:
+
+1. Keep the definition summary and modifier record synchronized.
+2. Keep every requirement label synchronized with the actual threshold.
+3. Preserve explicit player choice and locked rejection.
+4. Test that base stats remain unchanged while Party and combat totals change.
+5. Test desktop/mobile panels, notification output, and memorial retention.
+
+Phase 26 owns branching, hybrid paths, and class evolution. Those concepts must not be smuggled into
+the current five-class system without a new approved phase.
+
+---
+
+## 36. Debugging Method
 
 When something breaks, follow the value rather than changing random files.
 
@@ -1821,7 +1922,7 @@ git diff --check
 
 ---
 
-## 33. Safe Git Workflow
+## 37. Safe Git Workflow
 
 Before editing:
 
@@ -1849,7 +1950,7 @@ understand and intend to erase every uncommitted change.
 
 ---
 
-## 34. Definition of Done for a Change
+## 38. Definition of Done for a Change
 
 A feature is not done only because TypeScript compiles.
 
@@ -1873,7 +1974,7 @@ Use this checklist:
 
 ---
 
-## 35. Final Rule of Thumb
+## 39. Final Rule of Thumb
 
 When you are unsure where a change belongs, ask three questions:
 

@@ -57,9 +57,9 @@ export const FACILITY_RECIPES: readonly Readonly<FacilityRecipe>[] = Object.free
     service: "-10% daily Food demand",
   }),
   Object.freeze({
-    description: "A practical forge prepared for later equipment work.", durationMinutes: 480,
+    description: "A practical forge for timed equipment work and repairs.", durationMinutes: 480,
     footprintRadius: 4.3, id: "smithy", label: "Smithy", scrapCost: 16,
-    service: "-10% later facility Scrap costs",
+    service: "Craft and repair equipment · -10% facility Scrap costs",
   }),
 ]);
 

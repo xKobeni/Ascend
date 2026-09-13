@@ -89,7 +89,8 @@ export interface HeroOrigin {
   rarity: OriginRarity;
 }
 
-export type HeroClass = "Unclassified";
+export type BasicHeroClass = "Archer" | "Fighter" | "Guardian" | "Medic" | "Scout";
+export type HeroClass = BasicHeroClass | "Unclassified";
 export type SocialRole = "Resident";
 
 export interface HeroReputation {
@@ -185,6 +186,7 @@ export interface FallenHeroRecord {
   expeditions: number;
   finalSquadName: string;
   heroId: string;
+  heroClass: HeroClass;
   joinedDay: number;
   kills: number;
   level: number;

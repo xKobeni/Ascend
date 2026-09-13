@@ -39,6 +39,7 @@ export class LegacySystem {
       expeditions: hero.career.expeditions,
       finalSquadName,
       heroId: hero.id,
+      heroClass: hero.heroClass,
       joinedDay: hero.career.joinedDay,
       kills: hero.career.kills,
       level: hero.level,

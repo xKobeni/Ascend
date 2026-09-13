@@ -11,6 +11,7 @@ import { RecruitmentOverlay } from "../ui/RecruitmentOverlay";
 import { SelectionOverlay } from "../ui/SelectionOverlay";
 import { SquadOverlay } from "../ui/SquadOverlay";
 import { RefugeBuildOverlay } from "../ui/RefugeBuildOverlay";
+import { SmithyOverlay } from "../ui/SmithyOverlay";
 import {
   CameraSettingsOverlay,
   loadCameraControlScheme,
@@ -28,7 +29,7 @@ import { GameClock } from "./GameClock";
 import { Renderer, type RendererEvents } from "./Renderer";
 
 type GameEvents = RendererEvents;
-type HeroDetailTab = "Equipment" | "Overview" | "Relations" | "Skills" | "Training";
+type HeroDetailTab = "Class" | "Equipment" | "Overview" | "Relations" | "Skills" | "Training";
 
 interface RefugeBuildDraft {
   facilityId: RefugeStructureId;
@@ -77,6 +78,7 @@ export class Game {
   private readonly selectionOverlay: SelectionOverlay;
   private readonly simulation = new Simulation();
   private readonly squadOverlay: SquadOverlay;
+  private readonly smithyOverlay: SmithyOverlay;
   private readonly unsubscribeEvents: Array<() => void> = [];
 
   constructor(private readonly container: HTMLElement) {
@@ -103,6 +105,10 @@ export class Game {
         equip: (heroId, itemId) => { this.simulation.equipItem(heroId, itemId); },
         getSnapshot: () => this.simulation.getEquipmentSnapshot(),
         unequip: (heroId, slot) => { this.simulation.unequipItem(heroId, slot); },
+      },
+      {
+        getOptions: (heroId) => this.simulation.getHeroClassOptions(heroId),
+        select: (heroId, heroClass) => { this.simulation.selectHeroClass(heroId, heroClass); },
       },
     );
     this.recruitmentOverlay = new RecruitmentOverlay(
@@ -183,12 +189,27 @@ export class Game {
       container,
       (heroId) => this.openHeroDetail(heroId, "Skills", "Refuge"),
     );
+    this.smithyOverlay = new SmithyOverlay(container, {
+      close: () => this.closeSmithy(true),
+      craft: (recipeId) => {
+        this.simulation.startCrafting(recipeId);
+        this.refreshSmithyUi();
+      },
+      repair: (itemId) => {
+        this.simulation.startEquipmentRepair(itemId);
+        this.refreshSmithyUi();
+      },
+    });
     this.buildOverlay = new RefugeBuildOverlay(container, {
       cancel: () => this.cancelBuildDraft(),
       confirm: () => this.confirmBuildDraft(),
       enter: () => this.enterBuildMode(),
       exit: () => this.exitBuildMode(true),
       nudge: (dx, dz) => this.nudgeBuildDraft(dx, dz),
+      openSmithy: () => {
+        this.exitBuildMode(false);
+        this.openSmithy();
+      },
       pan: (dx, dz) => this.renderer.panCamera(dx * 3, dz * 3),
       rotate: () => this.rotateBuildDraft(),
       removeEnvironment: () => this.removeBuildEnvironment(),
@@ -256,6 +277,11 @@ export class Game {
           this.activateHudSection("Heroes");
           return;
         }
+        const construction = this.simulation.getConstructionSnapshot().sites.find((site) => site.id === selection.id);
+        if (construction?.recipeId === "smithy" && construction.state === "Complete") {
+          this.openSmithy();
+          return;
+        }
         this.closePlayerPanels();
         this.hudShell.setActive("Refuge");
         this.activeHudSection = "Refuge";
@@ -298,6 +324,7 @@ export class Game {
     this.notificationCenter.dispose();
     this.recruitmentOverlay.dispose();
     this.selectionOverlay.dispose();
+    this.smithyOverlay.dispose();
     this.squadOverlay.dispose();
     this.portraits.dispose();
     this.renderer.dispose();
@@ -339,11 +366,13 @@ export class Game {
       expeditionSnapshot,
       fallenHeroes,
       this.simulation.getResourceEconomySnapshot(),
+      this.simulation.getCraftingSnapshot(),
     );
     this.heroRosterOverlay.update();
     this.squadOverlay.updateEvaluation();
     this.combatOverlay.update();
     this.expeditionOverlay.update();
+    this.refreshSmithyUi();
     const constructionRevision = this.simulation.getConstructionSnapshot().revision;
     if (this.buildModeActive && constructionRevision !== this.lastBuildConstructionRevision) {
       this.refreshBuildUi();
@@ -451,6 +480,7 @@ export class Game {
     this.selectedHeroId = null;
     this.squadOverlay.close();
     this.expeditionOverlay.close();
+    this.smithyOverlay.close();
   }
 
   private openCameraSettings(): void {
@@ -477,8 +507,38 @@ export class Game {
   private syncRendererInteractionState(): void {
     this.renderer.setUiInteractionActive(
       this.cameraSettingsOverlay.isOpen() || this.debugOverlayOpen ||
-      this.activeHudSection !== "Refuge" || this.selectionOverlay.isOpen(),
+      this.activeHudSection !== "Refuge" || this.selectionOverlay.isOpen() || this.smithyOverlay.isOpen(),
     );
+  }
+
+  private openSmithy(): void {
+    if (!this.simulation.isSmithyOperational() ||
+      this.simulation.getExpeditionSnapshot().phase !== "Briefing" ||
+      this.simulation.getCombatSnapshot().result !== "Idle") return;
+    this.closePlayerPanels();
+    this.activeHudSection = "Refuge";
+    this.hudShell.setActive("Refuge");
+    this.buildOverlay.setAvailable(false);
+    this.smithyOverlay.open();
+    this.refreshSmithyUi();
+    this.renderer.setUiInteractionActive(true);
+  }
+
+  private closeSmithy(restoreFocus: boolean): void {
+    if (!this.smithyOverlay.isOpen()) return;
+    this.smithyOverlay.close();
+    this.buildOverlay.setAvailable(true);
+    this.syncRendererInteractionState();
+    if (restoreFocus) this.hudShell.focus("Refuge");
+  }
+
+  private refreshSmithyUi(): void {
+    this.smithyOverlay.update({
+      crafting: this.simulation.getCraftingSnapshot(),
+      equipment: this.simulation.getEquipmentSnapshot(),
+      recipes: this.simulation.getCraftingRecipes(),
+      resources: this.simulation.getExpeditionSnapshot().resources,
+    });
   }
 
   private enterBuildMode(): void {
@@ -748,6 +808,11 @@ export class Game {
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.code === "Escape" && this.smithyOverlay.isOpen()) {
+      event.preventDefault();
+      this.closeSmithy(true);
+      return;
+    }
     if (event.code === "Escape" && this.cameraSettingsOverlay.isOpen()) {
       event.preventDefault();
       this.closeCameraSettings(true);

@@ -29,6 +29,7 @@ export class HudShell {
         <div class="hud-time" data-hud="time">DAY 1 · 07:00</div>
         <div class="hud-resources" aria-label="Refuge resources">
           <span><i>SCRAP</i><b data-resource="scrap">0</b></span>
+          <span><i>METAL</i><b data-resource="metal">0</b></span>
           <span data-resource-item="food"><i>FOOD</i><b data-resource="food">0</b></span>
           <span><i>MEDICINE</i><b data-resource="medicine">0</b></span>
           <span><i>SHARDS</i><b data-resource="riftShards">0</b></span>
@@ -51,16 +52,17 @@ export class HudShell {
     const heroCount = this.element.querySelector<HTMLElement>("[data-hud='heroes']");
     const scrap = this.element.querySelector<HTMLElement>("[data-resource='scrap']");
     const food = this.element.querySelector<HTMLElement>("[data-resource='food']");
+    const metal = this.element.querySelector<HTMLElement>("[data-resource='metal']");
     const medicine = this.element.querySelector<HTMLElement>("[data-resource='medicine']");
     const riftShards = this.element.querySelector<HTMLElement>("[data-resource='riftShards']");
     const economyStatus = this.element.querySelector<HTMLElement>(".economy-status");
-    if (!time || !heroCount || !scrap || !food || !medicine || !riftShards || !economyStatus) {
+    if (!time || !heroCount || !scrap || !metal || !food || !medicine || !riftShards || !economyStatus) {
       throw new Error("HUD shell structure is incomplete.");
     }
     this.time = time;
     this.economyStatus = economyStatus;
     this.heroCount = heroCount;
-    this.resourceValues = { food, medicine, riftShards, scrap };
+    this.resourceValues = { food, metal, medicine, riftShards, scrap };
     this.element.addEventListener("click", this.handleClick);
     container.appendChild(this.element);
   }
@@ -77,6 +79,7 @@ export class HudShell {
     this.heroCount.textContent = `${snapshot.heroCount}/${dormitory.capacity}`;
     this.resourceValues.scrap.textContent = String(resources.scrap);
     this.resourceValues.food.textContent = String(resources.food);
+    this.resourceValues.metal.textContent = String(resources.metal);
     this.resourceValues.medicine.textContent = String(resources.medicine);
     this.resourceValues.riftShards.textContent = String(resources.riftShards);
     const foodResource = this.resourceValues.food.closest<HTMLElement>("[data-resource-item='food']");

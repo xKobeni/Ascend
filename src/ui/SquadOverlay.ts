@@ -168,7 +168,7 @@ export class SquadOverlay {
     const name = document.createElement("strong");
     name.textContent = hero.name;
     const details = document.createElement("span");
-    details.textContent = `${role} · Level ${hero.level}`;
+    details.textContent = `${role} · ${hero.heroClass} · Level ${hero.level}`;
     card.append(portrait, stars, name, details);
     return card;
   }
@@ -183,7 +183,7 @@ export class SquadOverlay {
       const name = document.createElement("strong");
       name.textContent = hero.name;
       const detail = document.createElement("small");
-      detail.textContent = `Level ${hero.level} · ${hero.origin.occupation}`;
+      detail.textContent = `Level ${hero.level} · ${hero.heroClass} · ${hero.origin.occupation}`;
       identity.append(name, detail);
       const add = document.createElement("button");
       add.type = "button";

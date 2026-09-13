@@ -2,13 +2,13 @@
 
 > A complete guide to understanding, maintaining, and modifying the ASCENT codebase.
 
-Current implementation boundary (verified September 11, 2026):
+Current implementation boundary (verified September 12, 2026):
 
 ```text
-Gameplay phases implemented: 0–23
+Gameplay phases implemented: 0–25
 Current player destinations: Heroes, Party, Refuge, Rift
 Developer-only combat sandbox: F3 → Arena
-Next gameplay phase: Phase 24 — Smithy and Crafting
+Next gameplay phase: Phase 26 — Branching Classes
 Procedural Character Forge: human recruitment subset implemented
 ```
 
@@ -87,6 +87,8 @@ future feature must not appear in the HUD or use mocked state before its impleme
     - [10.14 Modify the Refuge Layout Safely](#1014-modify-the-refuge-layout-safely)
     - [10.15 Modify Facility Construction Safely](#1015-modify-facility-construction-safely)
     - [10.16 Modify Equipment Safely](#1016-modify-equipment-safely)
+    - [10.17 Modify Smithy Crafting Safely](#1017-modify-smithy-crafting-safely)
+    - [10.18 Modify Classes Safely](#1018-modify-classes-safely)
 11. [Key Constants Reference](#11-key-constants-reference)
 12. [File Index](#12-file-index)
 13. [Appendix: Architecture Decisions FAQ](#appendix-architecture-decisions-faq)
@@ -120,6 +122,7 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The game l
 13. Refuge Build Mode can reorganize all starting structures, store ordinary facilities, edit smooth trails, and move or remove seeded trees and rocks
 14. Victory Scrap can fund new facilities; assigned builders deliver materials and complete them over game time
 15. Heroes can equip shared Refuge weapons and shields that change real squad/combat stats and live models
+16. Rift victories recover Metal; a completed Smithy turns Metal and Scrap into timed quality equipment or repairs
 
 Before and after a meaningful change, run:
 
@@ -132,7 +135,8 @@ git diff --check
 
 The browser playtest exercises the current UI, procedural portraits, camera gating, squad swaps,
 victory and withdrawal routes, recovery, permanent death, memories, trait evolution, recruitment,
-and the Refuge layout editor. A successful static build alone does not prove those runtime paths.
+the Refuge layout editor, crafting, and basic class selection. A successful static build alone does
+not prove those runtime paths.
 
 ### 1.1 Implemented Phase Map
 
@@ -156,9 +160,11 @@ and the Refuge layout editor. A successful static build alone does not prove tho
 | 21 | Broad editable Refuge plane, Build Mode, movable structures, trails, routing, trees and rocks | `refuge/RefugeLayoutSystem`, `RefugeBuildOverlay` |
 | 22 | Scrap recipes, construction sites, builder assignment, timed completion, and operational facility effects | `refuge/ConstructionSystem`, `RefugeBuildOverlay`, `ProceduralBaseScene` |
 | 23 | Shared inventory, reversible equipment loadouts, condition wear, derived combat stats, and visible attachments | `equipment/EquipmentSystem`, `SelectionOverlay`, `HeroMeshGenerator` |
+| 24 | Expedition Metal, operational Smithy recipes, timed quality output, and equipment repair | `crafting/CraftingSystem`, `SmithyOverlay`, `EquipmentSystem` |
+| 25 | Five evidence-gated basic classes with derived Party/combat bonuses | `classes/ClassSystem`, `SelectionOverlay`, combat and squad consumers |
 
-Phase 22 is the next boundary. Construction sites, builders, progress timers, build recipes, new
-Metal, crafting outputs, item repair, armor, accessories, and classes remain outside Phase 23.
+Phase 26 is the next boundary. Advanced and hybrid class branches, armor slots, accessories,
+advanced recipe tiers, assigned smith workers, and skill-shaped crafting quality remain future work.
 
 ---
 
@@ -609,6 +615,7 @@ The current stockpile and uses are:
 | Resource | Start | Victory reward | Use |
 |----------|------:|---------------:|-----|
 | Food | 12 | 8 | 1 per active hero per game day |
+| Metal | 0 | 12 | Smithy crafting and repair |
 | Medicine | 6 | 2 | Injury treatment |
 | Scrap | 0 | 18 | Dormitory upgrades |
 | Rift Shards | 0 | 3 | Recruitment |
@@ -625,8 +632,8 @@ When Empty, Eating stops restoring hunger, stress gains 2.5/hour, and morale los
 definitions. Combat and Debrief do not advance refuge consumption.
 
 The Refuge provisioning strip displays status, days, and Food/day. Low, Empty, and restored
-transitions produce notifications. Metal is absent because Phase 22 does not yet provide a real
-construction recipe or consumer.
+transitions produce notifications. Metal activates only after Phase 24 supplies both the Rift source
+and operational Smithy consumers.
 
 ---
 
@@ -1434,12 +1441,12 @@ assuming a passing typecheck proves layout quality.
 ### 10.13 Modify the Resource Economy Safely
 
 - Change daily consumption through `FOOD_PER_HERO_PER_DAY` in `ResourceEconomySystem.ts`.
-- Keep Food, Medicine, Scrap, and Rift Shard mutation inside `ExpeditionSystem`.
+- Keep Food, Metal, Medicine, Scrap, and Rift Shard mutation inside `ExpeditionSystem`.
 - Update `FIRST_MISSION.rewards` and the direct victory regression together.
 - Pass shortage state into `NeedsSystem`; do not edit every hero to apply temporary penalties.
 - Keep consequences gradual and scaled by game minutes.
 - Test Stocked, Low, Empty, restored supplies, partial availability, and zero-resource rejection.
-- Do not introduce Metal until a real source and consuming recipe are implemented.
+- Metal is now valid because the first mission supplies it and the operational Smithy consumes it.
 
 ### 10.14 Modify the Refuge Layout Safely
 
@@ -1491,11 +1498,11 @@ Completed services are derived in `Simulation`:
 - Training Hall: ×1.15 training progress when at least one is complete.
 - Infirmary Ward: ×1.20 injury recovery when at least one is complete.
 - Storehouse: ×0.90 Food demand when at least one is complete.
-- Smithy: 10% lower later facility Scrap costs, rounded up.
+- Smithy: contextual crafting/repair access and 10% lower later facility Scrap costs, rounded up.
 
 When adding another service, pass a temporary modifier into the owning system. Do not permanently
-rewrite hero attributes, resource totals, or recipe definitions. Phase 23 equipment is independent
-from Smithy crafting; keep recipes, repair actions, and Metal absent until Phase 24.
+rewrite hero attributes, resource totals, or recipe definitions. `CraftingSystem` now owns recipe
+and job state; construction only answers whether the required Smithy is operational.
 
 Test every construction change for unaffordable no-spend behavior, invalid placement, overlap with
 existing sites, builder eligibility, delivery transition, completion, service activation, mobile
@@ -1511,7 +1518,7 @@ state in `HeroMeshGenerator`, the Equipment tab, or a Three.js object.
 Equipment uses two current slots:
 
 ```text
-Main Hand → Sword, Spear, or Bow
+Main Hand → Sword, Spear, Bow, Axe, Mace, Dagger, Staff, or Crossbow
 Off Hand  → Shield
 ```
 
@@ -1534,9 +1541,81 @@ hero. Always change the item modifier and let consumers recompute.
 The equipment snapshot remains the truth; mesh presence is only a rendered consequence.
 
 Expedition completion applies condition wear through `EquipmentSystem.applyExpeditionWear()`:
-2 points for victory, 3 for withdrawal, and 5 for defeat. Repair is deliberately unavailable until
-Phase 24. Test item uniqueness, atomic transfer, equip/unequip reversibility, derived Party and combat
-stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and the four weapon shapes.
+2 points for victory, 3 for withdrawal, and 5 for defeat. Repair is queued through the operational
+Smithy. Test item uniqueness, atomic transfer, equip/unequip reversibility, derived Party and combat
+stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and every supported weapon shape.
+
+### 10.17 Modify Smithy Crafting Safely
+
+Phase 24 splits crafting across four narrow owners:
+
+- `src/crafting/CraftingSystem.ts` owns recipe data, the one-job timer, deterministic base quality,
+  repair quotes, and immutable snapshots.
+- `ExpeditionSystem` owns Metal and Scrap and performs the two-resource transaction atomically through
+  `consumeSmithyResources()`. Never subtract one material before confirming the other is available.
+- `EquipmentSystem` creates the unique finished item or restores the existing repaired item. A repair
+  must keep the same item ID so equipped loadouts do not break.
+- `SmithyOverlay` only renders the snapshot and invokes `Simulation.startCrafting()` or
+  `Simulation.startEquipmentRepair()`. It must not create an item directly.
+
+The live flow is:
+
+```text
+Rift victory → Metal stockpile → build and complete Smithy → open contextual Smithy panel
+→ validate idle forge + both costs → atomically spend → advance game-minute timer
+→ roll Normal/Good/Excellent → add one unique item to shared inventory
+```
+
+To add a recipe, extend `CraftingRecipeId` and `CRAFTING_RECIPES` together. Supply full base
+`EquipmentStats`, even when most values are zero, because combat and the expanded weapon catalog use
+the same shape. Keep recipe duration in game minutes and output visuals compatible with a supported
+`WeaponType`. Then update `SmithyOverlay.isRecipeId()` and the Phase 24 browser regression.
+
+Quality is a modifier on recipe output, not a permanent hero bonus. Normal uses the base recipe,
+Good applies ×1.25, and Excellent ×1.50 to Damage, Defense, and Range before rounding. The current
+base roll is deterministic for repeatable testing. The roadmap reserves hero crafting skill as a
+later modifier; do not assign workers or grant skill XP until that phase is approved.
+
+Repair quotes scale from missing condition: one Metal per 20 missing points, one Scrap per 25, and
+two game minutes per missing point with a 30-minute minimum. A repair at 100% must be rejected.
+Crafting and repairs pause during combat/debrief because the Refuge simulation itself is paused.
+
+The Smithy panel is contextual Refuge UI. A complete Smithy can open it from its 3D world selection
+or from **Open Smithy** in the completed Build Mode project. It gates the camera, closes with Escape,
+and becomes a full-height drawer on mobile. Do not add Smithy as a fifth bottom-navigation item.
+
+---
+
+### 10.18 Modify Classes Safely
+
+Phase 25 has one rules owner: `src/classes/ClassSystem.ts`. `CLASS_DEFINITIONS` contains the five
+player-facing names, descriptions, and bonus summaries. `getRequirements()` evaluates existing hero
+and equipment state, `select()` rejects locked or unchanged choices, and `getClassModifiers()` returns
+derived bonuses. None of these operations should rewrite attributes, legacy skills, personality,
+equipment stats, or Skill Forge levels.
+
+The class flow is:
+
+```text
+Hero starts Unclassified
+→ SelectionOverlay asks Simulation for class options
+→ ClassSystem reports three met/unmet requirements per class
+→ player explicitly chooses an unlocked path
+→ Simulation validates the request and stores hero.heroClass
+→ SquadSystem and CombatSimulation read derived modifiers
+→ roster, Party, memorial, and notifications display the result
+```
+
+To change a threshold, edit only the matching evidence rule in `getRequirements()` and update its
+visible label at the same time. To change balance, edit `MODIFIERS` and the corresponding
+`CLASS_DEFINITIONS.bonuses` summary together. If you add a new basic class, also extend
+`BasicHeroClass`, the modifier record, requirements, UI type guards, and playtest fixtures. Never use
+appearance or occupation alone to auto-select a class.
+
+Verify locked rejection, every valid unlock route, an explicit selection, unchanged base stats,
+derived Party and combat results, class notification, memorial retention, six detail tabs, and the
+mobile Class drawer. Phase 26 owns branching, upgrades, hybrids, and class evolution; do not add those
+as a Phase 25 maintenance change.
 
 ---
 
@@ -1558,12 +1637,16 @@ stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and the 
 | Construction builders | 2 per site | `src/refuge/ConstructionSystem.ts` |
 | Material delivery | 45 builder-minutes | `src/refuge/ConstructionSystem.ts` |
 | Facility recipes | 10–16 Scrap, 300–480 game minutes | `src/refuge/ConstructionSystem.ts` |
-| Starting equipment cache | 6 unique items across 4 weapon types | `src/equipment/EquipmentSystem.ts` |
+| Starting equipment cache | Unique shared weapon and shield instances | `src/equipment/EquipmentSystem.ts` |
 | Equipment slots | Main Hand and Off Hand | `src/equipment/EquipmentSystem.ts` |
 | Expedition equipment wear | 2 victory / 3 withdrawal / 5 defeat | `src/equipment/EquipmentSystem.ts` |
 | Starting Food | 12 | `src/expeditions/ExpeditionSystem.ts` |
 | Food consumption | 1 per active hero per game day | `src/economy/ResourceEconomySystem.ts` |
-| First mission reward | 8 Food, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
+| First mission reward | 8 Food, 12 Metal, 2 Medicine, 18 Scrap, 3 Rift Shards | `src/expeditions/ExpeditionSystem.ts` |
+| Smithy recipes | 3 recipes, 150–180 game minutes | `src/crafting/CraftingSystem.ts` |
+| Smithy quality | Normal ×1.00, Good ×1.25, Excellent ×1.50 | `src/crafting/CraftingSystem.ts` |
+| Basic classes | Fighter, Guardian, Archer, Medic, Scout | `src/classes/ClassSystem.ts` |
+| Class bonuses | Derived Attack, Defense, Healing, HP, Range, or Speed modifiers | `src/classes/ClassSystem.ts` |
 | Max training slots | 3 | `src/heroes/TrainingSystem.ts` |
 | Active skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
 | Passive skill loadout slots | 4 | `src/skills/SkillLoadoutSystem.ts` |
@@ -1616,6 +1699,8 @@ stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and the 
 | `src/simulation/Simulation.ts` | Top-level simulation coordinator. Time system. |
 | `src/refuge/ConstructionSystem.ts` | Facility catalog, site state, builders, progress, and completed services. |
 | `src/equipment/EquipmentSystem.ts` | Shared item inventory, hero loadouts, modifiers, transfer, and condition wear. |
+| `src/crafting/CraftingSystem.ts` | Smithy recipes, timed job, quality output, and repair quotes. |
+| `src/classes/ClassSystem.ts` | Basic class definitions, evidence requirements, selection, and derived modifiers. |
 
 ### Heroes
 | File | Purpose |
@@ -1711,6 +1796,7 @@ stats, wear, zero-condition behavior, mesh disposal, desktop/mobile UI, and the 
 |------|---------|
 | `src/ui/HudShell.ts` | Top status bar, Refuge provisioning record, and bottom navigation. |
 | `src/ui/RefugeBuildOverlay.ts` | Contextual layout tools, construction catalog, projects, and builder controls. |
+| `src/ui/SmithyOverlay.ts` | Contextual Smithy recipes, live job progress, resources, and repairs. |
 | `src/ui/SelectionOverlay.ts` | Hero detail panel (5 tabs, including Equipment). |
 | `src/ui/HeroRosterOverlay.ts` | Hero card grid, filters, recruitment eligibility, and Dormitory management. |
 | `src/ui/SquadOverlay.ts` | Formation editor, role assignment. |

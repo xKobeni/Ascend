@@ -18,17 +18,22 @@ import {
 } from "./FormationSystem";
 import type { SkillUsageEvent } from "../skills/Skill";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
+import { getClassModifiers } from "../classes/ClassSystem";
 import { getInjuryModifiers } from "../heroes/InjurySystem";
 import type { CombatMemoryEvent } from "../memories/HeroMemory";
 import type { EquipmentModifiers } from "../equipment/EquipmentSystem";
 
 interface Combatant extends CombatantSnapshot {
+  armorPierce: number;
   attackCooldown: number;
+  attackSpeed: number;
   bleedDamage: number;
   bleedTicks: number;
+  critChance: number;
   damageMultiplier: number;
   defense: number;
   defenseMultiplier: number;
+  equipmentHealthBonus: number;
   leadership: number;
   medicine: number;
   memories: Hero["memories"];
@@ -68,7 +73,7 @@ export class CombatSimulation {
     private readonly onSkillUsage: (event: Readonly<SkillUsageEvent>) => void = () => undefined,
     private readonly onMemoryEvent: (event: Readonly<CombatMemoryEvent>) => void = () => undefined,
     private readonly getEquipmentModifiers: (heroId: string) => Readonly<EquipmentModifiers> = () => ({
-      damage: 0, defense: 0, mainHandType: null, offHandType: null, range: 0,
+      armorPierce: 0, attackSpeed: 1, critChance: 0, damage: 0, defense: 0, healthBonus: 0, mainHandType: null, offHandType: null, range: 0,
     }),
   ) {}
 
@@ -101,23 +106,29 @@ export class CombatSimulation {
       const reactionSkills = Object.keys(entry.hero.skillForge.known).filter(
         (definitionId) => skillDefinitionRegistry.get(definitionId)?.type === "reaction",
       );
+      const equipment = this.getEquipmentModifiers(entry.hero.id);
+      const classModifiers = getClassModifiers(entry.hero.heroClass);
       this.combatants.push({
         action: "Idle",
         actionScores: [],
+        armorPierce: equipment.armorPierce,
         assistBoost: 1,
         attackCooldown: index * 0.12,
+        attackSpeed: equipment.attackSpeed,
         attributes: { ...entry.hero.attributes },
         berserkTicks: 0,
         bleedDamage: 0,
         bleedTicks: 0,
         buffStat: null,
         buffTicks: 0,
+        critChance: equipment.critChance,
         damageMultiplier: 1,
         decisionReason: "Awaiting first evaluation",
         defeatedBy: null,
         defending: false,
         defense: stats.defense,
         defenseMultiplier: 1,
+        equipmentHealthBonus: equipment.healthBonus,
         flanking: 0,
         focusTargetId: null,
         focusTargetTicks: 0,
@@ -131,7 +142,7 @@ export class CombatSimulation {
         kills: 0,
         label: entry.hero.name,
         leadership: entry.hero.attributes.leadership,
-        medicine: entry.hero.skills.medicine,
+        medicine: entry.hero.skills.medicine + classModifiers.healing,
         memories: entry.hero.memories,
         panicTicks: 0,
         personality: entry.hero.personality,
@@ -150,9 +161,9 @@ export class CombatSimulation {
         tacticalRole,
         team: "Hero",
         traits: entry.hero.traits,
-        weaponSkillId: this.getEquipmentModifiers(entry.hero.id).mainHandType === "Bow"
+        weaponSkillId: equipment.mainHandType === "Bow"
           ? null
-          : this.getEquipmentModifiers(entry.hero.id).mainHandType === "Spear"
+          : equipment.mainHandType === "Spear"
             ? "spear_mastery"
             : "sword_mastery",
       });
@@ -170,8 +181,10 @@ export class CombatSimulation {
       this.combatants.push({
         action: "Idle",
         actionScores: [],
+        armorPierce: 0,
         assistBoost: 1,
         attackCooldown: 0.2 + index * 0.12,
+        attackSpeed: 1,
         attributes: {
           agility: 3,
           endurance: 3,
@@ -185,12 +198,14 @@ export class CombatSimulation {
         bleedTicks: 0,
         buffStat: null,
         buffTicks: 0,
+        critChance: 0,
         damageMultiplier: 1,
         decisionReason: "Simple enemy behavior",
         defeatedBy: null,
         defending: false,
         defense: stats.defense,
         defenseMultiplier: 1,
+        equipmentHealthBonus: 0,
         flanking: 0,
         focusTargetId: null,
         focusTargetTicks: 0,
@@ -1028,9 +1043,14 @@ export class CombatSimulation {
     // Berserk defense penalty for attacker (applied to target's effective defense)
     const attackerBerserkPenalty = attacker.berserkTicks > 0 ? 0.7 : 1;
 
-    const effectiveDefense = target.stats.defense * defenseMultiplier * attackerBerserkPenalty;
+    const effectiveDefense = Math.max(0, target.stats.defense * defenseMultiplier * attackerBerserkPenalty - attacker.armorPierce);
 
     let baseDamage = Math.max(1, Math.round(attacker.stats.attack - effectiveDefense * 0.72));
+
+    // Crit check
+    if (attacker.critChance > 0 && Math.random() < attacker.critChance) {
+      baseDamage = Math.round(baseDamage * 1.5);
+    }
 
     // Flanking bonus: +15%
     if (attacker.flanking > 0) baseDamage = Math.round(baseDamage * 1.15);
@@ -1124,17 +1144,18 @@ export class CombatSimulation {
   private getHeroStats(hero: Readonly<Hero>, role: string): CombatStats {
     const injury = getInjuryModifiers(hero);
     const equipment = this.getEquipmentModifiers(hero.id);
+    const heroClass = getClassModifiers(hero.heroClass);
     const weaponSkill = Math.max(hero.skills.sword, hero.skills.spear);
     const roleHp = role === "Vanguard" ? 16 : 0;
     const roleAttack = role === "Damage" ? 4 : 0;
     const roleDefense = role === "Vanguard" ? 3 : 0;
     const roleRange = role === "Support" ? 2.2 : 1.8;
     return {
-      attack: (10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack + equipment.damage) * injury.attack,
-      defense: (4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense + equipment.defense) * injury.defense,
-      maxHp: 58 + hero.attributes.endurance * 7 + hero.level * 5 + roleHp,
-      range: roleRange + equipment.range,
-      speed: 1.45 + hero.attributes.agility * 0.08,
+      attack: (10 + hero.attributes.strength * 2 + weaponSkill * 2.5 + roleAttack + equipment.damage + heroClass.attack) * injury.attack * (equipment.attackSpeed === 1 ? 1 : equipment.attackSpeed),
+      defense: (4 + hero.attributes.endurance + hero.skills.defense * 1.5 + roleDefense + equipment.defense + heroClass.defense) * injury.defense,
+      maxHp: 58 + hero.attributes.endurance * 7 + hero.level * 5 + roleHp + equipment.healthBonus + heroClass.maxHp,
+      range: roleRange + equipment.range + heroClass.range,
+      speed: 1.45 + hero.attributes.agility * 0.08 + heroClass.speed,
     };
   }
 

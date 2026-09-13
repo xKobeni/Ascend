@@ -8,6 +8,7 @@ import type {
 } from "./Squad";
 import { getInjuryModifiers, hasRecoveringInjury } from "../heroes/InjurySystem";
 import type { EquipmentModifiers } from "../equipment/EquipmentSystem";
+import { getClassModifiers } from "../classes/ClassSystem";
 
 export const SQUAD_SIZE = 3;
 
@@ -111,7 +112,7 @@ export class SquadSystem {
   evaluate(
     heroes: readonly Readonly<Hero>[],
     getEquipment: (heroId: string) => Readonly<EquipmentModifiers> = () => ({
-      damage: 0, defense: 0, mainHandType: null, offHandType: null, range: 0,
+      armorPierce: 0, attackSpeed: 1, critChance: 0, damage: 0, defense: 0, healthBonus: 0, mainHandType: null, offHandType: null, range: 0,
     }),
   ): SquadEvaluation {
     const members = this.squad.members
@@ -136,14 +137,18 @@ export class SquadSystem {
       (result, hero) => {
         const injury = getInjuryModifiers(hero);
         const equipment = getEquipment(hero.id);
+        const heroClass = getClassModifiers(hero.heroClass);
         result.level += hero.level;
         result.combatPower += (
           hero.attributes.strength * 4 +
           hero.attributes.agility * 2 +
           Math.max(hero.skills.sword, hero.skills.spear) * 5 +
-          hero.level * 10 + equipment.damage * 8 + equipment.range * 3) * injury.attack;
-        result.healing += hero.skills.medicine * 10 + hero.attributes.intelligence * 2;
-        result.defense += (hero.skills.defense * 8 + hero.attributes.endurance * 3 + equipment.defense * 8) * injury.defense;
+          hero.level * 10 + equipment.damage * 8 + equipment.range * 3 +
+          equipment.healthBonus * 0.5 + equipment.armorPierce * 4 +
+          equipment.critChance * 60 + heroClass.attack * 8 + heroClass.range * 3 +
+          heroClass.speed * 10 + heroClass.maxHp * 0.5) * injury.attack;
+        result.healing += hero.skills.medicine * 10 + hero.attributes.intelligence * 2 + heroClass.healing * 10;
+        result.defense += (hero.skills.defense * 8 + hero.attributes.endurance * 3 + equipment.defense * 8 + heroClass.defense * 8 + heroClass.maxHp * 0.5) * injury.defense;
         result.recoveringMembers += Number(hasRecoveringInjury(hero));
         return result;
       },

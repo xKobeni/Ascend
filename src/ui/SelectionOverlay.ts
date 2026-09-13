@@ -1,5 +1,6 @@
 import type {
   Hero,
+  BasicHeroClass,
   HeroAttributes,
   FallenHeroRecord,
   HeroNeeds,
@@ -13,7 +14,9 @@ import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import { ACTIVE_SKILL_SLOTS, PASSIVE_SKILL_SLOTS } from "../skills/SkillLoadoutSystem";
 import { getSkillXpToNextLevel } from "../skills/SkillProgressionSystem";
 import { getInjuryDefinition, hasRecoveringInjury } from "../heroes/InjurySystem";
-import type { EquipmentSlot, EquipmentSnapshot } from "../equipment/EquipmentSystem";
+import type { EquipmentSlot, EquipmentRarity, EquipmentSnapshot } from "../equipment/EquipmentSystem";
+import { RARITY_COLORS } from "../equipment/EquipmentSystem";
+import type { ClassOption } from "../classes/ClassSystem";
 
 const ATTRIBUTE_LABELS: ReadonlyArray<[keyof HeroAttributes, string]> = [
   ["strength", "Strength"],
@@ -68,7 +71,8 @@ export class SelectionOverlay {
   private readonly heroContent: HTMLElement;
   private readonly memorialContent: HTMLElement;
   private selectedHeroId: string | null = null;
-  private selectedTab: "Equipment" | "Overview" | "Relations" | "Skills" | "Training" = "Overview";
+  private selectedTab: "Class" | "Equipment" | "Overview" | "Relations" | "Skills" | "Training" = "Overview";
+  private classRenderSignature: string | null = null;
   private equipmentRenderSignature: string | null = null;
   private skillForgeRenderSignature: string | null = null;
 
@@ -83,6 +87,10 @@ export class SelectionOverlay {
       equip(heroId: string, itemId: string): void;
       getSnapshot(): Readonly<EquipmentSnapshot>;
       unequip(heroId: string, slot: EquipmentSlot): void;
+    },
+    private readonly classes?: {
+      getOptions(heroId: string): readonly Readonly<ClassOption>[];
+      select(heroId: string, heroClass: BasicHeroClass): void;
     },
   ) {
     this.element = document.createElement("aside");
@@ -100,6 +108,7 @@ export class SelectionOverlay {
         <button type="button" data-hero-tab="Skills" aria-pressed="false">Skills</button>
         <button type="button" data-hero-tab="Training" aria-pressed="false">Training</button>
         <button type="button" data-hero-tab="Equipment" aria-pressed="false">Equipment</button>
+        <button type="button" data-hero-tab="Class" aria-pressed="false">Class</button>
         <button type="button" data-hero-tab="Relations" aria-pressed="false">Relations</button>
       </nav>
       <div class="hero-panel" data-selection="hero" hidden>
@@ -130,6 +139,9 @@ export class SelectionOverlay {
           <section class="hero-equipment"><span class="hero-panel__heading">Equipped</span><div data-hero="equipment-slots"></div></section>
           <section class="hero-inventory"><span class="hero-panel__heading">Refuge inventory</span><div data-hero="equipment-inventory"></div></section>
         </div>
+        <div data-hero-view="Class" hidden>
+          <section class="hero-classes"><span class="hero-panel__heading">Specialization</span><div class="hero-class-current" data-hero="class-current"></div><div class="hero-class-options" data-hero="class-options"></div><p>Classes emerge from existing attributes, skills, equipment, origins, personality, and field experience. Choosing a class never rewrites those base values.</p></section>
+        </div>
         <div data-hero-view="Relations" hidden>
           <section><span class="hero-panel__heading">Relationships</span><div class="hero-panel__relationships" data-hero="relationships"></div></section>
           <section><span class="hero-panel__heading">Memories</span><div class="hero-panel__memories" data-hero="memories"></div></section>
@@ -156,6 +168,7 @@ export class SelectionOverlay {
     if (nextHeroId !== this.selectedHeroId) {
       this.skillForgeRenderSignature = null;
       this.equipmentRenderSignature = null;
+      this.classRenderSignature = null;
     }
     this.selectedHeroId = nextHeroId;
     if (!selection) {
@@ -195,7 +208,7 @@ export class SelectionOverlay {
     this.memorialContent.hidden = false;
     this.memorialContent.innerHTML = `
       <span class="memorial-record__mark" aria-hidden="true">◇</span>
-      <p>${this.escape(record.occupation)} · Level ${record.level}</p>
+      <p>${this.escape(record.heroClass)} · ${this.escape(record.occupation)} · Level ${record.level}</p>
       <dl>
         <div><dt>Rank</dt><dd>${"★".repeat(record.rank)}</dd></div>
         <div><dt>Days alive</dt><dd>${record.daysAlive}</dd></div>
@@ -249,6 +262,8 @@ export class SelectionOverlay {
     this.renderValueGrid(this.requireHeroElement("skills"), SKILL_LABELS, hero.skills);
     this.renderSkillForge(hero);
     this.renderEquipment(hero);
+    this.renderClasses(hero);
+    this.renderHeroPath(hero);
   }
 
   private renderTraining(hero: Readonly<Hero>): void {
@@ -310,6 +325,12 @@ export class SelectionOverlay {
       this.equipmentRenderSignature = null;
       return;
     }
+    const classButton = target?.closest<HTMLButtonElement>("[data-class-id]");
+    if (classButton && this.selectedHeroId && this.isBasicHeroClass(classButton.dataset.classId) && this.classes) {
+      this.classes.select(this.selectedHeroId, classButton.dataset.classId);
+      this.classRenderSignature = null;
+      return;
+    }
     const button = target?.closest<HTMLButtonElement>("[data-training-type]");
     const type = button?.dataset.trainingType;
     if (button && this.selectedHeroId && this.isTrainingType(type)) {
@@ -327,11 +348,39 @@ export class SelectionOverlay {
   }
 
   private isHeroTab(value: string | undefined): value is typeof this.selectedTab {
-    return value !== undefined && ["Overview", "Skills", "Training", "Equipment", "Relations"].includes(value);
+    return value !== undefined && ["Overview", "Skills", "Training", "Equipment", "Class", "Relations"].includes(value);
   }
 
   private isEquipmentSlot(value: string | undefined): value is EquipmentSlot {
     return value === "mainHand" || value === "offHand";
+  }
+
+  private isBasicHeroClass(value: string | undefined): value is BasicHeroClass {
+    return value !== undefined && ["Fighter", "Guardian", "Archer", "Medic", "Scout"].includes(value);
+  }
+
+  private renderClasses(hero: Readonly<Hero>): void {
+    const current = this.requireHeroElement("class-current");
+    const options = this.requireHeroElement("class-options");
+    const evaluations = this.classes?.getOptions(hero.id) ?? [];
+    const signature = JSON.stringify({
+      current: hero.heroClass,
+      options: evaluations.map((option) => [option.definition.id, option.unlocked, option.requirements.map((requirement) => requirement.met)]),
+    });
+    if (signature === this.classRenderSignature) return;
+    this.classRenderSignature = signature;
+    const selected = evaluations.find((option) => option.definition.id === hero.heroClass);
+    current.innerHTML = `<span>CURRENT CLASS</span><strong>${this.escape(hero.heroClass)}</strong><small>${hero.heroClass === "Unclassified" ? "No specialization selected." : `${this.escape(selected?.definition.bonuses ?? "Class bonuses active")} · Active in Party evaluation and combat.`}</small>`;
+    options.replaceChildren(...evaluations.map((option) => {
+      const card = document.createElement("article");
+      card.className = "hero-class-option";
+      card.dataset.classUnlocked = String(option.unlocked);
+      const requirements = option.requirements.map((requirement) =>
+        `<li data-met="${requirement.met}"><b>${requirement.met ? "✓" : "×"}</b><span>${this.escape(requirement.label)}</span><small>${this.escape(requirement.detail)}</small></li>`,
+      ).join("");
+      card.innerHTML = `<header><div><span>${option.unlocked ? "AVAILABLE" : "LOCKED"}</span><strong>${this.escape(option.definition.id)}</strong></div><small>${this.escape(option.definition.bonuses)}</small></header><p>${this.escape(option.definition.description)}</p><ul>${requirements}</ul><button type="button" data-class-id="${option.definition.id}" ${!option.unlocked || hero.heroClass === option.definition.id ? "disabled" : ""}>${hero.heroClass === option.definition.id ? "Selected" : option.unlocked ? "Choose class" : "Requirements unmet"}</button>`;
+      return card;
+    }));
   }
 
   private renderEquipment(hero: Readonly<Hero>): void {
@@ -358,7 +407,7 @@ export class SelectionOverlay {
       const item = snapshot.items.find((entry) => entry.id === itemId);
       const row = document.createElement("article");
       row.className = "hero-equipment__slot";
-      row.innerHTML = `<span>${slot === "mainHand" ? "MAIN HAND" : "OFF HAND"}</span><strong>${this.escape(item?.name ?? "Empty")}</strong>${item ? `<small>${this.formatEquipmentStats(item.stats)} · ${item.durability}% condition</small><button type="button" data-unequip-slot="${slot}">Unequip</button>` : ""}`;
+      row.innerHTML = `<span>${slot === "mainHand" ? "MAIN HAND" : "OFF HAND"}</span><strong>${item ? `<span style="color:${this.getRarityColor(item.rarity)}">${this.escape(item.name)}</span>` : this.escape("Empty")}</strong>${item ? `<small>${this.formatEquipmentStats(item.stats)} · ${item.durability}% condition</small><button type="button" data-unequip-slot="${slot}">Unequip</button>` : ""}`;
       return row;
     }));
     inventory.replaceChildren(...snapshot.items.map((item) => {
@@ -367,14 +416,25 @@ export class SelectionOverlay {
       const card = document.createElement("article");
       card.className = "hero-inventory__item";
       card.dataset.rarity = item.rarity;
-      card.innerHTML = `<div><span>${item.type} · ${item.rarity}</span><strong>${this.escape(item.name)}</strong><small>${this.escape(item.description)}</small></div><div><b>${this.formatEquipmentStats(item.stats)}</b><small>${item.durability}% condition · ${owner}</small><button type="button" data-equipment-id="${item.id}" ${ownerId === hero.id ? "disabled" : ""}>${ownerId ? "Transfer" : "Equip"}</button></div>`;
+      card.innerHTML = `<div><span>${item.type} · <span style="color:${this.getRarityColor(item.rarity)}">${item.rarity}</span></span><strong>${this.escape(item.name)}</strong><small>${this.escape(item.description)}</small></div><div><b>${this.formatEquipmentStats(item.stats)}</b><small>${item.durability}% condition · ${owner}</small><button type="button" data-equipment-id="${item.id}" ${ownerId === hero.id ? "disabled" : ""}>${ownerId ? "Transfer" : "Equip"}</button></div>`;
       return card;
     }));
   }
 
-  private formatEquipmentStats(stats: Readonly<{ damage: number; defense: number; range: number }>): string {
-    return [stats.damage ? `Damage +${stats.damage}` : "", stats.defense ? `Defense +${stats.defense}` : "", stats.range ? `Range +${stats.range.toFixed(1)}` : ""]
+  private formatEquipmentStats(stats: Readonly<{ damage: number; defense: number; range: number; armorPierce?: number; critChance?: number; healthBonus?: number }>): string {
+    return [
+      stats.damage ? `Damage +${stats.damage}` : "",
+      stats.defense ? `Defense +${stats.defense}` : "",
+      stats.range ? `Range +${stats.range.toFixed(1)}` : "",
+      stats.armorPierce ? `Pierce +${stats.armorPierce}` : "",
+      stats.critChance ? `Crit +${Math.round(stats.critChance * 100)}%` : "",
+      stats.healthBonus ? `HP +${stats.healthBonus}` : "",
+    ]
       .filter(Boolean).join(" · ");
+  }
+
+  private getRarityColor(rarity: EquipmentRarity): string {
+    return RARITY_COLORS[rarity] ?? "#b0b0b0";
   }
 
   private renderSkillForge(hero: Readonly<Hero>): void {
@@ -478,10 +538,7 @@ export class SelectionOverlay {
     const identity = this.requireHeroElement("identity");
     const genderLabel = hero.appearance.gender === "female" ? "Female" : "Male";
     identity.textContent = `${genderLabel} · ${hero.origin.occupation} (${hero.origin.category}) · Age ${hero.age}`;
-    const path = this.requireHeroElement("path");
-    const reputation = hero.reputation.title ?? "Unproven";
-    path.textContent = `Class · ${hero.heroClass}  |  Refuge role · ${hero.socialRole}  |  Reputation · ${reputation}`;
-    path.title = `Origin aptitudes: ${hero.origin.aptitudes.join(", ")}`;
+    this.renderHeroPath(hero);
     this.updateHeroRuntime(hero, heroes);
 
     const traits = this.requireHeroElement("traits");
@@ -521,6 +578,13 @@ export class SelectionOverlay {
         return row;
       }),
     );
+  }
+
+  private renderHeroPath(hero: Readonly<Hero>): void {
+    const path = this.requireHeroElement("path");
+    const reputation = hero.reputation.title ?? "Unproven";
+    path.textContent = `Class · ${hero.heroClass}  |  Refuge role · ${hero.socialRole}  |  Reputation · ${reputation}`;
+    path.title = `Origin aptitudes: ${hero.origin.aptitudes.join(", ")}`;
   }
 
   private renderRelationships(hero: Readonly<Hero>, heroes: readonly Readonly<Hero>[]): void {

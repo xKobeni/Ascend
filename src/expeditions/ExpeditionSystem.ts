@@ -11,7 +11,7 @@ import type {
 } from "./Expedition";
 import { hasRecoveringInjury } from "../heroes/InjurySystem";
 
-const NO_REWARDS: Readonly<ExpeditionResources> = Object.freeze({ food: 0, medicine: 0, riftShards: 0, scrap: 0 });
+const NO_REWARDS: Readonly<ExpeditionResources> = Object.freeze({ food: 0, metal: 0, medicine: 0, riftShards: 0, scrap: 0 });
 
 const FIRST_MISSION: Readonly<ExpeditionMission> = Object.freeze({
   description: "Clear the collapsed transit yard before the Rift pack reaches the refuge routes.",
@@ -19,7 +19,7 @@ const FIRST_MISSION: Readonly<ExpeditionMission> = Object.freeze({
   id: "transit-yard-suppression",
   name: "Transit Yard Suppression",
   objective: "Eliminate Enemies",
-  rewards: Object.freeze({ food: 8, medicine: 2, riftShards: 3, scrap: 18 }),
+  rewards: Object.freeze({ food: 8, metal: 12, medicine: 2, riftShards: 3, scrap: 18 }),
   threats: Object.freeze(["3 Rift Stalkers", "Close-range pressure", "Retreat risk"]),
 });
 
@@ -28,7 +28,7 @@ export class ExpeditionSystem {
   private deployedSquad: Readonly<Squad> | null = null;
   private phase: ExpeditionSnapshot["phase"] = "Briefing";
   private report: ExpeditionReport | null = null;
-  private readonly resources: ExpeditionResources = { food: 12, medicine: 6, riftShards: 0, scrap: 0 };
+  private readonly resources: ExpeditionResources = { food: 12, metal: 0, medicine: 6, riftShards: 0, scrap: 0 };
 
   constructor(
     private readonly combat: CombatSimulation,
@@ -133,6 +133,18 @@ export class ExpeditionSystem {
     return true;
   }
 
+  consumeSmithyResources(scrap: number, metal: number): boolean {
+    const normalizedScrap = Math.max(0, Math.floor(scrap));
+    const normalizedMetal = Math.max(0, Math.floor(metal));
+    if ((normalizedScrap === 0 && normalizedMetal === 0) ||
+      this.resources.scrap < normalizedScrap || this.resources.metal < normalizedMetal) {
+      return false;
+    }
+    this.resources.scrap -= normalizedScrap;
+    this.resources.metal -= normalizedMetal;
+    return true;
+  }
+
   private resolve(
     combat: Readonly<CombatSnapshot>,
     outcome: Exclude<CombatResult, "Idle" | "Running">,
@@ -143,6 +155,7 @@ export class ExpeditionSystem {
     const successful = outcome === "Victory";
     const rewards = successful ? FIRST_MISSION.rewards : NO_REWARDS;
     this.resources.food += rewards.food;
+    this.resources.metal += rewards.metal;
     this.resources.medicine += rewards.medicine;
     this.resources.riftShards += rewards.riftShards;
     this.resources.scrap += rewards.scrap;

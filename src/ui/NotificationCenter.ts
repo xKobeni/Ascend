@@ -3,6 +3,7 @@ import type { FallenHeroRecord, Hero } from "../heroes/Hero";
 import type { SocialEvent } from "../heroes/RelationshipSystem";
 import { skillDefinitionRegistry } from "../skills/SkillDefinitionRegistry";
 import type { ProvisionStatus, ResourceEconomySnapshot } from "../economy/ResourceEconomySystem";
+import type { CraftingSnapshot } from "../crafting/CraftingSystem";
 
 interface NotificationEntry {
   expiresAt: number;
@@ -18,6 +19,7 @@ export class NotificationCenter {
   private initialized = false;
   private lastExpeditionPhase: ExpeditionSnapshot["phase"] = "Briefing";
   private lastProvisionStatus: ProvisionStatus = "Stocked";
+  private lastSmithyCompletionId: string | null = null;
   private latestSocialEventId = 0;
   private readonly list: HTMLOListElement;
   private nextId = 1;
@@ -27,6 +29,7 @@ export class NotificationCenter {
   private readonly injurySignatures = new Map<string, string>();
   private readonly knownMemorialIds = new Set<string>();
   private readonly knownHeroIds = new Set<string>();
+  private readonly heroClasses = new Map<string, Hero["heroClass"]>();
   private readonly recoveryOutcomes = new Map<string, string | null>();
   private readonly traitNames = new Map<string, Set<string>>();
 
@@ -58,9 +61,10 @@ export class NotificationCenter {
     expedition: Readonly<ExpeditionSnapshot>,
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
     economy?: Readonly<ResourceEconomySnapshot>,
+    crafting?: Readonly<CraftingSnapshot>,
   ): void {
     if (!this.initialized) {
-      this.initialize(heroes, socialEvents, expedition, fallenHeroes, economy);
+      this.initialize(heroes, socialEvents, expedition, fallenHeroes, economy, crafting);
       return;
     }
     this.captureSocialEvents(socialEvents);
@@ -70,6 +74,7 @@ export class NotificationCenter {
       this.captureProvisionChange(economy);
     }
     this.captureMemorialChanges(fallenHeroes);
+    if (crafting) this.captureSmithyCompletion(crafting);
     const now = performance.now();
     const before = this.notifications.length;
     this.notifications.splice(0, this.notifications.length, ...this.notifications.filter((entry) => entry.expiresAt > now));
@@ -91,6 +96,7 @@ export class NotificationCenter {
     expedition: Readonly<ExpeditionSnapshot>,
     fallenHeroes: readonly Readonly<FallenHeroRecord>[],
     economy?: Readonly<ResourceEconomySnapshot>,
+    crafting?: Readonly<CraftingSnapshot>,
   ): void {
     heroes.forEach((hero) => {
       this.knownHeroIds.add(hero.id);
@@ -98,6 +104,7 @@ export class NotificationCenter {
       this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
       this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
       this.traitNames.set(hero.id, new Set(hero.traits));
+      this.heroClasses.set(hero.id, hero.heroClass);
       Object.values(hero.skillForge.known).forEach((skill) => {
         this.skillLevels.set(`${hero.id}:${skill.definitionId}`, skill.level);
       });
@@ -105,8 +112,22 @@ export class NotificationCenter {
     this.latestSocialEventId = socialEvents[0]?.id ?? 0;
     this.lastExpeditionPhase = expedition.phase;
     this.lastProvisionStatus = economy?.provisionStatus ?? "Stocked";
+    this.lastSmithyCompletionId = crafting?.lastCompletion?.jobId ?? null;
     fallenHeroes.forEach((record) => this.knownMemorialIds.add(record.heroId));
     this.initialized = true;
+  }
+
+  private captureSmithyCompletion(crafting: Readonly<CraftingSnapshot>): void {
+    const completion = crafting.lastCompletion;
+    if (!completion || completion.jobId === this.lastSmithyCompletionId) return;
+    this.lastSmithyCompletionId = completion.jobId;
+    this.push(
+      completion.kind === "Repair"
+        ? "Smithy work complete · Equipment restored."
+        : `Smithy work complete · ${completion.quality ?? "Normal"} equipment forged.`,
+      "success",
+      20_000,
+    );
   }
 
   private captureMemorialChanges(fallenHeroes: readonly Readonly<FallenHeroRecord>[]): void {
@@ -133,6 +154,7 @@ export class NotificationCenter {
         this.injurySignatures.set(hero.id, this.getInjurySignature(hero));
         this.recoveryOutcomes.set(hero.id, hero.recovery.lastOutcome);
         this.traitNames.set(hero.id, new Set(hero.traits));
+        this.heroClasses.set(hero.id, hero.heroClass);
         Object.values(hero.skillForge.known).forEach((skill) => {
           this.skillLevels.set(`${hero.id}:${skill.definitionId}`, skill.level);
         });
@@ -167,6 +189,11 @@ export class NotificationCenter {
           this.push(`${hero.name} earned ${trait.name} · ${trait.reason}`, "success", 30_000);
         });
       this.traitNames.set(hero.id, new Set(hero.traits));
+      const previousClass = this.heroClasses.get(hero.id) ?? "Unclassified";
+      if (hero.heroClass !== previousClass) {
+        this.push(`${hero.name} chose the ${hero.heroClass} path.`, "success", 20_000);
+      }
+      this.heroClasses.set(hero.id, hero.heroClass);
       Object.values(hero.skillForge.known).forEach((skill) => {
         const key = `${hero.id}:${skill.definitionId}`;
         const previousLevel = this.skillLevels.get(key);

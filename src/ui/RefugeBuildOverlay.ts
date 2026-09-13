@@ -29,6 +29,7 @@ interface RefugeBuildActions {
   enter(): void;
   exit(): void;
   nudge(dx: number, dz: number): void;
+  openSmithy(): void;
   pan(dx: number, dz: number): void;
   removeEnvironment(): void;
   rotate(): void;
@@ -132,7 +133,7 @@ export class RefugeBuildOverlay {
             if (!recipe) return "";
             const progress = site.state === "Complete" ? 100 : Math.round(site.progressMinutes / recipe.durationMinutes * 100);
             const eligible = state.heroes.filter((hero) => !hero.training.active && !hero.injuries.some((injury) => !injury.permanent));
-            return `<article data-site-state="${site.state}"><strong>${recipe.label}</strong><span>${site.state} · ${progress}%</span><progress max="100" value="${progress}"></progress><div>${site.state === "Complete" ? `<small>${recipe.service} · Operational</small>` : eligible.map((hero) => `<button type="button" data-site-id="${site.id}" data-builder-id="${hero.id}" aria-pressed="${site.builderIds.includes(hero.id)}">${site.builderIds.includes(hero.id) ? "✓ " : ""}${hero.name}</button>`).join("")}</div></article>`;
+            return `<article data-site-state="${site.state}"><strong>${recipe.label}</strong><span>${site.state} · ${progress}%</span><progress max="100" value="${progress}"></progress><div>${site.state === "Complete" ? `<small>${recipe.service} · Operational</small>${site.recipeId === "smithy" ? `<button type="button" data-build-action="open-smithy">Open Smithy</button>` : ""}` : eligible.map((hero) => `<button type="button" data-site-id="${site.id}" data-builder-id="${hero.id}" aria-pressed="${site.builderIds.includes(hero.id)}">${site.builderIds.includes(hero.id) ? "✓ " : ""}${hero.name}</button>`).join("")}</div></article>`;
           }).join("")}
         </section>
         <small>${facility ? `${facility.kind} · ${facility.placed ? "Placed" : "Stored"} · ${Math.round(state.rotation * 180 / Math.PI)}°` : `${state.layout.planeSize}×${state.layout.planeSize} field · ${state.layout.trails.length} trail segments · expansion prepared, locked`}</small>
@@ -180,6 +181,7 @@ export class RefugeBuildOverlay {
     if (action === "cancel") this.actions.cancel();
     if (action === "store") this.actions.store();
     if (action === "remove-environment") this.actions.removeEnvironment();
+    if (action === "open-smithy") this.actions.openSmithy();
     if (action === "undo") this.actions.undo();
   };
 

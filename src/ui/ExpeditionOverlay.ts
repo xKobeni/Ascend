@@ -182,7 +182,7 @@ export class ExpeditionOverlay {
   }
 
   private renderResources(resources: Readonly<ExpeditionSnapshot["resources"]>, includeMedicine = false): string {
-    return `<div class="expedition-overlay__resources"><span><b>${resources.scrap}</b> Scrap</span><span><b>${resources.food}</b> Food</span>${includeMedicine ? `<span><b>${resources.medicine}</b> Medicine</span>` : ""}<span><b>${resources.riftShards}</b> Rift Shards</span></div>`;
+    return `<div class="expedition-overlay__resources"><span><b>${resources.scrap}</b> Scrap</span><span><b>${resources.metal}</b> Metal</span><span><b>${resources.food}</b> Food</span>${includeMedicine ? `<span><b>${resources.medicine}</b> Medicine</span>` : ""}<span><b>${resources.riftShards}</b> Rift Shards</span></div>`;
   }
 
   private renderStockpile(resources: Readonly<ExpeditionSnapshot["resources"]>): string {
